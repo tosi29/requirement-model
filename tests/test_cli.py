@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -100,6 +101,30 @@ def test_explain_unknown_node(capsys):
 def test_explain_edge_filter_rejects_unknown_edge(capsys):
     assert main(["explain", "FR-3", "-f", SAMPLE, "--edges", "nope"]) == 2
     assert "未知のエッジ種別" in capsys.readouterr().err
+
+
+def test_plan_command(tmp_path: Path, capsys, monkeypatch):
+    def git(*args: str) -> None:
+        subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)
+
+    git("init")
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "t")
+    definition = tmp_path / "requirements.py"
+    definition.write_text(
+        HEADER + 'n = Need(id="N-1", text="早く精算したい")\n', encoding="utf-8"
+    )
+    git("add", "requirements.py")
+    git("commit", "-m", "first")
+    definition.write_text(
+        HEADER + 'n = Need(id="N-1", text="今すぐ精算したい")\n', encoding="utf-8"
+    )
+
+    monkeypatch.chdir(tmp_path)
+    assert main(["plan"]) == 0
+    out = capsys.readouterr().out
+    assert "# 構造 diff (HEAD → 作業ツリー)" in out
+    assert "text: 早く精算したい → 今すぐ精算したい" in out
 
 
 def test_export_command(capsys):

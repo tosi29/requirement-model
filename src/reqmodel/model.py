@@ -1,0 +1,328 @@
+"""メタモデル: ノード型・エッジ型の定義。
+
+設計方針:
+- 意味内容 (text) は自然言語のまま保持し、形式化しない。
+- 構造 (型・エッジ) だけを Pydantic のフィールド型として形式化する。
+- エッジは ``list[Ref[T]]`` の形で宣言し、型規則をフィールド型そのもので表現する。
+  これにより mypy と IDE 補完が記述時点から効く。
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
+
+from pydantic import BaseModel, BeforeValidator, ConfigDict, field_validator
+
+__all__ = [
+    "Node",
+    "Sourced",
+    "Requirement",
+    "Goal",
+    "Need",
+    "FunctionalRequirement",
+    "QualityRequirement",
+    "Constraint",
+    "Source",
+    "System",
+    "Decision",
+    "FR",
+    "QR",
+    "Ref",
+    "Status",
+    "EdgeSpec",
+    "NODE_TYPES",
+    "TYPE_ORDER",
+    "edge_specs_for",
+    "STATUS_RANK",
+    "HIGH_PRIORITY_THRESHOLD",
+]
+
+
+# ---------------------------------------------------------------------------
+# 基本語彙
+# ---------------------------------------------------------------------------
+
+Status = Literal["proposed", "approved", "implemented", "verified"]
+
+#: 状態の成熟度。上流ノードは下流ノード以上に成熟しているべき、という検査に使う。
+STATUS_RANK: dict[str, int] = {
+    "proposed": 0,
+    "approved": 1,
+    "implemented": 2,
+    "verified": 3,
+}
+
+#: priority は「小さいほど高優先」。この値以下を高優先度として扱う。
+HIGH_PRIORITY_THRESHOLD = 2
+
+
+class RefMarker:
+    """``Ref[...]`` であることを実行時に識別するためのマーカ。"""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:  # pragma: no cover - デバッグ表示のみ
+        return "RefMarker()"
+
+
+def _to_id(value: Any) -> Any:
+    """ノードインスタンスを受け取ったら id 文字列に正規化する。"""
+    if isinstance(value, Node):
+        return value.id
+    return value
+
+
+T = TypeVar("T")
+
+#: 他ノードへの参照。定義ファイルではノード変数そのものを書け、内部では id 文字列になる。
+Ref = Annotated[Union[T, str], BeforeValidator(_to_id), RefMarker()]
+
+
+def _strip_terminator(text: str) -> str:
+    return text.strip().rstrip("。.")
+
+
+# ---------------------------------------------------------------------------
+# ノード型
+# ---------------------------------------------------------------------------
+
+
+class Node(BaseModel):
+    """全ノード共通の属性。"""
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    id: str
+    text: str
+    status: Status = "proposed"
+    priority: int | None = None
+
+    @field_validator("id")
+    @classmethod
+    def _check_id(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("id は空にできない")
+        if any(c.isspace() for c in value):
+            raise ValueError("id に空白を含めることはできない")
+        return value
+
+    @field_validator("text")
+    @classmethod
+    def _check_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("text は空にできない")
+        return value
+
+
+class Sourced(Node):
+    """源泉トレースを持つノード (Goal / Need / FR / QR / Constraint)。"""
+
+    has_source: list[Ref["Source"]] = []
+
+
+class Requirement(Sourced):
+    """FR と QR の共通部分。受け入れ基準を持つ。"""
+
+    acceptance_criteria: list[str] = []
+
+
+class Goal(Sourced):
+    """事業・ステークホルダーの意図 (なぜ)。"""
+
+    #: この Goal を分解した子 Goal 群の結合方法。
+    decomposition: Literal["AND", "OR"] = "AND"
+    #: 自分がどの親 Goal を詳細化しているか (子 → 親)。
+    refines: list[Ref["Goal"]] = []
+    motivates: list[Ref["Need"]] = []
+
+
+class Need(Sourced):
+    """何が満たされたいか。語尾は願望形「〜たい」。
+
+    指示書の例示は「〜したい」だが、「気づきたい」「知りたい」のように
+    サ変以外の願望形も同じ語尾規則の対象とみなし、「〜たい」で判定する。
+    """
+
+    @field_validator("text")
+    @classmethod
+    def _check_suffix(cls, value: str) -> str:
+        if not _strip_terminator(value).endswith("たい"):
+            raise ValueError("Need の text は願望形「〜したい」/「〜たい」で終わること")
+        return value
+
+
+class FunctionalRequirement(Requirement):
+    """システムが提供すべき機能。語尾は「〜すること」。
+
+    指示書の例示は「〜すること」だが、「読み取ること」「送ること」のように
+    サ変以外の動詞も同じ語尾規則の対象とみなし、「〜こと」で判定する。
+    """
+
+    satisfies: list[Ref[Need]] = []
+    refines: list[Ref["FunctionalRequirement"]] = []
+    conflicts: list[Ref[Requirement]] = []
+
+    @field_validator("text")
+    @classmethod
+    def _check_suffix(cls, value: str) -> str:
+        if not _strip_terminator(value).endswith("こと"):
+            raise ValueError(
+                "FunctionalRequirement の text は「〜すること」/「〜こと」で終わること"
+            )
+        return value
+
+
+class QualityRequirement(Requirement):
+    """品質要求。qualifies を出せるのは QR だけ。"""
+
+    qualifies: list[Ref[Union["FunctionalRequirement", "System"]]] = []
+    conflicts: list[Ref[Requirement]] = []
+
+
+class Constraint(Sourced):
+    """解決策の自由度を制限する条件。要求ではない。"""
+
+    constrains: list[
+        Ref[Union["FunctionalRequirement", "QualityRequirement", "Decision"]]
+    ] = []
+
+
+class Source(Node):
+    """要求の源泉。構造的振る舞いが同一なので単一型とし kind で分類する。"""
+
+    kind: Literal["stakeholder", "document", "existing_system"]
+
+
+class System(Node):
+    """全体品質の張り先となるノード。"""
+
+
+class Decision(Node):
+    """conflict 解消の記録。"""
+
+    resolves: list[tuple[Ref[Requirement], Ref[Requirement]]] = []
+
+
+#: 短縮名 (指示書中の FR / QR 表記に対応)。
+FR = FunctionalRequirement
+QR = QualityRequirement
+
+
+#: 出力順序を安定させるための型の並び。
+TYPE_ORDER: tuple[type[Node], ...] = (
+    Goal,
+    Need,
+    FunctionalRequirement,
+    QualityRequirement,
+    Constraint,
+    Decision,
+    System,
+    Source,
+)
+
+NODE_TYPES: dict[str, type[Node]] = {t.__name__: t for t in TYPE_ORDER}
+NODE_TYPES["FR"] = FunctionalRequirement
+NODE_TYPES["QR"] = QualityRequirement
+
+TYPE_INDEX: dict[str, int] = {t.__name__: i for i, t in enumerate(TYPE_ORDER)}
+
+
+# ---------------------------------------------------------------------------
+# エッジ仕様 (フィールド型注釈から機械的に導出する)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class EdgeSpec:
+    """1 つのエッジ型の仕様。ノード型のフィールド注釈から導出される。"""
+
+    name: str
+    owner: type[Node]
+    targets: tuple[type[Node], ...]
+    #: 要素がペア (tuple) かどうか。resolves のみ True。
+    pair: bool = False
+    #: 対称エッジかどうか。conflicts のみ True。
+    symmetric: bool = False
+
+    def target_names(self) -> str:
+        return " | ".join(t.__name__ for t in self.targets)
+
+
+SYMMETRIC_EDGES = frozenset({"conflicts"})
+
+
+def _analyze(annotation: Any) -> tuple[tuple[type, ...], bool]:
+    """注釈を辿り (参照先型, ペアかどうか) を返す。参照でなければ空タプル。"""
+    origin = get_origin(annotation)
+
+    if origin is Annotated:
+        args = get_args(annotation)
+        if any(isinstance(meta, RefMarker) for meta in args[1:]):
+            targets = tuple(
+                arg
+                for arg in (get_args(args[0]) or (args[0],))
+                if isinstance(arg, type) and arg is not str
+            )
+            return targets, False
+        return _analyze(args[0])
+
+    if origin in (list, set, frozenset, tuple) or origin is Union:
+        collected: list[type] = []
+        pair = origin is tuple
+        for arg in get_args(annotation):
+            if arg is Ellipsis:
+                continue
+            sub_targets, sub_pair = _analyze(arg)
+            pair = pair or sub_pair
+            for target in sub_targets:
+                if target not in collected:
+                    collected.append(target)
+        return tuple(collected), pair
+
+    return (), False
+
+
+def _build_edge_specs() -> dict[type[Node], dict[str, EdgeSpec]]:
+    specs: dict[type[Node], dict[str, EdgeSpec]] = {}
+    for node_type in TYPE_ORDER:
+        hints = get_type_hints(node_type, include_extras=True)
+        found: dict[str, EdgeSpec] = {}
+        for field_name in node_type.model_fields:
+            targets, pair = _analyze(hints.get(field_name))
+            if not targets:
+                continue
+            found[field_name] = EdgeSpec(
+                name=field_name,
+                owner=node_type,
+                targets=tuple(targets),
+                pair=pair,
+                symmetric=field_name in SYMMETRIC_EDGES,
+            )
+        specs[node_type] = found
+    return specs
+
+
+_EDGE_SPECS: dict[type[Node], dict[str, EdgeSpec]] = _build_edge_specs()
+
+
+def edge_specs_for(node_type: type[Node]) -> dict[str, EdgeSpec]:
+    """ノード型が持つエッジ仕様を返す。"""
+    return _EDGE_SPECS[node_type]
+
+
+#: エッジ名の一覧 (CLI のフィルタ指定などに使う)。
+EDGE_NAMES: tuple[str, ...] = tuple(
+    dict.fromkeys(
+        name for specs in _EDGE_SPECS.values() for name in specs
+    )
+)

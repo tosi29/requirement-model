@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reqmodel"
+version = "0.1.0"
+description = "要求を型付き有向グラフとして宣言的に記述し、機械的に検証・影響分析するツール"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.6"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "mypy>=1.8"]
+
+[project.scripts]
+req = "reqmodel.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+files = ["src", "examples"]

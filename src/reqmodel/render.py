@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from typing import Iterable
 
+from typing import Any
+
 from .graph import RequirementGraph
 from .model import (
+    TYPE_ORDER,
     Constraint,
     Decision,
     FunctionalRequirement,
@@ -17,7 +20,7 @@ from .model import (
     System,
 )
 
-__all__ = ["render_mermaid", "render_dot", "FORMATS"]
+__all__ = ["render_mermaid", "render_dot", "render_meta", "FORMATS"]
 
 FORMATS = ("mermaid", "dot")
 
@@ -59,6 +62,24 @@ _EDGE_STYLE_MERMAID = {
     "conflicts": "-.->",
     "has_source": "-.->",
 }
+
+
+def render_meta() -> dict[str, Any]:
+    """型ごとの描画情報。ブラウザ側で Mermaid を組み立てるために書き出す。
+
+    形状・配色の定義をこのモジュールに一本化し、静的サイト側に複製しないための出口。
+    """
+    return {
+        "types": {
+            node_type.__name__: {
+                "shape": list(_MERMAID_SHAPE[node_type]),
+                "style": _MERMAID_CLASSDEF[node_type.__name__],
+            }
+            for node_type in TYPE_ORDER
+        },
+        "edge_arrows": dict(_EDGE_STYLE_MERMAID),
+        "default_arrow": "-->",
+    }
 
 
 def _truncate(text: str, limit: int) -> str:

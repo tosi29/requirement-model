@@ -1,0 +1,66 @@
+name: Pages
+
+# 要求グラフの閲覧用サイトをビルドし、GitHub Pages に公開する。
+# Pages の設定で Source を "GitHub Actions" にしておくこと。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 公開は同時に 1 つだけ。実行中のデプロイは中断しない。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: インストール
+        run: pip install -e ".[dev]"
+
+      - name: テスト
+        run: pytest -q
+
+      - name: 定義ファイルを検証する
+        run: req validate examples/sample.py
+
+      - name: 静的サイトを生成する
+        run: |
+          req site examples/sample.py \
+            --output site \
+            --title "要求グラフ (examples/sample.py)" \
+            --mermaid mermaid.min.js
+
+      - name: Mermaid を同梱する
+        # 公開ページから外部への通信を無くすため、描画ライブラリを一緒に置く。
+        # URL (バージョン込み) は reqmodel 側の定義を唯一の出典とする。
+        run: |
+          curl -fsSL --retry 3 -o site/mermaid.min.js \
+            "$(python -c 'from reqmodel.site import MERMAID_URL; print(MERMAID_URL)')"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

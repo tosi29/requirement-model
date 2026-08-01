@@ -43,6 +43,7 @@ $ req plan     [PATH ...] [--rev HEAD]     # git 前版との構造 diff → 影
 $ req graph    [PATH ...] [--format mermaid|dot] [-o FILE]
 $ req explain  ID [ID ...] [-f PATH]       # 影響部分グラフを LLM 用に整形
 $ req export   [PATH ...] [-o FILE]        # 正規化 JSON の出力
+$ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (GitHub Pages 用)
 ```
 
 `PATH` を省略するとカレントの `requirements.py` または `requirements/` を探す。
@@ -63,6 +64,7 @@ $ req export   [PATH ...] [-o FILE]        # 正規化 JSON の出力
 | `--depth N` | explain | 探索の深さ上限 |
 | `--undirected` | explain | エッジの向きを無視して辿る |
 | `--highlight ID,ID` | graph | 指定ノードを強調する |
+| `--title` / `--mermaid` | site | ページ題名 / 描画ライブラリの参照先 |
 
 ## 定義ファイルの規約 (宣言のみ)
 
@@ -202,6 +204,48 @@ impact(n) = ancestors(n) ∪ descendants(n)   # --edges でエッジ型を絞れ
 ```console
 $ req explain FR-3 -f examples/sample.py --undirected --depth 2
 ```
+
+## 可視化
+
+3 通りある。用途で使い分ける。
+
+| 出力 | コマンド | 用途 |
+|---|---|---|
+| Mermaid | `req graph --format mermaid` | Markdown / PR 本文にそのまま貼る |
+| DOT | `req graph --format dot` | Graphviz で画像に落とす |
+| 静的サイト | `req site` | ブラウザで探索する。GitHub Pages で公開する |
+
+`req site` が出す 1 枚の HTML は、グラフの描画に加えて次のことができる。
+
+- ノードをクリックすると、**影響範囲を色分け表示** (選択=赤 / 上流=青 / 下流=緑 / 無関係=減光)
+- ノード種別・エッジ種別の絞り込み。**絞り込みは影響範囲の計算にも効く**
+  (`req explain --edges` と同じ考え方)
+- 本文・受け入れ基準・出入りのエッジ・そのノードへの指摘を右ペインに表示
+- 「影響部分グラフをコピー」で `req explain` 相当のテキストをクリップボードへ (LLM 連携用)
+- 検証結果の一覧。指摘をクリックすると該当ノードへ飛ぶ
+
+出力ディレクトリには `index.html` のほか、`model.json` (正規化 JSON) と
+`graph.mmd` / `graph.dot` も置かれる。
+
+```console
+$ req site examples/sample.py -o site --title "経費精算システムの要求グラフ"
+$ python -m http.server -d site
+```
+
+描画には Mermaid (バージョン固定の UMD ビルド) を使う。既定では CDN を参照するが、
+`--mermaid mermaid.min.js` を渡して同じディレクトリに UMD ビルドを置けば、
+外部への通信が一切無い自己完結のサイトになる。Pages のワークフローはこの方式で公開する。
+
+## GitHub Pages への公開
+
+`.github/workflows/pages.yml` が、`main` への push (と手動実行) をきっかけに
+テスト → `req validate` → `req site` → デプロイまで行う。検証が通らなければ公開されない。
+
+**リポジトリ側の設定が 1 つだけ必要**: Settings → Pages → Build and deployment の
+Source を **GitHub Actions** にする。これは API やワークフローからは設定できない。
+
+公開されるのは `examples/sample.py` のグラフ。自分の定義ファイルを公開するときは
+ワークフロー中の `req validate` / `req site` の引数を差し替える。
 
 ## 開発
 

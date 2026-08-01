@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%94%97%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #ffffff;
+  --panel: #f7f8fa;
+  --border: #dfe3e8;
+  --fg: #1f2328;
+  --muted: #656d76;
+  --accent: #3b6fd4;
+  --error: #d93025;
+  --severe: #e8710a;
+  --warning: #b8860b;
+  --info: #5f6368;
+  --shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216;
+    --panel: #161b22;
+    --border: #2b3440;
+    --fg: #e6edf3;
+    --muted: #9198a1;
+    --accent: #6ea8fe;
+    --error: #ff7b72;
+    --severe: #ffa657;
+    --warning: #e3b341;
+    --info: #9198a1;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.6;
+}
+header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: baseline;
+}
+header h1 { font-size: 17px; margin: 0; }
+header .sub { color: var(--muted); font-size: 12px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.chip {
+  font-size: 12px;
+  padding: 2px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  white-space: nowrap;
+}
+.chip.error { color: var(--error); border-color: var(--error); }
+.chip.severe { color: var(--severe); border-color: var(--severe); }
+.chip.warning { color: var(--warning); border-color: var(--warning); }
+main {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  gap: 0;
+  height: calc(100vh - 56px);
+}
+@media (max-width: 1100px) {
+  main { grid-template-columns: 1fr; height: auto; }
+  .pane { max-height: none !important; }
+}
+.pane { overflow-y: auto; padding: 14px; border-right: 1px solid var(--border); }
+.pane:last-child { border-right: 0; border-left: 1px solid var(--border); }
+.graph-pane { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.toolbar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.graph-scroll { flex: 1; overflow: auto; padding: 12px; min-height: 420px; }
+#graph { transform-origin: top left; }
+#graph svg { max-width: none; height: auto; }
+h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  margin: 18px 0 8px;
+}
+h2:first-child { margin-top: 0; }
+button, select, input[type="search"] {
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+input[type="search"] { cursor: text; width: 100%; }
+button:hover { border-color: var(--accent); }
+label.toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  padding: 2px 0;
+  cursor: pointer;
+}
+label.toggle .count { margin-left: auto; color: var(--muted); font-size: 11px; }
+ul.plain { list-style: none; margin: 0; padding: 0; }
+ul.plain li { padding: 3px 0; }
+.node-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 7px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.node-btn:hover { background: var(--panel); }
+.node-btn .id { font-weight: 600; }
+.node-btn .type { color: var(--muted); font-size: 11px; }
+.node-btn.active { background: var(--panel); outline: 1px solid var(--accent); }
+.finding {
+  border-left: 3px solid var(--border);
+  padding: 5px 9px;
+  margin-bottom: 7px;
+  background: var(--panel);
+  border-radius: 0 6px 6px 0;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.finding.error { border-left-color: var(--error); }
+.finding.severe { border-left-color: var(--severe); }
+.finding.warning { border-left-color: var(--warning); }
+.finding.info { border-left-color: var(--info); }
+.finding .code { color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; }
+.detail h3 { margin: 0 0 4px; font-size: 15px; }
+.detail .text { margin: 0 0 10px; }
+.detail dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0 0 12px; font-size: 13px; }
+.detail dt { color: var(--muted); }
+.detail dd { margin: 0; }
+.detail .edge { font-family: ui-monospace, monospace; font-size: 12px; }
+.empty { color: var(--muted); font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; color: var(--muted); }
+footer { padding: 10px 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+code { font-family: ui-monospace, monospace; background: var(--panel); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+.hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>__TITLE__</h1>
+  <span class="sub" id="sources"></span>
+  <span class="chips" id="stats"></span>
+</header>
+
+<main>
+  <aside class="pane">
+    <h2>ノード検索</h2>
+    <input type="search" id="search" placeholder="id / 本文で絞り込む" autocomplete="off">
+    <ul class="plain" id="node-list"></ul>
+
+    <h2>ノード種別</h2>
+    <div id="type-filters"></div>
+
+    <h2>エッジ種別</h2>
+    <div id="edge-filters"></div>
+    <p class="hint">エッジを絞ると、影響範囲の計算もその種別だけで行われる。</p>
+  </aside>
+
+  <section class="graph-pane">
+    <div class="toolbar">
+      <button id="zoom-out" title="縮小">−</button>
+      <button id="zoom-in" title="拡大">＋</button>
+      <button id="zoom-reset">等倍</button>
+      <button id="zoom-fit">全体表示</button>
+      <select id="direction">
+        <option value="TD">縦 (TD)</option>
+        <option value="LR">横 (LR)</option>
+      </select>
+      <button id="clear">選択解除</button>
+      <span class="legend" id="legend"></span>
+    </div>
+    <div class="graph-scroll"><div id="graph"></div></div>
+  </section>
+
+  <aside class="pane detail">
+    <h2>ノード詳細</h2>
+    <div id="detail"><p class="empty">グラフのノードをクリックすると、本文・受け入れ基準・影響範囲を表示する。</p></div>
+
+    <h2>検証結果</h2>
+    <div id="findings"></div>
+  </aside>
+</main>
+
+<footer>
+  静的サイトは <code>req site</code> が生成する。同じデータの生出力は
+  <a href="model.json">model.json</a> / <a href="graph.mmd">graph.mmd</a> /
+  <a href="graph.dot">graph.dot</a>。
+</footer>
+
+<script type="application/json" id="model-data">__DATA__</script>
+<script src="__MERMAID_URL__"></script>
+<script type="module">
+const mermaid = window.mermaid;
+
+const DATA = JSON.parse(document.getElementById("model-data").textContent);
+const byId = new Map(DATA.nodes.map((n) => [n.id, n]));
+const state = {
+  types: new Set(DATA.types),
+  edges: new Set(DATA.edge_names),
+  selected: null,
+  direction: "TD",
+  zoom: 1,
+  fitPending: true,
+};
+let renderSeq = 0;
+
+const isDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+const mermaidConfig = () => ({
+  startOnLoad: false,
+  securityLevel: "loose",
+  theme: isDark() ? "dark" : "default",
+  flowchart: { useMaxWidth: false, htmlLabels: true },
+});
+if (mermaid) mermaid.initialize(mermaidConfig());
+
+// --- 表示対象 --------------------------------------------------------------
+
+const visibleNodes = () => DATA.nodes.filter((n) => state.types.has(n.type));
+const visibleEdges = () =>
+  DATA.edges.filter(
+    (e) =>
+      state.edges.has(e.name) &&
+      state.types.has(byId.get(e.source).type) &&
+      state.types.has(byId.get(e.target).type),
+  );
+
+function reach(start, forward) {
+  const edges = visibleEdges();
+  const seen = new Set();
+  const queue = [start];
+  while (queue.length) {
+    const current = queue.shift();
+    for (const edge of edges) {
+      const from = forward ? edge.source : edge.target;
+      const to = forward ? edge.target : edge.source;
+      if (from !== current || to === start || seen.has(to)) continue;
+      seen.add(to);
+      queue.push(to);
+    }
+  }
+  return seen;
+}
+
+// --- Mermaid の組み立て ----------------------------------------------------
+
+const safeId = (id) => "n_" + id.replace(/[^A-Za-z0-9_]/g, "_");
+const escapeLabel = (text) =>
+  text.replace(/\\/g, "＼").replace(/"/g, "#quot;").replace(/</g, "#lt;").replace(/>/g, "#gt;");
+const truncate = (text, limit = 42) =>
+  text.length > limit ? text.slice(0, limit - 1) + "…" : text;
+
+function buildMermaid() {
+  const nodes = visibleNodes();
+  const edges = visibleEdges();
+  const lines = [`flowchart ${state.direction}`];
+
+  for (const node of nodes) {
+    const [open, close] = DATA.meta.types[node.type].shape;
+    const label = `<b>${node.id}</b> [${node.type}]<br/>${escapeLabel(truncate(node.text))}`;
+    lines.push(`  ${safeId(node.id)}${open}"${label}"${close}`);
+  }
+  for (const edge of edges) {
+    const arrow = DATA.meta.edge_arrows[edge.name] || DATA.meta.default_arrow;
+    lines.push(`  ${safeId(edge.source)} ${arrow}|${edge.name}| ${safeId(edge.target)}`);
+  }
+  for (const [type, meta] of Object.entries(DATA.meta.types)) {
+    lines.push(`  classDef ${type} ${meta.style}`);
+  }
+  for (const node of nodes) lines.push(`  class ${safeId(node.id)} ${node.type}`);
+
+  if (state.selected && byId.has(state.selected)) {
+    const up = reach(state.selected, false);
+    const down = reach(state.selected, true);
+    lines.push("  classDef sel stroke:#d93025,stroke-width:4px");
+    lines.push("  classDef up stroke:#1a73e8,stroke-width:2.5px");
+    lines.push("  classDef down stroke:#188038,stroke-width:2.5px");
+    lines.push("  classDef dim opacity:0.35");
+    for (const node of nodes) {
+      if (node.id === state.selected) lines.push(`  class ${safeId(node.id)} sel`);
+      else if (up.has(node.id)) lines.push(`  class ${safeId(node.id)} up`);
+      else if (down.has(node.id)) lines.push(`  class ${safeId(node.id)} down`);
+      else lines.push(`  class ${safeId(node.id)} dim`);
+    }
+  }
+  for (const node of nodes) {
+    lines.push(`  click ${safeId(node.id)} call selectNode("${node.id}")`);
+  }
+  return lines.join("\n");
+}
+
+const graphEl = document.getElementById("graph");
+
+function applyZoom(value) {
+  state.zoom = Math.min(3, Math.max(0.2, value));
+  graphEl.style.transform = `scale(${state.zoom})`;
+}
+
+async function renderGraph() {
+  if (!mermaid) {
+    graphEl.innerHTML =
+      '<p class="empty">Mermaid を読み込めなかった。図の元データは <a href="graph.mmd">graph.mmd</a> / <a href="graph.dot">graph.dot</a> にある。</p>';
+    return;
+  }
+  const source = buildMermaid();
+  try {
+    const { svg, bindFunctions } = await mermaid.render(`svg-${++renderSeq}`, source);
+    graphEl.innerHTML = svg;
+    if (bindFunctions) bindFunctions(graphEl);
+  } catch (error) {
+    graphEl.innerHTML = `<p class="empty">グラフを描画できなかった: ${error}</p>`;
+  }
+  if (state.fitPending) {
+    state.fitPending = false;
+    fitToView();
+  } else {
+    applyZoom(state.zoom);
+  }
+}
+
+/** グラフ全体が枠に収まる倍率にする。 */
+function fitToView() {
+  const svg = graphEl.querySelector("svg");
+  const frame = document.querySelector(".graph-scroll");
+  if (!svg || !frame) return;
+  graphEl.style.transform = "scale(1)";
+  const box = svg.getBoundingClientRect();
+  if (!box.width || !box.height) return;
+  const scale = Math.min(
+    (frame.clientWidth - 24) / box.width,
+    (frame.clientHeight - 24) / box.height,
+    1,
+  );
+  applyZoom(scale);
+  frame.scrollTo(0, 0);
+}
+
+// --- 詳細パネル ------------------------------------------------------------
+
+const EDGE_FIELDS = DATA.edge_names;
+
+function nodeContext(id) {
+  const node = byId.get(id);
+  const up = [...reach(id, false)];
+  const down = [...reach(id, true)];
+  const lines = [`# 影響部分グラフ: ${id}`, ""];
+  lines.push(`対象 1 件 / 上流 ${up.length} 件 / 下流 ${down.length} 件`, "");
+  const describe = (target) => {
+    const other = byId.get(target);
+    const attrs = [`status=${other.status}`];
+    if (other.priority !== null && other.priority !== undefined) attrs.push(`priority=${other.priority}`);
+    if (other.kind) attrs.push(`kind=${other.kind}`);
+    const rows = [`- [${other.type}] ${other.id}: ${other.text}`, `    (${attrs.join(", ")})`];
+    for (const criterion of other.acceptance_criteria || []) rows.push(`    受け入れ基準: ${criterion}`);
+    return rows.join("\n");
+  };
+  lines.push("## 対象ノード", describe(id), "");
+  if (up.length) lines.push("## 上流 (この変更の理由・根拠になるノード)", ...up.map(describe), "");
+  if (down.length) lines.push("## 下流 (この変更の影響を受けるノード)", ...down.map(describe), "");
+  const whole = new Set([id, ...up, ...down]);
+  const edges = visibleEdges().filter((e) => whole.has(e.source) && whole.has(e.target));
+  if (edges.length) {
+    lines.push("## 部分グラフのエッジ");
+    for (const edge of edges) lines.push(`- ${edge.source} --${edge.name}--> ${edge.target}`);
+  }
+  return lines.join("\n");
+}
+
+function renderDetail() {
+  const panel = document.getElementById("detail");
+  if (!state.selected || !byId.has(state.selected)) {
+    panel.innerHTML = '<p class="empty">グラフのノードをクリックすると、本文・受け入れ基準・影響範囲を表示する。</p>';
+    return;
+  }
+  const node = byId.get(state.selected);
+  const up = [...reach(node.id, false)];
+  const down = [...reach(node.id, true)];
+  const outgoing = visibleEdges().filter((e) => e.source === node.id);
+  const incoming = visibleEdges().filter((e) => e.target === node.id);
+
+  const rows = [];
+  rows.push(`<h3>${node.id} <span class="node-btn type">[${node.type}]</span></h3>`);
+  rows.push(`<p class="text">${escapeHtml(node.text)}</p>`);
+  rows.push("<dl>");
+  rows.push(`<dt>status</dt><dd>${node.status}</dd>`);
+  if (node.priority !== null && node.priority !== undefined) rows.push(`<dt>priority</dt><dd>${node.priority}</dd>`);
+  if (node.kind) rows.push(`<dt>kind</dt><dd>${node.kind}</dd>`);
+  if (node.decomposition) rows.push(`<dt>分解</dt><dd>${node.decomposition}</dd>`);
+  rows.push(`<dt>上流</dt><dd>${up.length} 件</dd>`);
+  rows.push(`<dt>下流</dt><dd>${down.length} 件</dd>`);
+  rows.push("</dl>");
+
+  if ((node.acceptance_criteria || []).length) {
+    rows.push("<h2>受け入れ基準</h2><ul>");
+    for (const criterion of node.acceptance_criteria) rows.push(`<li>${escapeHtml(criterion)}</li>`);
+    rows.push("</ul>");
+  }
+
+  const edgeList = (edges, direction) =>
+    edges
+      .map((edge) => {
+        const other = direction === "out" ? edge.target : edge.source;
+        const arrow = direction === "out" ? `--${edge.name}-->` : `<--${edge.name}--`;
+        return `<li class="edge"><button class="node-btn" data-id="${other}">${arrow} ${other}</button></li>`;
+      })
+      .join("");
+
+  if (outgoing.length) rows.push(`<h2>出るエッジ</h2><ul class="plain">${edgeList(outgoing, "out")}</ul>`);
+  if (incoming.length) rows.push(`<h2>入るエッジ</h2><ul class="plain">${edgeList(incoming, "in")}</ul>`);
+
+  const nodeFindings = DATA.findings.filter((f) => f.node_id === node.id);
+  if (nodeFindings.length) {
+    rows.push("<h2>このノードへの指摘</h2>");
+    for (const finding of nodeFindings) rows.push(findingHtml(finding));
+  }
+
+  rows.push('<h2>LLM 連携</h2><button id="copy-context">影響部分グラフをコピー</button>');
+  rows.push('<p class="hint"><code>req explain</code> と同じ内容をクリップボードに入れる。</p>');
+  panel.innerHTML = rows.join("");
+
+  panel.querySelectorAll("button[data-id]").forEach((button) => {
+    button.addEventListener("click", () => selectNode(button.dataset.id));
+  });
+  const copyButton = document.getElementById("copy-context");
+  copyButton.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(nodeContext(node.id));
+      copyButton.textContent = "コピーした";
+    } catch {
+      copyButton.textContent = "コピーできなかった";
+    }
+    setTimeout(() => (copyButton.textContent = "影響部分グラフをコピー"), 1600);
+  });
+}
+
+const escapeHtml = (text) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function findingHtml(finding) {
+  const where = finding.node_id ? ` (${finding.node_id})` : "";
+  return `<div class="finding ${finding.severity}" data-id="${finding.node_id || ""}">
+    <div class="code">${finding.severity.toUpperCase()} · L${finding.layer} · ${finding.code}${where}</div>
+    <div>${escapeHtml(finding.message)}</div>
+  </div>`;
+}
+
+// --- 左サイドバー ----------------------------------------------------------
+
+function renderNodeList() {
+  const query = document.getElementById("search").value.trim().toLowerCase();
+  const list = document.getElementById("node-list");
+  const matched = visibleNodes().filter(
+    (node) =>
+      !query ||
+      node.id.toLowerCase().includes(query) ||
+      node.text.toLowerCase().includes(query),
+  );
+  list.innerHTML = matched
+    .map(
+      (node) => `<li><button class="node-btn ${node.id === state.selected ? "active" : ""}" data-id="${node.id}">
+        <span class="id">${node.id}</span> <span class="type">${node.type}</span><br>${escapeHtml(truncate(node.text, 34))}
+      </button></li>`,
+    )
+    .join("");
+  list.querySelectorAll("button[data-id]").forEach((button) => {
+    button.addEventListener("click", () => selectNode(button.dataset.id));
+  });
+}
+
+function renderFilters() {
+  const typeCounts = {};
+  for (const node of DATA.nodes) typeCounts[node.type] = (typeCounts[node.type] || 0) + 1;
+  document.getElementById("type-filters").innerHTML = DATA.types
+    .map(
+      (type) => `<label class="toggle"><input type="checkbox" data-type="${type}" checked>
+        ${type}<span class="count">${typeCounts[type] || 0}</span></label>`,
+    )
+    .join("");
+
+  const edgeCounts = {};
+  for (const edge of DATA.edges) edgeCounts[edge.name] = (edgeCounts[edge.name] || 0) + 1;
+  document.getElementById("edge-filters").innerHTML = DATA.edge_names
+    .map(
+      (name) => `<label class="toggle"><input type="checkbox" data-edge="${name}" checked>
+        ${name}<span class="count">${edgeCounts[name] || 0}</span></label>`,
+    )
+    .join("");
+
+  document.querySelectorAll("input[data-type]").forEach((input) => {
+    input.addEventListener("change", () => {
+      input.checked ? state.types.add(input.dataset.type) : state.types.delete(input.dataset.type);
+      refresh();
+    });
+  });
+  document.querySelectorAll("input[data-edge]").forEach((input) => {
+    input.addEventListener("change", () => {
+      input.checked ? state.edges.add(input.dataset.edge) : state.edges.delete(input.dataset.edge);
+      refresh();
+    });
+  });
+}
+
+function renderStats() {
+  const counts = DATA.stats.findings;
+  const chips = [
+    `<span class="chip">${DATA.stats.nodes} ノード</span>`,
+    `<span class="chip">${DATA.stats.edges} エッジ</span>`,
+  ];
+  for (const severity of ["error", "severe", "warning", "info"]) {
+    if (counts[severity]) chips.push(`<span class="chip ${severity}">${severity} ${counts[severity]}</span>`);
+  }
+  if (!counts.error && !counts.severe && !counts.warning && !counts.info) {
+    chips.push('<span class="chip">指摘なし</span>');
+  }
+  document.getElementById("stats").innerHTML = chips.join("");
+  document.getElementById("sources").textContent = DATA.generated_from.join(", ");
+  document.getElementById("legend").innerHTML = DATA.types
+    .map((type) => `<span>${type}</span>`)
+    .join("");
+
+  const panel = document.getElementById("findings");
+  panel.innerHTML = DATA.findings.length
+    ? DATA.findings.map(findingHtml).join("")
+    : '<p class="empty">指摘は無い。</p>';
+  panel.querySelectorAll(".finding[data-id]").forEach((element) => {
+    if (!element.dataset.id) return;
+    element.addEventListener("click", () => selectNode(element.dataset.id));
+  });
+}
+
+// --- 操作 ------------------------------------------------------------------
+
+function selectNode(id) {
+  state.selected = state.selected === id ? null : id;
+  refresh();
+}
+window.selectNode = selectNode;
+
+function refresh() {
+  renderNodeList();
+  renderDetail();
+  renderGraph();
+}
+
+document.getElementById("search").addEventListener("input", renderNodeList);
+document.getElementById("clear").addEventListener("click", () => {
+  state.selected = null;
+  refresh();
+});
+document.getElementById("direction").addEventListener("change", (event) => {
+  state.direction = event.target.value;
+  state.fitPending = true;
+  renderGraph();
+});
+document.getElementById("zoom-in").addEventListener("click", () => applyZoom(state.zoom * 1.2));
+document.getElementById("zoom-out").addEventListener("click", () => applyZoom(state.zoom / 1.2));
+document.getElementById("zoom-reset").addEventListener("click", () => applyZoom(1));
+document.getElementById("zoom-fit").addEventListener("click", fitToView);
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (mermaid) mermaid.initialize(mermaidConfig());
+  renderGraph();
+});
+
+renderFilters();
+renderStats();
+refresh();
+</script>
+</body>
+</html>

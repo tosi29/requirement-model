@@ -23,7 +23,7 @@ from .loader import LoadResult, discover_paths, load_paths
 from .model import EDGE_NAMES
 from .plan import diff_graphs, format_plan, load_revision
 from .render import FORMATS, render
-from .site import DEFAULT_TITLE, MERMAID_URL, build_site
+from .site import DEFAULT_RENDERER, DEFAULT_TITLE, RENDERERS, build_site
 from .validate import validate_semantics_lexical, validate_structure
 
 __all__ = ["main", "build_parser"]
@@ -126,10 +126,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     site_parser.add_argument("--title", default=DEFAULT_TITLE, help="ページタイトル")
     site_parser.add_argument(
-        "--mermaid",
-        default=MERMAID_URL,
+        "--renderer",
+        choices=sorted(RENDERERS),
+        default=DEFAULT_RENDERER,
+        help=f"図の描画方式 (既定: {DEFAULT_RENDERER})",
+    )
+    site_parser.add_argument(
+        "--library",
         help=(
-            "Mermaid (UMD ビルド) の URL。出力先に mermaid.min.js を置いて "
+            "描画ライブラリの参照先 URL (既定: CDN)。出力先にライブラリを置いて "
             "相対パスを渡せば、外部通信の無い自己完結サイトになる"
         ),
     )
@@ -326,10 +331,12 @@ def cmd_site(args: argparse.Namespace) -> int:
         Path(args.output),
         title=args.title,
         sources=[str(p) for p in result.paths],
-        mermaid_url=args.mermaid,
+        renderer=args.renderer,
+        library=args.library,
     )
     print(
-        f"生成した: {index} ({len(result.graph)} ノード / {findings.summary()})",
+        f"生成した: {index} ({len(result.graph)} ノード / {findings.summary()}"
+        f" / 描画 {args.renderer})",
         file=sys.stderr,
     )
     return EXIT_OK

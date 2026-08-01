@@ -28,4 +28,4 @@ plugins = ["pydantic.mypy"]
 files = ["src", "examples"]
 
 [tool.setuptools.package-data]
-reqmodel = ["site_template.html"]
+reqmodel = ["site_template.html", "renderer_*.js"]

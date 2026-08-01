@@ -36,15 +36,27 @@ _MERMAID_SHAPE: dict[type[Node], tuple[str, str]] = {
     Source: ("[(", ")]"),
 }
 
+#: 型名 → (塗り, 線) の配色。Mermaid / DOT / 静的サイトはすべてここを出典にする。
+_PALETTE: dict[str, tuple[str, str]] = {
+    "Goal": ("#e8f0fe", "#3b6fd4"),
+    "Need": ("#e9f7ef", "#2f9e5f"),
+    "FunctionalRequirement": ("#fff8e1", "#c9971c"),
+    "QualityRequirement": ("#fdeef4", "#c2557f"),
+    "Constraint": ("#f2f2f2", "#777777"),
+    "Decision": ("#ede7f6", "#6f4fbf"),
+    "System": ("#e0f7fa", "#3a97a8"),
+    "Source": ("#ffffff", "#999999"),
+}
+
 _MERMAID_CLASSDEF = {
-    "Goal": "fill:#e8f0fe,stroke:#3b6fd4",
-    "Need": "fill:#e9f7ef,stroke:#2f9e5f",
-    "FunctionalRequirement": "fill:#fff8e1,stroke:#c9971c",
-    "QualityRequirement": "fill:#fdeef4,stroke:#c2557f",
-    "Constraint": "fill:#f2f2f2,stroke:#777777",
-    "Decision": "fill:#ede7f6,stroke:#6f4fbf",
-    "System": "fill:#e0f7fa,stroke:#3a97a8",
-    "Source": "fill:#ffffff,stroke:#999999",
+    name: f"fill:{fill},stroke:{stroke}" for name, (fill, stroke) in _PALETTE.items()
+}
+
+#: 影響範囲を示す色。選択ノード / 上流 / 下流。
+_HIGHLIGHT = {
+    "selected": "#d93025",
+    "upstream": "#1a73e8",
+    "downstream": "#188038",
 }
 
 _DOT_SHAPE: dict[type[Node], str] = {
@@ -58,27 +70,34 @@ _DOT_SHAPE: dict[type[Node], str] = {
     Source: "cylinder",
 }
 
-_EDGE_STYLE_MERMAID = {
-    "conflicts": "-.->",
-    "has_source": "-.->",
-}
+#: 破線で描くエッジ (弱い関係・出所)。
+_DASHED_EDGES = ("conflicts", "has_source")
+
+_EDGE_STYLE_MERMAID = {name: "-.->" for name in _DASHED_EDGES}
 
 
 def render_meta() -> dict[str, Any]:
-    """型ごとの描画情報。ブラウザ側で Mermaid を組み立てるために書き出す。
+    """型ごとの描画情報。ブラウザ側で図を組み立てるために書き出す。
 
     形状・配色の定義をこのモジュールに一本化し、静的サイト側に複製しないための出口。
+    Mermaid 用 (``shape`` / ``style``) と DOT 用 (``dot_shape`` / ``fill`` /
+    ``stroke``) を並べて持つ。
     """
     return {
         "types": {
             node_type.__name__: {
                 "shape": list(_MERMAID_SHAPE[node_type]),
                 "style": _MERMAID_CLASSDEF[node_type.__name__],
+                "dot_shape": _DOT_SHAPE[node_type],
+                "fill": _PALETTE[node_type.__name__][0],
+                "stroke": _PALETTE[node_type.__name__][1],
             }
             for node_type in TYPE_ORDER
         },
         "edge_arrows": dict(_EDGE_STYLE_MERMAID),
         "default_arrow": "-->",
+        "dashed_edges": list(_DASHED_EDGES),
+        "highlight": dict(_HIGHLIGHT),
     }
 
 
@@ -154,7 +173,9 @@ def render_mermaid(
         lines.append(f"    class {_safe_id(node.id)} {type(node).__name__}")
 
     if highlighted:
-        lines.append("    classDef highlight stroke-width:3px,stroke:#d93025")
+        lines.append(
+            f"    classDef highlight stroke-width:3px,stroke:{_HIGHLIGHT['selected']}"
+        )
         for node_id in sorted(highlighted):
             if node_id in graph.nodes:
                 lines.append(f"    class {_safe_id(node_id)} highlight")
@@ -180,19 +201,26 @@ def render_dot(
     ]
     for node in graph.ordered_nodes():
         shape = _dot_shape_of(node)
+        type_name = type(node).__name__
+        fill, stroke = _PALETTE[type_name]
         label = _dot_escape(
-            f"{node.id} [{type(node).__name__}]\\n{_truncate(node.text, max_label)}"
+            f"{node.id} [{type_name}]\\n{_truncate(node.text, max_label)}"
         )
-        node_attrs = f'shape={shape}, label="{label}"'
         if node.id in highlighted:
-            node_attrs += ', color="#d93025", penwidth=2'
+            stroke, extra = _HIGHLIGHT["selected"], ", penwidth=2"
+        else:
+            extra = ""
+        node_attrs = (
+            f'shape={shape}, label="{label}", fillcolor="{fill}", color="{stroke}"'
+            f"{extra}"
+        )
         lines.append(f"    {_safe_id(node.id)} [{node_attrs}];")
 
     for edge in graph.edges:
         if edge.target not in graph.nodes:
             continue
         edge_attrs = [f'label="{edge.name}"']
-        if edge.name in ("conflicts", "has_source"):
+        if edge.name in _DASHED_EDGES:
             edge_attrs.append("style=dashed")
         lines.append(
             f"    {_safe_id(edge.source)} -> {_safe_id(edge.target)} "

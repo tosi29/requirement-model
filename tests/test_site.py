@@ -6,10 +6,11 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 from conftest import build, fr, goal, need, qr, source
 from reqmodel.cli import main
 from reqmodel.findings import FindingList
-from reqmodel.site import MERMAID_URL, build_site, site_data
+from reqmodel.site import GRAPHVIZ_URL, MERMAID_URL, build_site, library_url, site_data
 from reqmodel.validate import validate_structure
 
 SAMPLE = str(Path(__file__).resolve().parents[1] / "examples" / "sample.py")
@@ -78,9 +79,48 @@ def test_findings_are_embedded(tmp_path: Path):
     assert data["stats"]["findings"]["warning"] >= 1
 
 
-def test_mermaid_source_can_be_pointed_at_a_local_copy(tmp_path: Path):
-    index = build_site(chain(), FindingList(), tmp_path, mermaid_url="mermaid.min.js")
-    assert '<script src="mermaid.min.js"></script>' in index.read_text(encoding="utf-8")
+def test_library_can_be_pointed_at_a_local_copy(tmp_path: Path):
+    index = build_site(chain(), FindingList(), tmp_path, library="mermaid.min.js")
+    html = index.read_text(encoding="utf-8")
+    assert 'const LIBRARY_URL = "mermaid.min.js";' in html
+    assert MERMAID_URL not in html
+
+
+def test_graphviz_renderer_embeds_the_dot_backend(tmp_path: Path):
+    index = build_site(chain(), FindingList(), tmp_path, renderer="graphviz")
+    html = index.read_text(encoding="utf-8")
+
+    assert GRAPHVIZ_URL in html
+    assert 'name: "graphviz"' in html
+    assert "digraph requirements {" in html  # DOT をブラウザで組み立てる
+    assert "mermaid" not in html.split('id="model-data"')[0]
+    # 型ごとの DOT 形状・配色は render_meta() 経由でのみ渡す。
+    data = embedded_data(html)
+    assert data["meta"]["types"]["Goal"]["dot_shape"] == "hexagon"
+    assert data["meta"]["types"]["Goal"]["fill"].startswith("#")
+    assert "conflicts" in data["meta"]["dashed_edges"]
+    assert set(data["meta"]["highlight"]) == {"selected", "upstream", "downstream"}
+
+
+def test_no_placeholder_is_left_in_the_page(tmp_path: Path):
+    for renderer in ("mermaid", "graphviz"):
+        index = build_site(
+            chain(), FindingList(), tmp_path / renderer, renderer=renderer
+        )
+        html = index.read_text(encoding="utf-8")
+        for placeholder in ("__TITLE__", "__DATA__", "__LIBRARY_URL__", "__RENDERER_JS__"):
+            assert placeholder not in html
+
+
+def test_renderers_have_their_own_default_library(tmp_path: Path):
+    assert library_url("mermaid") == MERMAID_URL
+    assert library_url("graphviz") == GRAPHVIZ_URL
+    assert library_url("graphviz", local=True) == "./graphviz.js"
+
+
+def test_unknown_renderer_is_rejected(tmp_path: Path):
+    with pytest.raises(ValueError, match="未対応の描画方式"):
+        build_site(chain(), FindingList(), tmp_path, renderer="d3")
 
 
 def test_site_command(tmp_path: Path, capsys):
@@ -93,6 +133,19 @@ def test_site_command(tmp_path: Path, capsys):
     assert data["stats"]["nodes"] == 20
     assert data["generated_from"] == [SAMPLE]
     assert data["findings"] == []
+
+
+def test_site_command_accepts_a_renderer(tmp_path: Path, capsys):
+    output = tmp_path / "site"
+    assert (
+        main(["site", SAMPLE, "-o", str(output), "--renderer", "graphviz", "--library", "./graphviz.js"])
+        == 0
+    )
+    assert "描画 graphviz" in capsys.readouterr().err
+
+    html = (output / "index.html").read_text(encoding="utf-8")
+    assert 'const LIBRARY_URL = "./graphviz.js";' in html
+    assert embedded_data(html)["stats"]["nodes"] == 20
 
 
 def test_site_command_refuses_broken_definitions(tmp_path: Path):

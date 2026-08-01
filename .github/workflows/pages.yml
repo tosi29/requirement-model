@@ -42,14 +42,21 @@ jobs:
           req site examples/sample.py \
             --output site \
             --title "要求グラフ (examples/sample.py)" \
-            --mermaid mermaid.min.js
+            --library mermaid.min.js
+          # 比較用のプロトタイプ (P19): Graphviz WASM 版を /graphviz/ に併置する。
+          req site examples/sample.py \
+            --output site/graphviz \
+            --title "要求グラフ (Graphviz WASM 版)" \
+            --renderer graphviz \
+            --library ./graphviz.js
 
-      - name: Mermaid を同梱する
+      - name: 描画ライブラリを同梱する
         # 公開ページから外部への通信を無くすため、描画ライブラリを一緒に置く。
         # URL (バージョン込み) は reqmodel 側の定義を唯一の出典とする。
         run: |
-          curl -fsSL --retry 3 -o site/mermaid.min.js \
-            "$(python -c 'from reqmodel.site import MERMAID_URL; print(MERMAID_URL)')"
+          url() { python -c "from reqmodel.site import library_url; print(library_url('$1'))"; }
+          curl -fsSL --retry 3 -o site/mermaid.min.js "$(url mermaid)"
+          curl -fsSL --retry 3 -o site/graphviz/graphviz.js "$(url graphviz)"
 
       - uses: actions/upload-pages-artifact@v3
         with:

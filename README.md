@@ -64,7 +64,9 @@ $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (
 | `--depth N` | explain | 探索の深さ上限 |
 | `--undirected` | explain | エッジの向きを無視して辿る |
 | `--highlight ID,ID` | graph | 指定ノードを強調する |
-| `--title` / `--mermaid` | site | ページ題名 / 描画ライブラリの参照先 |
+| `--title` | site | ページ題名 |
+| `--renderer` | site | 図の描画方式 (`mermaid` / `graphviz`) |
+| `--library` | site | 描画ライブラリの参照先 (既定: CDN) |
 
 ## 定義ファイルの規約 (宣言のみ)
 
@@ -232,9 +234,31 @@ $ req site examples/sample.py -o site --title "経費精算システムの要求
 $ python -m http.server -d site
 ```
 
-描画には Mermaid (バージョン固定の UMD ビルド) を使う。既定では CDN を参照するが、
-`--mermaid mermaid.min.js` を渡して同じディレクトリに UMD ビルドを置けば、
-外部への通信が一切無い自己完結のサイトになる。Pages のワークフローはこの方式で公開する。
+### 描画方式 (`--renderer`)
+
+図を描く部分は差し替えられる。既定は Mermaid。ライブラリは既定では CDN を参照するが、
+`--library` に相対パスを渡して同じディレクトリへ実体を置けば、外部への通信が一切無い
+自己完結のサイトになる。Pages のワークフローはこの方式で公開する。
+
+| 方式 | ライブラリ | 同梱サイズ | 特徴 |
+|---|---|---|---|
+| `mermaid` (既定) | Mermaid 11.16.0 (UMD) | 3.6 MB | Markdown 出力と同じ見た目。ダークテーマあり |
+| `graphviz` | [@hpcc-js/wasm-graphviz](https://github.com/hpcc-systems/hpcc-js-wasm) 1.28.0 | 0.8 MB | Graphviz の `dot` レイアウト。交差が少なく、再描画が速い |
+
+```console
+$ req site examples/sample.py -o site --renderer graphviz --library ./graphviz.js
+$ curl -fsSLo site/graphviz.js \
+    "$(python -c 'from reqmodel.site import library_url; print(library_url("graphviz"))')"
+```
+
+`graphviz` はブラウザ側で DOT を組み立て、WASM の `dot` に流して SVG を得る
+(`src/reqmodel/renderer_graphviz.js`)。形状・配色は Mermaid 版と同じく
+`render.py` の `render_meta()` が唯一の出典。日本語の字幅は WASM 側が正しく
+測れないので、ラベルをブラウザで実測して箱の大きさを決めている。
+
+選択ハイライトは描画済み SVG への class 付与だけで行うため、フィルタが変わらない
+限り再レイアウトは走らない (選択の切り替えは 1 ms 程度)。ツールバー右端に
+「方式・所要時間・表示件数」が出る。
 
 ## GitHub Pages への公開
 
@@ -246,6 +270,8 @@ Source を **GitHub Actions** にする。これは API やワークフローか
 
 公開されるのは `examples/sample.py` のグラフ。自分の定義ファイルを公開するときは
 ワークフロー中の `req validate` / `req site` の引数を差し替える。
+
+比較用に、同じグラフの Graphviz WASM 版を `/graphviz/` にも併置している。
 
 ## 開発
 

@@ -4,12 +4,14 @@
 グラフ表示・絞り込み・影響範囲の可視化ができるようにする。
 
 描画の定義 (形状・配色) は render.py から `render_meta()` で受け取り、
-ブラウザ側に複製しない。
+ブラウザ側に複製しない。図を描く部分は差し替えられるようにしてあり、
+`renderer_*.js` のどれか 1 つがテンプレートに埋め込まれる。
 """
 
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from html import escape
 from importlib import resources
 from pathlib import Path
@@ -20,15 +22,76 @@ from .graph import RequirementGraph
 from .model import EDGE_NAMES, TYPE_ORDER
 from .render import render_dot, render_meta, render_mermaid
 
-__all__ = ["build_site", "site_data", "MERMAID_URL", "DEFAULT_TITLE"]
+__all__ = [
+    "build_site",
+    "site_data",
+    "library_url",
+    "RENDERERS",
+    "DEFAULT_RENDERER",
+    "MERMAID_URL",
+    "GRAPHVIZ_URL",
+    "DEFAULT_TITLE",
+]
 
-#: 図の描画に使う Mermaid。バージョンは固定する。
-#: 単一ファイルの UMD ビルドなので、公開先に置いて相対パスを指す (自己完結) こともできる。
+
+@dataclass(frozen=True)
+class Renderer:
+    """図の描画方式。テンプレートに埋め込む JS と、その依存ライブラリ。"""
+
+    name: str
+    script: str
+    #: 既定の参照先 (CDN)。相対パスを渡せば同梱したファイルを見に行く。
+    url: str
+    #: 自己完結サイトに置くときの推奨ファイル名。
+    local_name: str
+
+
+#: 図の描画に使うライブラリ。バージョンは固定する。
 MERMAID_VERSION = "11.16.0"
-MERMAID_FILE = "mermaid.min.js"
-MERMAID_URL = f"https://cdn.jsdelivr.net/npm/mermaid@{MERMAID_VERSION}/dist/{MERMAID_FILE}"
+MERMAID_URL = (
+    f"https://cdn.jsdelivr.net/npm/mermaid@{MERMAID_VERSION}/dist/mermaid.min.js"
+)
 
+#: Graphviz の WASM ビルド。dist/index.js は wasm を内包した単一の ES モジュール。
+GRAPHVIZ_VERSION = "1.28.0"
+GRAPHVIZ_URL = (
+    "https://cdn.jsdelivr.net/npm/"
+    f"@hpcc-js/wasm-graphviz@{GRAPHVIZ_VERSION}/dist/index.js"
+)
+
+RENDERERS: dict[str, Renderer] = {
+    "mermaid": Renderer(
+        name="mermaid",
+        script="renderer_mermaid.js",
+        url=MERMAID_URL,
+        local_name="mermaid.min.js",
+    ),
+    "graphviz": Renderer(
+        name="graphviz",
+        script="renderer_graphviz.js",
+        url=GRAPHVIZ_URL,
+        # ES モジュールとして動的 import するので、相対パスの形にしておく。
+        local_name="./graphviz.js",
+    ),
+}
+
+DEFAULT_RENDERER = "mermaid"
 DEFAULT_TITLE = "要求グラフ"
+
+
+def library_url(renderer: str, local: bool = False) -> str:
+    """描画ライブラリの参照先。local=True なら同梱したファイルへの相対パス。"""
+    entry = _renderer(renderer)
+    return entry.local_name if local else entry.url
+
+
+def _renderer(name: str) -> Renderer:
+    try:
+        return RENDERERS[name]
+    except KeyError:
+        raise ValueError(
+            f"未対応の描画方式: {name} (使えるのは {', '.join(RENDERERS)})"
+        ) from None
 
 
 def site_data(
@@ -63,12 +126,8 @@ def site_data(
     }
 
 
-def _template() -> str:
-    return (
-        resources.files("reqmodel")
-        .joinpath("site_template.html")
-        .read_text(encoding="utf-8")
-    )
+def _asset(name: str) -> str:
+    return resources.files("reqmodel").joinpath(name).read_text(encoding="utf-8")
 
 
 def build_site(
@@ -77,20 +136,23 @@ def build_site(
     out_dir: Path,
     title: str = DEFAULT_TITLE,
     sources: Sequence[str] = (),
-    mermaid_url: str = MERMAID_URL,
+    renderer: str = DEFAULT_RENDERER,
+    library: str | None = None,
 ) -> Path:
     """out_dir に index.html と生データを書き出し、index.html のパスを返す。
 
-    mermaid_url に相対パス (例: ``mermaid.min.js``) を渡し、同じディレクトリへ
-    その UMD ビルドを置けば、外部への通信が無い自己完結のサイトになる。
+    library に相対パス (例: ``mermaid.min.js`` / ``./graphviz.js``) を渡し、
+    同じディレクトリへその実体を置けば、外部への通信が無い自己完結のサイトになる。
     """
+    entry = _renderer(renderer)
     data = site_data(graph, findings, title, sources)
     payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
 
     html = (
-        _template()
+        _asset("site_template.html")
+        .replace("__RENDERER_JS__", _asset(entry.script))
         .replace("__TITLE__", escape(title))
-        .replace("__MERMAID_URL__", escape(mermaid_url, quote=True))
+        .replace("__LIBRARY_URL__", escape(library or entry.url, quote=True))
         .replace("__DATA__", payload)
     )
 

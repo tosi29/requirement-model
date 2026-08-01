@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from html import escape
 from importlib import resources
 from pathlib import Path
@@ -20,15 +21,49 @@ from .graph import RequirementGraph
 from .model import EDGE_NAMES, TYPE_ORDER
 from .render import render_dot, render_meta, render_mermaid
 
-__all__ = ["build_site", "site_data", "MERMAID_URL", "DEFAULT_TITLE"]
+__all__ = [
+    "build_site",
+    "site_data",
+    "Asset",
+    "SITE_ASSETS",
+    "asset_srcs",
+    "DEFAULT_TITLE",
+]
 
-#: 図の描画に使う Mermaid。バージョンは固定する。
-#: 単一ファイルの UMD ビルドなので、公開先に置いて相対パスを指す (自己完結) こともできる。
-MERMAID_VERSION = "11.16.0"
-MERMAID_FILE = "mermaid.min.js"
-MERMAID_URL = f"https://cdn.jsdelivr.net/npm/mermaid@{MERMAID_VERSION}/dist/{MERMAID_FILE}"
+
+@dataclass(frozen=True)
+class Asset:
+    """ページが読み込む描画ライブラリ 1 つ。"""
+
+    file: str
+    url: str
+
+
+#: 図の描画に使うライブラリ。バージョンは固定する。
+#: どちらも単一ファイルの UMD ビルドなので、公開先に置いて相対パスを指す
+#: (自己完結) こともできる。cytoscape-dagre は dagre を同梱しているため、
+#: 別途 dagre を置く必要は無い。
+CYTOSCAPE_VERSION = "3.34.0"
+CYTOSCAPE_DAGRE_VERSION = "4.0.0"
+_CDN = "https://cdn.jsdelivr.net/npm"
+
+SITE_ASSETS: tuple[Asset, ...] = (
+    Asset(
+        "cytoscape.min.js",
+        f"{_CDN}/cytoscape@{CYTOSCAPE_VERSION}/dist/cytoscape.min.js",
+    ),
+    Asset(
+        "cytoscape-dagre.js",
+        f"{_CDN}/cytoscape-dagre@{CYTOSCAPE_DAGRE_VERSION}/dist/cytoscape-dagre.js",
+    ),
+)
 
 DEFAULT_TITLE = "要求グラフ"
+
+
+def asset_srcs(local: bool = False) -> list[str]:
+    """`<script src>` に入れる参照先。local なら出力先の同名ファイルを相対参照する。"""
+    return [asset.file if local else asset.url for asset in SITE_ASSETS]
 
 
 def site_data(
@@ -77,20 +112,24 @@ def build_site(
     out_dir: Path,
     title: str = DEFAULT_TITLE,
     sources: Sequence[str] = (),
-    mermaid_url: str = MERMAID_URL,
+    scripts: Sequence[str] | None = None,
 ) -> Path:
     """out_dir に index.html と生データを書き出し、index.html のパスを返す。
 
-    mermaid_url に相対パス (例: ``mermaid.min.js``) を渡し、同じディレクトリへ
+    scripts に相対パス (``asset_srcs(local=True)``) を渡し、同じディレクトリへ
     その UMD ビルドを置けば、外部への通信が無い自己完結のサイトになる。
     """
     data = site_data(graph, findings, title, sources)
     payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
+    tags = "\n".join(
+        f'<script src="{escape(src, quote=True)}"></script>'
+        for src in (asset_srcs() if scripts is None else scripts)
+    )
 
     html = (
         _template()
         .replace("__TITLE__", escape(title))
-        .replace("__MERMAID_URL__", escape(mermaid_url, quote=True))
+        .replace("__SCRIPTS__", tags)
         .replace("__DATA__", payload)
     )
 

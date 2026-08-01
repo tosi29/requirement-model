@@ -23,7 +23,7 @@ from .loader import LoadResult, discover_paths, load_paths
 from .model import EDGE_NAMES
 from .plan import diff_graphs, format_plan, load_revision
 from .render import FORMATS, render
-from .site import DEFAULT_TITLE, MERMAID_URL, build_site
+from .site import DEFAULT_TITLE, SITE_ASSETS, asset_srcs, build_site
 from .validate import validate_semantics_lexical, validate_structure
 
 __all__ = ["main", "build_parser"]
@@ -126,11 +126,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     site_parser.add_argument("--title", default=DEFAULT_TITLE, help="ページタイトル")
     site_parser.add_argument(
-        "--mermaid",
-        default=MERMAID_URL,
+        "--assets",
+        choices=("cdn", "local"),
+        default="cdn",
         help=(
-            "Mermaid (UMD ビルド) の URL。出力先に mermaid.min.js を置いて "
-            "相対パスを渡せば、外部通信の無い自己完結サイトになる"
+            "描画ライブラリ (Cytoscape.js) の参照先。local を選び、出力先に "
+            f"{' / '.join(asset.file for asset in SITE_ASSETS)} を置けば、"
+            "外部通信の無い自己完結サイトになる (既定: cdn)"
         ),
     )
     site_parser.add_argument(
@@ -326,7 +328,7 @@ def cmd_site(args: argparse.Namespace) -> int:
         Path(args.output),
         title=args.title,
         sources=[str(p) for p in result.paths],
-        mermaid_url=args.mermaid,
+        scripts=asset_srcs(local=args.assets == "local"),
     )
     print(
         f"生成した: {index} ({len(result.graph)} ノード / {findings.summary()})",

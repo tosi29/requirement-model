@@ -9,7 +9,7 @@ from pathlib import Path
 from conftest import build, fr, goal, need, qr, source
 from reqmodel.cli import main
 from reqmodel.findings import FindingList
-from reqmodel.site import MERMAID_URL, build_site, site_data
+from reqmodel.site import SITE_ASSETS, asset_srcs, build_site, site_data
 from reqmodel.validate import validate_structure
 
 SAMPLE = str(Path(__file__).resolve().parents[1] / "examples" / "sample.py")
@@ -40,7 +40,10 @@ def test_site_data_contains_graph_findings_and_render_meta():
     assert {n["id"] for n in data["nodes"]} == {"S-1", "N-1", "G-1", "FR-1"}
     assert {"source": "FR-1", "name": "satisfies", "target": "N-1"} in data["edges"]
     assert data["stats"]["nodes"] == 4
-    assert data["meta"]["types"]["Goal"]["shape"] == ["{{", "}}"]
+    assert data["meta"]["types"]["Goal"]["shape"] == "hexagon"
+    assert data["meta"]["types"]["Goal"]["fill"].startswith("#")
+    assert "has_source" in data["meta"]["dashed_edges"]
+    assert set(data["meta"]["impact_colors"]) == {"selected", "upstream", "downstream"}
     assert "satisfies" in data["edge_names"]
 
 
@@ -54,7 +57,10 @@ def test_build_site_writes_page_and_raw_outputs(tmp_path: Path):
 
     html = index.read_text(encoding="utf-8")
     assert "<title>要求グラフ</title>" in html
-    assert MERMAID_URL in html
+    for placeholder in ("__TITLE__", "__SCRIPTS__", "__DATA__"):
+        assert placeholder not in html
+    for asset in SITE_ASSETS:
+        assert f'<script src="{asset.url}"></script>' in html
     assert embedded_data(html)["stats"]["nodes"] == 4
     assert json.loads((tmp_path / "model.json").read_text(encoding="utf-8"))["nodes"]
 
@@ -78,9 +84,22 @@ def test_findings_are_embedded(tmp_path: Path):
     assert data["stats"]["findings"]["warning"] >= 1
 
 
-def test_mermaid_source_can_be_pointed_at_a_local_copy(tmp_path: Path):
-    index = build_site(chain(), FindingList(), tmp_path, mermaid_url="mermaid.min.js")
-    assert '<script src="mermaid.min.js"></script>' in index.read_text(encoding="utf-8")
+def test_libraries_can_be_pointed_at_local_copies(tmp_path: Path):
+    index = build_site(chain(), FindingList(), tmp_path, scripts=asset_srcs(local=True))
+    html = index.read_text(encoding="utf-8")
+
+    assert "cdn.jsdelivr.net" not in html
+    for asset in SITE_ASSETS:
+        assert f'<script src="{asset.file}"></script>' in html
+
+
+def test_site_command_can_bundle_libraries_locally(tmp_path: Path):
+    output = tmp_path / "site"
+    assert main(["site", SAMPLE, "-o", str(output), "--assets", "local"]) == 0
+
+    html = (output / "index.html").read_text(encoding="utf-8")
+    assert "cdn.jsdelivr.net" not in html
+    assert f'<script src="{SITE_ASSETS[0].file}"></script>' in html
 
 
 def test_site_command(tmp_path: Path, capsys):

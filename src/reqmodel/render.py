@@ -36,15 +36,40 @@ _MERMAID_SHAPE: dict[type[Node], tuple[str, str]] = {
     Source: ("[(", ")]"),
 }
 
+#: 型 → (塗り, 線) の配色。形状以外の見た目はここが唯一の出典。
+_PALETTE: dict[str, tuple[str, str]] = {
+    "Goal": ("#e8f0fe", "#3b6fd4"),
+    "Need": ("#e9f7ef", "#2f9e5f"),
+    "FunctionalRequirement": ("#fff8e1", "#c9971c"),
+    "QualityRequirement": ("#fdeef4", "#c2557f"),
+    "Constraint": ("#f2f2f2", "#777777"),
+    "Decision": ("#ede7f6", "#6f4fbf"),
+    "System": ("#e0f7fa", "#3a97a8"),
+    "Source": ("#ffffff", "#999999"),
+}
+
 _MERMAID_CLASSDEF = {
-    "Goal": "fill:#e8f0fe,stroke:#3b6fd4",
-    "Need": "fill:#e9f7ef,stroke:#2f9e5f",
-    "FunctionalRequirement": "fill:#fff8e1,stroke:#c9971c",
-    "QualityRequirement": "fill:#fdeef4,stroke:#c2557f",
-    "Constraint": "fill:#f2f2f2,stroke:#777777",
-    "Decision": "fill:#ede7f6,stroke:#6f4fbf",
-    "System": "fill:#e0f7fa,stroke:#3a97a8",
-    "Source": "fill:#ffffff,stroke:#999999",
+    type_name: f"fill:{fill},stroke:{stroke}"
+    for type_name, (fill, stroke) in _PALETTE.items()
+}
+
+#: 型 → Cytoscape.js のノード形状。静的サイトの描画に使う。
+_CYTOSCAPE_SHAPE: dict[type[Node], str] = {
+    Goal: "hexagon",
+    Need: "ellipse",
+    FunctionalRequirement: "round-rectangle",
+    QualityRequirement: "rhomboid",
+    Constraint: "cut-rectangle",
+    Decision: "diamond",
+    System: "barrel",
+    Source: "tag",
+}
+
+#: 影響範囲の色分け (選択 / 上流 / 下流)。
+_IMPACT_COLORS = {
+    "selected": "#d93025",
+    "upstream": "#1a73e8",
+    "downstream": "#188038",
 }
 
 _DOT_SHAPE: dict[type[Node], str] = {
@@ -65,20 +90,23 @@ _EDGE_STYLE_MERMAID = {
 
 
 def render_meta() -> dict[str, Any]:
-    """型ごとの描画情報。ブラウザ側で Mermaid を組み立てるために書き出す。
+    """型ごとの描画情報。ブラウザ側 (Cytoscape.js) の初期化に使う。
 
     形状・配色の定義をこのモジュールに一本化し、静的サイト側に複製しないための出口。
     """
     return {
         "types": {
             node_type.__name__: {
-                "shape": list(_MERMAID_SHAPE[node_type]),
-                "style": _MERMAID_CLASSDEF[node_type.__name__],
+                "shape": _CYTOSCAPE_SHAPE[node_type],
+                "fill": _PALETTE[node_type.__name__][0],
+                "stroke": _PALETTE[node_type.__name__][1],
             }
             for node_type in TYPE_ORDER
         },
-        "edge_arrows": dict(_EDGE_STYLE_MERMAID),
-        "default_arrow": "-->",
+        "dashed_edges": [
+            name for name, arrow in _EDGE_STYLE_MERMAID.items() if arrow == "-.->"
+        ],
+        "impact_colors": dict(_IMPACT_COLORS),
     }
 
 

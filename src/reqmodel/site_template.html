@@ -85,9 +85,9 @@ main {
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
-.graph-scroll { flex: 1; overflow: auto; padding: 12px; min-height: 420px; }
-#graph { transform-origin: top left; }
-#graph svg { max-width: none; height: auto; }
+.graph-frame { flex: 1; position: relative; min-height: 480px; }
+#graph { position: absolute; inset: 0; }
+#graph .empty { padding: 14px; }
 h2 {
   font-size: 12px;
   text-transform: uppercase;
@@ -156,6 +156,8 @@ ul.plain li { padding: 3px 0; }
 .detail .edge { font-family: ui-monospace, monospace; font-size: 12px; }
 .empty { color: var(--muted); font-size: 13px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend .swatch { width: 9px; height: 9px; border: 1px solid; border-radius: 2px; }
 footer { padding: 10px 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
 code { font-family: ui-monospace, monospace; background: var(--panel); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
@@ -192,10 +194,11 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
         <option value="TD">縦 (TD)</option>
         <option value="LR">横 (LR)</option>
       </select>
+      <button id="relayout" title="表示中のノードだけで並べ直す">整列</button>
       <button id="clear">選択解除</button>
       <span class="legend" id="legend"></span>
     </div>
-    <div class="graph-scroll"><div id="graph"></div></div>
+    <div class="graph-frame"><div id="graph"></div></div>
   </section>
 
   <aside class="pane detail">
@@ -214,9 +217,9 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
 </footer>
 
 <script type="application/json" id="model-data">__DATA__</script>
-<script src="__MERMAID_URL__"></script>
+__SCRIPTS__
 <script type="module">
-const mermaid = window.mermaid;
+const cytoscape = window.cytoscape;
 
 const DATA = JSON.parse(document.getElementById("model-data").textContent);
 const byId = new Map(DATA.nodes.map((n) => [n.id, n]));
@@ -225,19 +228,7 @@ const state = {
   edges: new Set(DATA.edge_names),
   selected: null,
   direction: "TD",
-  zoom: 1,
-  fitPending: true,
 };
-let renderSeq = 0;
-
-const isDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
-const mermaidConfig = () => ({
-  startOnLoad: false,
-  securityLevel: "loose",
-  theme: isDark() ? "dark" : "default",
-  flowchart: { useMaxWidth: false, htmlLabels: true },
-});
-if (mermaid) mermaid.initialize(mermaidConfig());
 
 // --- 表示対象 --------------------------------------------------------------
 
@@ -267,97 +258,229 @@ function reach(start, forward) {
   return seen;
 }
 
-// --- Mermaid の組み立て ----------------------------------------------------
+// --- Cytoscape.js -----------------------------------------------------------
+//
+// グラフは 1 度だけ構築し、以後は要素の見せ消し (display) とクラスの付け替えだけを
+// 行う。フィルタや選択でレイアウトを回さないので、ノードの位置が動かない。
 
-const safeId = (id) => "n_" + id.replace(/[^A-Za-z0-9_]/g, "_");
-const escapeLabel = (text) =>
-  text.replace(/\\/g, "＼").replace(/"/g, "#quot;").replace(/</g, "#lt;").replace(/>/g, "#gt;");
 const truncate = (text, limit = 42) =>
   text.length > limit ? text.slice(0, limit - 1) + "…" : text;
 
-function buildMermaid() {
-  const nodes = visibleNodes();
-  const edges = visibleEdges();
-  const lines = [`flowchart ${state.direction}`];
-
-  for (const node of nodes) {
-    const [open, close] = DATA.meta.types[node.type].shape;
-    const label = `<b>${node.id}</b> [${node.type}]<br/>${escapeLabel(truncate(node.text))}`;
-    lines.push(`  ${safeId(node.id)}${open}"${label}"${close}`);
-  }
-  for (const edge of edges) {
-    const arrow = DATA.meta.edge_arrows[edge.name] || DATA.meta.default_arrow;
-    lines.push(`  ${safeId(edge.source)} ${arrow}|${edge.name}| ${safeId(edge.target)}`);
-  }
-  for (const [type, meta] of Object.entries(DATA.meta.types)) {
-    lines.push(`  classDef ${type} ${meta.style}`);
-  }
-  for (const node of nodes) lines.push(`  class ${safeId(node.id)} ${node.type}`);
-
-  if (state.selected && byId.has(state.selected)) {
-    const up = reach(state.selected, false);
-    const down = reach(state.selected, true);
-    lines.push("  classDef sel stroke:#d93025,stroke-width:4px");
-    lines.push("  classDef up stroke:#1a73e8,stroke-width:2.5px");
-    lines.push("  classDef down stroke:#188038,stroke-width:2.5px");
-    lines.push("  classDef dim opacity:0.35");
-    for (const node of nodes) {
-      if (node.id === state.selected) lines.push(`  class ${safeId(node.id)} sel`);
-      else if (up.has(node.id)) lines.push(`  class ${safeId(node.id)} up`);
-      else if (down.has(node.id)) lines.push(`  class ${safeId(node.id)} down`);
-      else lines.push(`  class ${safeId(node.id)} dim`);
+/** Cytoscape の text-wrap は空白でしか折り返さず日本語に効かないので、自前で折る。 */
+function wrapLabel(text, perLine = 9) {
+  const lines = [];
+  let line = "";
+  for (const char of text) {
+    line += char;
+    if (line.length < perLine) continue;
+    const space = line.lastIndexOf(" ");
+    if (space > 0) {
+      lines.push(line.slice(0, space));
+      line = line.slice(space + 1);
+    } else {
+      lines.push(line);
+      line = "";
     }
   }
-  for (const node of nodes) {
-    lines.push(`  click ${safeId(node.id)} call selectNode("${node.id}")`);
-  }
+  if (line) lines.push(line);
   return lines.join("\n");
 }
 
 const graphEl = document.getElementById("graph");
+const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(name).trim();
 
-function applyZoom(value) {
-  state.zoom = Math.min(3, Math.max(0.2, value));
-  graphEl.style.transform = `scale(${state.zoom})`;
+const elements = () => [
+  ...DATA.nodes.map((node) => ({
+    data: {
+      id: node.id,
+      type: node.type,
+      label: `${node.id}\n${wrapLabel(truncate(node.text, 30))}`,
+    },
+  })),
+  ...DATA.edges.map((edge, index) => ({
+    data: {
+      id: `e${index}`,
+      index,
+      source: edge.source,
+      target: edge.target,
+      name: edge.name,
+    },
+  })),
+];
+
+/** 現在のカラースキームに合わせたスタイル定義。テーマ変更時に差し替える。 */
+function graphStyle() {
+  const impact = DATA.meta.impact_colors;
+  const style = [
+    {
+      selector: "node",
+      style: {
+        label: "data(label)",
+        "text-wrap": "wrap",
+        "text-max-width": "160px",
+        "text-valign": "center",
+        "font-size": 10,
+        "line-height": 1.25,
+        color: "#1f2328",
+        width: "label",
+        height: "label",
+        padding: "7px",
+        "border-width": 1.5,
+        "transition-property": "opacity, border-width, border-color",
+        "transition-duration": "120ms",
+      },
+    },
+    {
+      selector: "edge",
+      style: {
+        label: "data(name)",
+        "font-size": 9,
+        color: cssVar("--muted"),
+        "text-background-color": cssVar("--bg"),
+        "text-background-opacity": 0.85,
+        "text-background-padding": "1px",
+        width: 1.2,
+        "line-color": cssVar("--border"),
+        "target-arrow-color": cssVar("--border"),
+        "target-arrow-shape": "triangle",
+        "arrow-scale": 0.8,
+        "curve-style": "bezier",
+      },
+    },
+    { selector: "edge.dashed", style: { "line-style": "dashed" } },
+    { selector: ".hidden", style: { display: "none" } },
+    { selector: ".dim", style: { opacity: 0.28 } },
+    {
+      selector: "node.sel",
+      style: { "border-width": 4, "border-color": impact.selected, "z-index": 10 },
+    },
+    {
+      selector: "node.up",
+      style: { "border-width": 3, "border-color": impact.upstream },
+    },
+    {
+      selector: "node.down",
+      style: { "border-width": 3, "border-color": impact.downstream },
+    },
+    {
+      selector: "edge.on-path",
+      style: { width: 2, "line-color": cssVar("--fg"), "target-arrow-color": cssVar("--fg") },
+    },
+  ];
+  for (const [type, meta] of Object.entries(DATA.meta.types)) {
+    style.push({
+      selector: `node[type = "${type}"]`,
+      style: { shape: meta.shape, "background-color": meta.fill, "border-color": meta.stroke },
+    });
+  }
+  return style;
 }
 
-async function renderGraph() {
-  if (!mermaid) {
+const layoutOptions = () => ({
+  name: "dagre",
+  rankDir: state.direction === "LR" ? "LR" : "TB",
+  nodeSep: 24,
+  rankSep: 56,
+  edgeSep: 12,
+  animate: false,
+  fit: true,
+  padding: 18,
+});
+
+let cy = null;
+
+function initGraph() {
+  try {
+    cy = cytoscape({
+      container: graphEl,
+      elements: elements(),
+      style: graphStyle(),
+      layout: layoutOptions(),
+      wheelSensitivity: 0.25,
+      minZoom: 0.1,
+      maxZoom: 3,
+    });
+  } catch (error) {
     graphEl.innerHTML =
-      '<p class="empty">Mermaid を読み込めなかった。図の元データは <a href="graph.mmd">graph.mmd</a> / <a href="graph.dot">graph.dot</a> にある。</p>';
+      '<p class="empty">描画ライブラリ (Cytoscape.js / dagre) を読み込めなかった。図の元データは <a href="graph.mmd">graph.mmd</a> / <a href="graph.dot">graph.dot</a> にある。</p>';
     return;
   }
-  const source = buildMermaid();
-  try {
-    const { svg, bindFunctions } = await mermaid.render(`svg-${++renderSeq}`, source);
-    graphEl.innerHTML = svg;
-    if (bindFunctions) bindFunctions(graphEl);
-  } catch (error) {
-    graphEl.innerHTML = `<p class="empty">グラフを描画できなかった: ${error}</p>`;
+  for (const name of DATA.meta.dashed_edges) {
+    cy.edges(`[name = "${name}"]`).addClass("dashed");
   }
-  if (state.fitPending) {
-    state.fitPending = false;
-    fitToView();
-  } else {
-    applyZoom(state.zoom);
-  }
+  cy.on("tap", "node", (event) => selectNode(event.target.id()));
+  cy.on("tap", (event) => {
+    if (event.target === cy && state.selected) selectNode(state.selected);
+  });
+  fitInitial();
 }
 
-/** グラフ全体が枠に収まる倍率にする。 */
+/** 絞り込みの反映。再レイアウトはせず、表示・非表示だけを切り替える。 */
+function applyVisibility() {
+  if (!cy) return;
+  const nodes = new Set(visibleNodes().map((n) => n.id));
+  const edges = new Set(visibleEdges());
+  cy.batch(() => {
+    cy.nodes().forEach((element) => {
+      element.toggleClass("hidden", !nodes.has(element.id()));
+    });
+    cy.edges().forEach((element) => {
+      element.toggleClass("hidden", !edges.has(DATA.edges[element.data("index")]));
+    });
+  });
+}
+
+/** 影響範囲の色分け。クラスの付け替えだけで済む。 */
+function applyHighlight() {
+  if (!cy) return;
+  cy.batch(() => {
+    cy.elements().removeClass("sel up down dim on-path");
+    if (!state.selected || !byId.has(state.selected)) return;
+    const up = reach(state.selected, false);
+    const down = reach(state.selected, true);
+    const inScope = new Set([state.selected, ...up, ...down]);
+    cy.nodes().forEach((element) => {
+      const id = element.id();
+      if (id === state.selected) element.addClass("sel");
+      else if (up.has(id)) element.addClass("up");
+      else if (down.has(id)) element.addClass("down");
+      else element.addClass("dim");
+    });
+    cy.edges().forEach((element) => {
+      const linked =
+        inScope.has(element.data("source")) && inScope.has(element.data("target"));
+      element.addClass(linked ? "on-path" : "dim");
+    });
+  });
+}
+
+/** 表示中のノードだけで並べ直す。方向を変えたときと「整列」ボタンから呼ぶ。 */
+function relayout() {
+  if (!cy) return;
+  cy.elements(":visible").layout(layoutOptions()).run();
+  fitInitial();
+}
+
 function fitToView() {
-  const svg = graphEl.querySelector("svg");
-  const frame = document.querySelector(".graph-scroll");
-  if (!svg || !frame) return;
-  graphEl.style.transform = "scale(1)";
-  const box = svg.getBoundingClientRect();
-  if (!box.width || !box.height) return;
-  const scale = Math.min(
-    (frame.clientWidth - 24) / box.width,
-    (frame.clientHeight - 24) / box.height,
-    1,
-  );
-  applyZoom(scale);
-  frame.scrollTo(0, 0);
+  if (cy) cy.fit(cy.elements(":visible"), 18);
+}
+
+//: これ以上縮めると文字が読めなくなる倍率。
+const MIN_READABLE_ZOOM = 0.45;
+
+/** 全体表示。ただし極端に横長のグラフでは縮めすぎず、左上から見せる。 */
+function fitInitial() {
+  if (!cy) return;
+  fitToView();
+  if (cy.zoom() >= MIN_READABLE_ZOOM) return;
+  const box = cy.elements(":visible").boundingBox();
+  cy.zoom(MIN_READABLE_ZOOM);
+  cy.pan({ x: 18 - box.x1 * MIN_READABLE_ZOOM, y: 18 - box.y1 * MIN_READABLE_ZOOM });
+}
+
+function zoomBy(factor) {
+  if (!cy) return;
+  cy.zoom({ level: cy.zoom() * factor, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
 }
 
 // --- 詳細パネル ------------------------------------------------------------
@@ -540,7 +663,10 @@ function renderStats() {
   document.getElementById("stats").innerHTML = chips.join("");
   document.getElementById("sources").textContent = DATA.generated_from.join(", ");
   document.getElementById("legend").innerHTML = DATA.types
-    .map((type) => `<span>${type}</span>`)
+    .map((type) => {
+      const meta = DATA.meta.types[type];
+      return `<span><i class="swatch" style="background:${meta.fill};border-color:${meta.stroke}"></i>${type}</span>`;
+    })
     .join("");
 
   const panel = document.getElementById("findings");
@@ -559,12 +685,12 @@ function selectNode(id) {
   state.selected = state.selected === id ? null : id;
   refresh();
 }
-window.selectNode = selectNode;
 
 function refresh() {
   renderNodeList();
   renderDetail();
-  renderGraph();
+  applyVisibility();
+  applyHighlight();
 }
 
 document.getElementById("search").addEventListener("input", renderNodeList);
@@ -574,18 +700,20 @@ document.getElementById("clear").addEventListener("click", () => {
 });
 document.getElementById("direction").addEventListener("change", (event) => {
   state.direction = event.target.value;
-  state.fitPending = true;
-  renderGraph();
+  relayout();
 });
-document.getElementById("zoom-in").addEventListener("click", () => applyZoom(state.zoom * 1.2));
-document.getElementById("zoom-out").addEventListener("click", () => applyZoom(state.zoom / 1.2));
-document.getElementById("zoom-reset").addEventListener("click", () => applyZoom(1));
+document.getElementById("relayout").addEventListener("click", relayout);
+document.getElementById("zoom-in").addEventListener("click", () => zoomBy(1.2));
+document.getElementById("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
+document.getElementById("zoom-reset").addEventListener("click", () => {
+  if (cy) cy.zoom(1);
+});
 document.getElementById("zoom-fit").addEventListener("click", fitToView);
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-  if (mermaid) mermaid.initialize(mermaidConfig());
-  renderGraph();
+  if (cy) cy.style(graphStyle());
 });
 
+initGraph();
 renderFilters();
 renderStats();
 refresh();

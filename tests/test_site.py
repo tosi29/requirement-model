@@ -53,6 +53,13 @@ def test_site_data_contains_graph_findings_and_render_meta():
     assert "has_source" in data["meta"]["dashed_edges"]
     assert set(data["meta"]["impact_colors"]) == {"selected", "upstream", "downstream"}
     assert "satisfies" in data["edge_names"]
+    # テーブルビューの status 列は辞書順ではなく成熟度で並べる。
+    assert data["status_rank"] == {
+        "proposed": 0,
+        "approved": 1,
+        "implemented": 2,
+        "verified": 3,
+    }
     # ページ側が「このグラフに現れうるエッジ」を CLI と同じ手順で数えるための材料。
     assert data["edge_names_by_type"]["Goal"] == ["has_source", "refines", "motivates"]
     assert data["edge_names_by_type"]["Source"] == []
@@ -101,6 +108,18 @@ def test_page_carries_the_app_js_inline(tmp_path: Path):
     assert app_js() in html
     # 外部 JS ファイルは書き出さない (単一ファイルで自己完結する)。
     assert not list(tmp_path.glob("*.js"))
+
+
+def test_page_has_both_the_graph_and_the_table_view(tmp_path: Path):
+    """棚卸し用のテーブルビューは、グラフと同じページのタブとして載る。"""
+    index = build_site(chain(), FindingList(), tmp_path)
+    html = index.read_text(encoding="utf-8")
+
+    for element_id in ("tab-graph", "tab-table", "graph-frame", "table-frame", "node-table"):
+        assert f'id="{element_id}"' in html
+    # 表示層 (site_app.js) が両方を描く。
+    assert "function renderTable(" in html
+    assert "function setMode(" in html
 
 
 def test_definition_text_is_never_treated_as_a_placeholder(tmp_path: Path):

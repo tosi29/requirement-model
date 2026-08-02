@@ -10,6 +10,7 @@ import {
   escapeHtml,
   graphElements,
   graphStyle,
+  isNodeVisible,
   layoutOptions,
   nodeContext,
   reach,
@@ -254,4 +255,42 @@ test("layoutOptions は TD / LR を dagre の rankDir に写す", () => {
   assert.equal(layoutOptions("TD").rankDir, "TB");
   assert.equal(layoutOptions("LR").rankDir, "LR");
   assert.equal(layoutOptions("TD").animate, false);
+});
+
+// --- 選択ノードの追従 -------------------------------------------------------
+
+const EXTENT = { x1: 0, y1: 0, x2: 400, y2: 300 };
+const box = (x1, y1, width = 60, height = 30) => ({
+  x1,
+  y1,
+  x2: x1 + width,
+  y2: y1 + height,
+});
+
+test("表示範囲の内側にあるノードは見えている扱い", () => {
+  assert.equal(isNodeVisible(EXTENT, box(100, 100)), true);
+});
+
+test("表示範囲の外にあるノードは見えていない扱い", () => {
+  assert.equal(isNodeVisible(EXTENT, box(500, 100)), false);
+  assert.equal(isNodeVisible(EXTENT, box(-100, 100)), false);
+  assert.equal(isNodeVisible(EXTENT, box(100, 400)), false);
+  assert.equal(isNodeVisible(EXTENT, box(100, -50)), false);
+});
+
+test("端に掛かっているノードは余白の分だけ外側と見なす", () => {
+  const edge = box(350, 100); // x2 = 410 で右端 (400) をはみ出す
+  assert.equal(isNodeVisible(EXTENT, edge), false);
+
+  const inside = box(300, 100); // x2 = 360。余白 40 でちょうど収まる
+  assert.equal(isNodeVisible(EXTENT, inside, 40), true);
+  assert.equal(isNodeVisible(EXTENT, box(310, 100), 40), false);
+});
+
+test("視野より大きいノードは中心が見えていれば十分", () => {
+  const huge = box(-100, -50, 600, 400);
+  assert.equal(isNodeVisible(EXTENT, huge), true);
+
+  const offCenter = box(300, -50, 600, 400); // 中心 x=600 は右端の外
+  assert.equal(isNodeVisible(EXTENT, offCenter), false);
 });

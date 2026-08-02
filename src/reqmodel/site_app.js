@@ -12,6 +12,7 @@ import {
   escapeHtml,
   graphElements,
   graphStyle,
+  isNodeVisible,
   layoutOptions,
   nodeContext,
   reach,
@@ -136,6 +137,27 @@ function fitInitial() {
   const box = cy.elements(":visible").boundingBox();
   cy.zoom(MIN_READABLE_ZOOM);
   cy.pan({ x: 18 - box.x1 * MIN_READABLE_ZOOM, y: 18 - box.y1 * MIN_READABLE_ZOOM });
+}
+
+//: 選択ノードの周りに最低限空けておきたい余白 (画面 px)。端に半分掛かっている
+//: 状態を「見えている」と扱わないための遊び。
+const REVEAL_MARGIN_PX = 40;
+
+//: パン先が分かる程度に短いアニメーション。
+const REVEAL_DURATION_MS = 180;
+
+/**
+ * 選択ノードが表示範囲の外にあるときだけ、そこまでパンする。
+ * 倍率は変えない。既に見えているノードを選び直しても動かない
+ * (グラフ上のノードを直接クリックしたときはこちらに来る)。
+ */
+function revealSelected() {
+  if (!cy || !state.selected || !view.byId.has(state.selected)) return;
+  const node = cy.getElementById(state.selected);
+  if (node.empty() || node.hasClass("hidden")) return;
+  if (isNodeVisible(cy.extent(), node.boundingBox(), REVEAL_MARGIN_PX / cy.zoom())) return;
+  cy.stop();
+  cy.animate({ center: { eles: node } }, { duration: REVEAL_DURATION_MS });
 }
 
 function zoomBy(factor) {
@@ -326,6 +348,7 @@ function renderStats() {
 function selectNode(id) {
   state.selected = state.selected === id ? null : id;
   refresh();
+  revealSelected();
 }
 
 function refresh() {

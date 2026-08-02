@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from reqmodel.cli import main
+from reqmodel.graph import SCHEMA_VERSION
 
 SAMPLE = str(Path(__file__).resolve().parents[1] / "examples" / "sample.py")
 HEADER = "from reqmodel import Need\n"
@@ -130,8 +131,9 @@ def test_plan_command(tmp_path: Path, capsys, monkeypatch):
 def test_export_command(capsys):
     assert main(["export", SAMPLE]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["schema_version"] == 1
+    assert payload["schema_version"] == SCHEMA_VERSION
     assert payload["nodes"][0]["type"] == "Goal"
+    assert all(node["location"].startswith(SAMPLE + ":") for node in payload["nodes"])
 
 
 def test_commands_refuse_to_run_on_broken_definitions(tmp_path: Path, capsys):

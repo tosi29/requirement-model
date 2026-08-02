@@ -72,6 +72,22 @@ def test_json_round_trip_is_stable():
     assert set(again.nodes) == set(graph.nodes)
 
 
+def test_locations_survive_the_json_round_trip():
+    graph = RequirementGraph([need("N-1"), need("N-2")], {"N-1": "reqs.py:7"})
+    record = {n["id"]: n for n in graph.to_json_obj()["nodes"]}
+    assert record["N-1"]["location"] == "reqs.py:7"
+    assert "location" not in record["N-2"]  # 分からないノードには付けない
+
+    again = RequirementGraph.from_json(graph.to_json())
+    assert again.location_of("N-1") == "reqs.py:7"
+    assert again.location_of("N-2") is None
+
+
+def test_locations_of_unknown_nodes_are_dropped():
+    graph = RequirementGraph([need("N-1")], {"N-1": "reqs.py:7", "N-9": "reqs.py:9"})
+    assert graph.locations == {"N-1": "reqs.py:7"}
+
+
 def test_node_order_is_deterministic():
     graph = build(qr("QR-1"), goal("G-2"), goal("G-1"), system("SYS"))
     assert [n.id for n in graph.ordered_nodes()] == ["G-1", "G-2", "QR-1", "SYS"]

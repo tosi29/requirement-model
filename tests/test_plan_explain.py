@@ -106,6 +106,46 @@ def test_load_revision_reads_the_previous_version(tmp_path: Path):
     assert diff.changed["N-1"][0].before == "早く精算したい"
 
 
+def test_moving_a_definition_to_another_line_is_not_a_change(tmp_path: Path):
+    """出所は正規化 JSON には載るが、diff の比較対象からは外してある。"""
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)
+
+    git("init")
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "t")
+    definition = tmp_path / "requirements.py"
+    definition.write_text(
+        HEADER
+        + 'n = Need(id="N-1", text="早く精算したい")\n'
+        + 'n2 = Need(id="N-2", text="紙をなくしたい")\n',
+        encoding="utf-8",
+    )
+    git("add", "requirements.py")
+    git("commit", "-m", "first")
+
+    # 並べ替えと空行の挿入だけを行う (ノードの中身は変えない)
+    definition.write_text(
+        HEADER
+        + "\n"
+        + 'n2 = Need(id="N-2", text="紙をなくしたい")\n'
+        + "\n"
+        + 'n = Need(id="N-1", text="早く精算したい")\n',
+        encoding="utf-8",
+    )
+
+    previous = load_revision([definition], "HEAD", repo=tmp_path)
+    current = load_paths([definition])
+    assert previous.graph.location_of("N-1") != current.graph.location_of("N-1")
+
+    diff = diff_graphs(previous.graph, current.graph)
+    assert diff.empty
+    assert "構造上の変更はない" in format_plan(
+        previous.graph, current.graph, diff, "HEAD"
+    )
+
+
 def test_load_revision_tolerates_files_absent_in_the_revision(tmp_path: Path):
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     definition = tmp_path / "requirements.py"

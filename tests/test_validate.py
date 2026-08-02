@@ -15,6 +15,7 @@ from conftest import (
     source,
     system,
 )
+from reqmodel.loader import load_sources
 from reqmodel.validate import validate_semantics_lexical, validate_structure
 
 
@@ -202,3 +203,33 @@ def test_ambiguous_term_lookup_avoids_false_positives():
         fr("FR-1", text="本番同等の環境で計測できること", acceptance_criteria=["不安定な回線でも動くこと"])
     )
     assert list(validate_semantics_lexical(graph)) == []
+
+
+# --- 出所 (file:line) の引き回し --------------------------------------------
+
+
+def loaded(*lines: str):
+    header = "from reqmodel import Goal, Need, FunctionalRequirement, Source\n"
+    return load_sources([("reqs.py", header + "".join(lines))]).graph
+
+
+def test_structure_findings_carry_the_definition_location():
+    graph = loaded(
+        's = Source(id="S-1", text="経理部長", kind="stakeholder")\n',
+        'n = Need(id="N-1", text="早く精算したい")\n',
+    )
+    findings = {f.code: f for f in validate_structure(graph)}
+    assert findings["structure.orphan_need"].location == "reqs.py:3"
+    assert findings["structure.unused_source"].location == "reqs.py:2"
+
+
+def test_lexical_findings_carry_the_definition_location():
+    graph = loaded('n = Need(id="N-1", text="高速に精算したい")\n')
+    finding = validate_semantics_lexical(graph).items[0]
+    assert finding.location == "reqs.py:2"
+    assert "reqs.py:2" in finding.format()
+
+
+def test_findings_without_a_known_node_keep_an_empty_location():
+    findings = validate_structure(build(fr("FR-1", satisfies=["N-missing"])))
+    assert all(f.location is None for f in findings)

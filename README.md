@@ -161,6 +161,9 @@ FR / QR には `acceptance_criteria: list[str]` が加わる。
 | 層3 | 意味 | 曖昧語辞書のみ先行実装 (`lexicon.py`)。LLM 連携は後続 |
 
 指摘の重大度は `error` / `severe` (重大警告) / `warning` / `info` の 4 段階。
+指摘には、そのノードを宣言した場所 (`examples/sample.py:42`) が全層で付く。
+層0・層1 は AST の行番号がそのまま出る。層2 は構造だけを見て指摘を作り、
+出所の解決は `validate.attach_locations()` の 1 か所だけで行う。
 
 層2 のチェック一覧:
 
@@ -195,6 +198,11 @@ impact(n) = ancestors(n) ∪ descendants(n)   # --edges でエッジ型を絞れ
 `req plan` は git 前版の定義ファイルを (実行せずに) 読んで正規化し、ノード単位・
 フィールド単位の差分と、変更されたノードの影響範囲を出す。
 
+**出所 (file:line) は diff の比較対象に含めない**。定義を並べ替えただけ、上に 1 行
+足しただけの変更が「グラフが変わった」として出てしまうと、構造 diff の意味が無くなる。
+比較単位は `graph.node_to_json_obj()` (出所を含まないノード表現) で、出所は
+`RequirementGraph.locations` に横持ちする。
+
 `req explain` は影響部分グラフの各ノードの `text` (自然言語) と受け入れ基準を含めて
 整形出力する。機械が網羅性を担保し、解釈は LLM に委ねるための入力を作る。
 
@@ -220,13 +228,14 @@ $ req explain FR-3 -f examples/sample.py --undirected --depth 2
 - ノードをクリックすると、**影響範囲を色分け表示** (選択=赤 / 上流=青 / 下流=緑 / 無関係=減光)
 - ノード種別・エッジ種別の絞り込み。**絞り込みは影響範囲の計算にも効く**
   (`req explain --edges` と同じ考え方)
-- 本文・受け入れ基準・出入りのエッジ・そのノードへの指摘を右ペインに表示
+- 本文・受け入れ基準・出所 (file:line)・出入りのエッジ・そのノードへの指摘を右ペインに表示
 - 「影響部分グラフをコピー」で `req explain` 相当のテキストをクリップボードへ (LLM 連携用)
 - 検証結果の一覧。指摘をクリックすると該当ノードへ飛ぶ
 - ドラッグでパン、ホイールでズーム。ノードは個別に掴んで動かせる
 
 出力ディレクトリには `index.html` のほか、`model.json` (正規化 JSON) と
-`graph.mmd` / `graph.dot` も置かれる。
+`graph.mmd` / `graph.dot` も置かれる。`model.json` の各ノードには
+`"location": "examples/sample.py:42"` が入るので、そこから定義に戻れる。
 
 ```console
 $ req site examples/sample.py -o site --title "経費精算システムの要求グラフ"

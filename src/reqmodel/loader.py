@@ -83,6 +83,7 @@ def load_sources(sources: Iterable[tuple[str, str]]) -> LoadResult:
 def _build(extracts: list[ExtractResult]) -> LoadResult:
     findings = FindingList()
     nodes: list[Node] = []
+    locations: dict[str, str] = {}
     seen_ids: dict[str, str] = {}
 
     for extract in extracts:
@@ -117,9 +118,10 @@ def _build(extracts: list[ExtractResult]) -> LoadResult:
                 )
                 continue
             seen_ids[node.id] = location
+            locations[node.id] = location
             nodes.append(node)
 
-    return LoadResult(graph=RequirementGraph(nodes), findings=findings)
+    return LoadResult(graph=RequirementGraph(nodes, locations), findings=findings)
 
 
 def _instantiate(raw: RawNode, location: str, findings: FindingList) -> Node | None:

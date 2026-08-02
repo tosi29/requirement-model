@@ -10,6 +10,8 @@ import {
   TABLE_COLUMNS,
   activeEdgeNames,
   createView,
+  decodeHash,
+  encodeHash,
   escapeHtml,
   graphElements,
   graphStyle,
@@ -27,18 +29,14 @@ import {
 const cytoscape = window.cytoscape;
 
 const DATA = JSON.parse(document.getElementById("model-data").textContent);
-const state = {
-  types: new Set(DATA.types),
-  edges: new Set(DATA.edge_names),
-  selected: null,
-  direction: "TD",
-  //: 中央ペインに出しているもの。"graph" か "table"。
-  mode: "graph",
-  //: 検索語。左の一覧とテーブルの両方に効く。
-  query: "",
-  //: テーブルの並び順。
-  sort: { key: "id", asc: true },
-};
+
+/**
+ * 表示状態。中身は `defaultState()` を参照。
+ *
+ * URL ハッシュが唯一の出典なので、初期値はハッシュから作り、以降も
+ * 変更のたびに `writeHash()` で書き戻す (戻る/進むは `applyHash()` で戻す)。
+ */
+let state = decodeHash(location.hash, DATA);
 
 /** 絞り込みを反映した現在のグラフ。refresh() で作り直す。 */
 let view = createView(DATA, state);
@@ -296,9 +294,11 @@ function renderNodeList() {
 function renderFilters() {
   const typeCounts = {};
   for (const node of DATA.nodes) typeCounts[node.type] = (typeCounts[node.type] || 0) + 1;
+  //: チェックの初期値は state から取る (ハッシュ付きの URL で開いたとき用)。
+  const checked = (on) => (on ? " checked" : "");
   document.getElementById("type-filters").innerHTML = DATA.types
     .map(
-      (type) => `<label class="toggle"><input type="checkbox" data-type="${type}" checked>
+      (type) => `<label class="toggle"><input type="checkbox" data-type="${type}"${checked(state.types.has(type))}>
         ${type}<span class="count">${typeCounts[type] || 0}</span></label>`,
     )
     .join("");
@@ -307,7 +307,7 @@ function renderFilters() {
   for (const edge of DATA.edges) edgeCounts[edge.name] = (edgeCounts[edge.name] || 0) + 1;
   document.getElementById("edge-filters").innerHTML = DATA.edge_names
     .map(
-      (name) => `<label class="toggle"><input type="checkbox" data-edge="${name}" checked>
+      (name) => `<label class="toggle"><input type="checkbox" data-edge="${name}"${checked(state.edges.has(name))}>
         ${name}<span class="count">${edgeCounts[name] || 0}</span></label>`,
     )
     .join("");
@@ -316,13 +316,27 @@ function renderFilters() {
     input.addEventListener("change", () => {
       input.checked ? state.types.add(input.dataset.type) : state.types.delete(input.dataset.type);
       refresh();
+      writeHash();
     });
   });
   document.querySelectorAll("input[data-edge]").forEach((input) => {
     input.addEventListener("change", () => {
       input.checked ? state.edges.add(input.dataset.edge) : state.edges.delete(input.dataset.edge);
       refresh();
+      writeHash();
     });
+  });
+}
+
+/** 入力欄・チェック・タブを state に合わせ直す。ハッシュから復元したとき用。 */
+function syncControls() {
+  document.getElementById("search").value = state.query;
+  document.getElementById("direction").value = state.direction;
+  document.querySelectorAll("input[data-type]").forEach((input) => {
+    input.checked = state.types.has(input.dataset.type);
+  });
+  document.querySelectorAll("input[data-edge]").forEach((input) => {
+    input.checked = state.edges.has(input.dataset.edge);
   });
 }
 
@@ -414,6 +428,7 @@ function renderTable() {
     button.addEventListener("click", () => {
       state.sort = nextSort(state.sort, button.dataset.key);
       renderTable();
+      writeHash();
     });
   });
   table.querySelectorAll("tbody tr[data-id]").forEach((tr) => {
@@ -456,12 +471,52 @@ function setMode(mode) {
   revealSelected();
 }
 
+// --- URL ハッシュ ----------------------------------------------------------
+//
+// 表示状態と URL を両向きに繋ぐ。書くのは writeHash()、読むのは applyHash() だけ。
+
+/**
+ * いまの状態を URL に書き戻す。
+ *
+ * push=true なら履歴に積む (戻る/進むで辿れる)。検索語のように 1 打鍵ごとに
+ * 変わるものは push=false で最後のエントリを置き換え、履歴を埋めない。
+ */
+function writeHash(push = true) {
+  const hash = encodeHash(state, DATA);
+  if (hash === location.hash) return;
+  // ハッシュが空になるときは "#" 自体を落とす。
+  const url = hash || location.pathname + location.search;
+  try {
+    push ? history.pushState(null, "", url) : history.replaceState(null, "", url);
+  } catch {
+    // file:// で開いていると pushState が使えないことがある。履歴の粒度は
+    // 諦めて、URL だけは合わせる (この代入は hashchange を起こす)。
+    location.hash = hash;
+  }
+}
+
+/**
+ * URL のハッシュから表示状態を作り直す。戻る/進む (popstate) と、URL を手で
+ * 書き換えたとき (hashchange) の入口。既に一致していれば何もしない。
+ */
+function applyHash() {
+  if (location.hash === encodeHash(state, DATA)) return;
+  const next = decodeHash(location.hash, DATA);
+  const turned = next.direction !== state.direction;
+  state = next;
+  syncControls();
+  refresh();
+  setMode(state.mode);
+  if (turned) relayout();
+}
+
 // --- 操作 ------------------------------------------------------------------
 
 function selectNode(id) {
   state.selected = state.selected === id ? null : id;
   refresh();
   revealSelected();
+  writeHash();
 }
 
 function refresh() {
@@ -473,20 +528,29 @@ function refresh() {
   applyHighlight();
 }
 
-document.getElementById("tab-graph").addEventListener("click", () => setMode("graph"));
-document.getElementById("tab-table").addEventListener("click", () => setMode("table"));
+document.getElementById("tab-graph").addEventListener("click", () => {
+  setMode("graph");
+  writeHash();
+});
+document.getElementById("tab-table").addEventListener("click", () => {
+  setMode("table");
+  writeHash();
+});
 document.getElementById("search").addEventListener("input", (event) => {
   state.query = event.target.value;
   renderNodeList();
   renderTable();
+  writeHash(false);
 });
 document.getElementById("clear").addEventListener("click", () => {
   state.selected = null;
   refresh();
+  writeHash();
 });
 document.getElementById("direction").addEventListener("change", (event) => {
   state.direction = event.target.value;
   relayout();
+  writeHash();
 });
 document.getElementById("relayout").addEventListener("click", relayout);
 document.getElementById("zoom-in").addEventListener("click", () => zoomBy(1.2));
@@ -499,7 +563,26 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
   if (cy) cy.style(graphStyle(DATA.meta, palette()));
 });
 
+const copyLink = document.getElementById("copy-link");
+copyLink.addEventListener("click", async () => {
+  //: URL は writeHash() が常に最新にしているので、そのまま渡せばよい。
+  try {
+    await navigator.clipboard.writeText(location.href);
+    copyLink.textContent = "コピーした";
+  } catch {
+    copyLink.textContent = "コピーできなかった";
+  }
+  setTimeout(() => (copyLink.textContent = "リンクをコピー"), 1600);
+});
+
+window.addEventListener("popstate", applyHash);
+window.addEventListener("hashchange", applyHash);
+
 initGraph();
 renderFilters();
+syncControls();
 renderStats();
 refresh();
+setMode(state.mode);
+// 解釈できない項目を落とした後の正しい URL に直す (履歴は増やさない)。
+writeHash(false);

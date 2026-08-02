@@ -210,6 +210,107 @@ export function nextSort(sort, key) {
   return { key, asc: !column.numeric };
 }
 
+// --- URL ハッシュ ----------------------------------------------------------
+//
+// 表示状態を URL に載せ、「この FR を見て」と URL だけ渡せば相手にも同じ画面が
+// 出るようにする (`#node=FR-3&types=Goal,Need&dir=LR`)。
+//
+// 既定値は書かない。初期表示のままなら URL にハッシュは付かず、載っている項目が
+// そのまま「既定と違うところ」の一覧になる。読めるように、値の区切りには
+// パーセントエンコードしない `,` と `:` を使う。
+
+//: テーブルの既定の並び順。
+const DEFAULT_SORT = { key: "id", asc: true };
+
+/** ハッシュが無いときの状態。ページの初期 state でもある。 */
+export function defaultState(data) {
+  return {
+    types: new Set(data.types),
+    edges: new Set(data.edge_names),
+    selected: null,
+    direction: "TD",
+    mode: "graph",
+    query: "",
+    sort: { ...DEFAULT_SORT },
+  };
+}
+
+/** 状態を `#...` にする。既定のままなら空文字 (ハッシュ無し)。 */
+export function encodeHash(state, data) {
+  const params = [];
+  const put = (key, value) => params.push(`${key}=${value}`);
+  //: 選択の順ではなく定義順で並べる。同じ絞り込みなら常に同じ URL になる。
+  const list = (selected, all) =>
+    all.filter((name) => selected.has(name)).map(encodeURIComponent).join(",");
+  const sort = state.sort || DEFAULT_SORT;
+  const query = (state.query || "").trim();
+
+  if (state.selected) put("node", encodeURIComponent(state.selected));
+  if (state.types.size !== data.types.length) put("types", list(state.types, data.types));
+  if (state.edges.size !== data.edge_names.length) {
+    put("edges", list(state.edges, data.edge_names));
+  }
+  if (state.direction === "LR") put("dir", "LR");
+  if (state.mode === "table") put("view", "table");
+  if (query) put("q", encodeURIComponent(query));
+  if (sort.key !== DEFAULT_SORT.key || sort.asc !== DEFAULT_SORT.asc) {
+    put("sort", `${sort.key}:${sort.asc ? "asc" : "desc"}`);
+  }
+  return params.length ? `#${params.join("&")}` : "";
+}
+
+/**
+ * `#...` から状態を復元する。書かれていない項目は既定のまま。
+ *
+ * 手で書き換えられる場所なので、解釈できない値は黙って捨てる (知らないノード
+ * 種別・存在しないノード id・壊れたエスケープ)。ただし `types=` のように
+ * 「空を選んでいる」状態は URL に出せる以上そのまま復元する。
+ */
+export function decodeHash(hash, data) {
+  const state = defaultState(data);
+  const params = parseHash(hash);
+  const subset = (raw, all) =>
+    new Set(raw.split(",").map((name) => name.trim()).filter((name) => all.includes(name)));
+
+  const node = params.get("node");
+  if (node && data.nodes.some((item) => item.id === node)) state.selected = node;
+  if (params.has("types")) state.types = subset(params.get("types"), data.types);
+  if (params.has("edges")) state.edges = subset(params.get("edges"), data.edge_names);
+  if (params.get("dir") === "LR") state.direction = "LR";
+  if (params.get("view") === "table") state.mode = "table";
+  if (params.has("q")) state.query = params.get("q");
+  const sort = parseSort(params.get("sort"));
+  if (sort) state.sort = sort;
+  return state;
+}
+
+/** `#a=1&b=2` を Map にする。壊れている組はその組だけ捨てる。 */
+function parseHash(hash) {
+  const params = new Map();
+  for (const part of (hash || "").replace(/^#/, "").split("&")) {
+    if (!part) continue;
+    const at = part.indexOf("=");
+    try {
+      params.set(
+        decodeURIComponent(at < 0 ? part : part.slice(0, at)),
+        at < 0 ? "" : decodeURIComponent(part.slice(at + 1)),
+      );
+    } catch {
+      // 壊れたパーセントエンコード。
+    }
+  }
+  return params;
+}
+
+/** `findings:desc` を並び順にする。知らない列や向きは null (既定のまま)。 */
+function parseSort(raw) {
+  if (!raw) return null;
+  const [key, order] = raw.split(":");
+  if (!TABLE_COLUMNS.some((column) => column.key === key)) return null;
+  if (order !== "asc" && order !== "desc") return null;
+  return { key, asc: order === "asc" };
+}
+
 // --- LLM 用コンテキスト -----------------------------------------------------
 //
 // 以下は `explain.py` の explain_text() / _describe() / _all_edge_names() の写し。

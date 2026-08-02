@@ -232,7 +232,13 @@ export const META = {
     { type: "Need", label: "Need (上位)" },
   ],
   dashed_edges: ["conflicts", "has_source"],
-  impact_colors: { selected: "#d93025", upstream: "#1a73e8", downstream: "#188038" },
+  impact_colors: {
+    selected: "#d93025",
+    upstream: "#1a73e8",
+    downstream: "#188038",
+    related: "#8430ce",
+  },
+  search: { hit: "#00b8d4" },
 };
 
 /** 既定の state (すべて表示)。 */

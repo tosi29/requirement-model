@@ -8,8 +8,8 @@
 
 import {
   FOCUS_DEPTHS,
+  IMPACT_DEPTHS,
   TABLE_COLUMNS,
-  activeEdgeNames,
   bandDefs,
   bandId,
   bandedLayout,
@@ -17,9 +17,11 @@ import {
   decodeHash,
   encodeHash,
   escapeHtml,
+  explainCommand,
   focusSet,
   graphElements,
   graphStyle,
+  impactSets,
   isNodeVisible,
   layoutOptions,
   legendGroups,
@@ -27,9 +29,10 @@ import {
   nextSort,
   nodeContext,
   priorityFilters,
-  reach,
+  searchHits,
   sortRows,
   statusFilters,
+  stepHit,
   tableRows,
   truncate,
 } from "./site_logic.js";
@@ -208,29 +211,78 @@ function applyVisibility() {
   });
 }
 
-/** 影響範囲の色分け。クラスの付け替えだけで済む。 */
+/**
+ * 影響範囲の色分け。クラスの付け替えだけで済む。
+ *
+ * 範囲は state の深さ・向きの設定 (`impactSets()`) で決まる。設定を変えても
+ * 描く要素は変わらないので、再レイアウトは走らない。
+ */
 function applyHighlight() {
   if (!cy) return;
   cy.batch(() => {
-    cy.elements().removeClass("sel up down dim on-path");
+    cy.elements().removeClass("sel up down rel dim on-path");
     if (!state.selected || !view.byId.has(state.selected)) return;
-    const up = reach(view, state.selected, false);
-    const down = reach(view, state.selected, true);
-    const inScope = new Set([state.selected, ...up, ...down]);
+    const { upstream, downstream, whole, undirected } = impactSets(view, state.selected);
     //: 帯枠は減光の対象にしない (子の強調が読めるよう、枠は常に薄いまま)。
     cy.nodes().not(".band").forEach((element) => {
       const id = element.id();
       if (id === state.selected) element.addClass("sel");
-      else if (up.has(id)) element.addClass("up");
-      else if (down.has(id)) element.addClass("down");
+      //: 無向のときは上流/下流を分けない (CLI と同じく 1 つの「関連」)。
+      else if (undirected) element.addClass(downstream.has(id) ? "rel" : "dim");
+      else if (upstream.has(id)) element.addClass("up");
+      else if (downstream.has(id)) element.addClass("down");
       else element.addClass("dim");
     });
     cy.edges().forEach((element) => {
       const linked =
-        inScope.has(element.data("source")) && inScope.has(element.data("target"));
+        whole.has(element.data("source")) && whole.has(element.data("target"));
       element.addClass(linked ? "on-path" : "dim");
     });
   });
+}
+
+// --- 検索のグラフ連動 -------------------------------------------------------
+//
+// 検索は左の一覧を絞るだけでは足りない。ヒットしたノードが図のどこにあるかが
+// 分からないと、1 件ずつ選んで確かめることになる。図の上でも暈し (underlay) で
+// 示し、↑↓ で候補を送れるようにする。
+//
+// 暈しは影響範囲の色分け (枠線) とは別の視覚チャンネルなので、両方が同時に
+// 点いても読み分けられる。
+
+//: ↑↓ で送っている最中の候補。URL には載せない (選択とは別で、履歴に残す
+//: ほどの状態ではない)。検索語が変わると先頭に戻る。
+let cursor = null;
+
+/** いまの検索語にヒットするノードの id (一覧と同じ並び)。 */
+const hits = () => searchHits(view, state.query);
+
+/** 検索ヒットの暈し。影響範囲のクラスとは独立に付け外しする。 */
+function applySearchHits() {
+  if (!cy) return;
+  const matched = new Set(hits());
+  cy.batch(() => {
+    cy.nodes().not(".band").forEach((element) => {
+      const id = element.id();
+      element.toggleClass("hit", matched.has(id));
+      element.toggleClass("hit-current", id === cursor);
+    });
+  });
+}
+
+/**
+ * ↑↓ で候補を送る。図では現在の候補を強く出し、画面外ならそこまでパンする。
+ * 選択 (state.selected) は動かさない。決めるのは Enter。
+ */
+function moveCursor(delta) {
+  const next = stepHit(hits(), cursor, delta);
+  if (next === null) return;
+  cursor = next;
+  renderNodeList();
+  applySearchHits();
+  revealNode(cursor);
+  const active = document.querySelector("#node-list .node-btn.cursor");
+  if (active) active.scrollIntoView({ block: "nearest" });
 }
 
 /** 表示中のノードだけで並べ直す。方向を変えたときと「整列」ボタンから呼ぶ。 */
@@ -263,19 +315,22 @@ const REVEAL_MARGIN_PX = 40;
 const REVEAL_DURATION_MS = 180;
 
 /**
- * 選択ノードが表示範囲の外にあるときだけ、そこまでパンする。
- * 倍率は変えない。既に見えているノードを選び直しても動かない
+ * 指定ノードが表示範囲の外にあるときだけ、そこまでパンする。
+ * 倍率は変えない。既に見えているノードなら動かない
  * (グラフ上のノードを直接クリックしたときはこちらに来る)。
  */
-function revealSelected() {
+function revealNode(id) {
   if (!cy || state.mode !== "graph") return;
-  if (!state.selected || !view.byId.has(state.selected)) return;
-  const node = cy.getElementById(state.selected);
+  if (!id || !view.byId.has(id)) return;
+  const node = cy.getElementById(id);
   if (node.empty() || node.hasClass("hidden")) return;
   if (isNodeVisible(cy.extent(), node.boundingBox(), REVEAL_MARGIN_PX / cy.zoom())) return;
   cy.stop();
   cy.animate({ center: { eles: node } }, { duration: REVEAL_DURATION_MS });
 }
+
+/** 選択ノードを表示範囲に入れる。選択が変わったときの追従。 */
+const revealSelected = () => revealNode(state.selected);
 
 function zoomBy(factor) {
   if (!cy) return;
@@ -295,8 +350,7 @@ function renderDetail() {
     return;
   }
   const node = view.byId.get(state.selected);
-  const up = [...reach(view, node.id, false)];
-  const down = [...reach(view, node.id, true)];
+  const impact = impactSets(view, node.id);
   const outgoing = view.edges.filter((edge) => edge.source === node.id);
   const incoming = view.edges.filter((edge) => edge.target === node.id);
 
@@ -309,8 +363,13 @@ function renderDetail() {
   if (node.kind) rows.push(`<dt>kind</dt><dd>${node.kind}</dd>`);
   if (node.decomposition) rows.push(`<dt>分解</dt><dd>${node.decomposition}</dd>`);
   if (node.location) rows.push(`<dt>出所</dt><dd class="loc">${escapeHtml(node.location)}</dd>`);
-  rows.push(`<dt>上流</dt><dd>${up.length} 件</dd>`);
-  rows.push(`<dt>下流</dt><dd>${down.length} 件</dd>`);
+  //: 件数は影響範囲の設定 (深さ・向き) に従う。図の色分けと同じ範囲を数える。
+  if (impact.undirected) {
+    rows.push(`<dt>関連</dt><dd>${impact.downstream.size} 件</dd>`);
+  } else {
+    rows.push(`<dt>上流</dt><dd>${impact.upstream.size} 件</dd>`);
+    rows.push(`<dt>下流</dt><dd>${impact.downstream.size} 件</dd>`);
+  }
   rows.push("</dl>");
 
   if ((node.acceptance_criteria || []).length) {
@@ -345,12 +404,10 @@ function renderDetail() {
     for (const finding of nodeFindings) rows.push(findingHtml(finding));
   }
 
-  const filtered = activeEdgeNames(view);
   rows.push('<h2>LLM 連携</h2><button id="copy-context">影響部分グラフをコピー</button>');
   rows.push(
-    `<p class="hint"><code>req explain ${node.id}` +
-      (filtered ? ` --edges ${filtered.join(",")}` : "") +
-      "</code> と同じ内容をクリップボードに入れる。</p>",
+    `<p class="hint"><code>${escapeHtml(explainCommand(view, node.id))}</code>` +
+      " と同じ内容をクリップボードに入れる。</p>",
   );
   panel.innerHTML = rows.join("");
 
@@ -387,11 +444,16 @@ function renderNodeList() {
   const list = document.getElementById("node-list");
   const matched = view.nodes.filter((node) => matchesQuery(node, state.query));
   list.innerHTML = matched
-    .map(
-      (node) => `<li><button class="node-btn ${node.id === state.selected ? "active" : ""}" data-id="${node.id}">
+    .map((node) => {
+      const marks = [
+        node.id === state.selected ? "active" : "",
+        //: ↑↓ で送っている最中の候補。図の暈しと同じものを指す。
+        node.id === cursor ? "cursor" : "",
+      ].join(" ");
+      return `<li><button class="node-btn ${marks}" data-id="${node.id}">
         <span class="id">${node.id}</span> <span class="type">${node.type}</span><br>${escapeHtml(truncate(node.text, 34))}
-      </button></li>`,
-    )
+      </button></li>`;
+    })
     .join("");
   list.querySelectorAll("button[data-id]").forEach((button) => {
     button.addEventListener("click", () => selectNode(button.dataset.id));
@@ -470,11 +532,31 @@ function renderFocusOptions() {
   ].join("");
 }
 
+/**
+ * 影響範囲の探索設定。深さの上限は `IMPACT_DEPTHS` を唯一の出典とする。
+ *
+ * ここはグラフの描画ではなく**影響範囲そのもの**の設定なので、図のツールバー
+ * (フォーカス) ではなく絞り込みと同じ左サイドバーに置く。色分け・詳細ペインの
+ * 件数・コピー本文の 3 つに同じだけ効く。
+ */
+function renderImpactControls() {
+  const slider = document.getElementById("depth");
+  slider.min = "0";
+  slider.max = String(Math.max(...IMPACT_DEPTHS));
+  slider.step = "1";
+}
+
+/** 深さスライダの現在値の表示。0 は上限無し。 */
+const depthLabel = () => (state.depth ? `${state.depth} ホップ` : "無制限");
+
 /** 入力欄・チェック・タブを state に合わせ直す。ハッシュから復元したとき用。 */
 function syncControls() {
   document.getElementById("search").value = state.query;
   document.getElementById("direction").value = state.direction;
   document.getElementById("focus").value = String(state.focus);
+  document.getElementById("depth").value = String(state.depth);
+  document.getElementById("depth-value").textContent = depthLabel();
+  document.getElementById("undirected").checked = state.undirected;
   for (const [attribute, key] of FILTER_SETS) {
     document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
       input.checked = state[key].has(input.dataset[attribute]);
@@ -673,13 +755,25 @@ function selectNode(id) {
   writeHash();
 }
 
+/** 選択を決める (トグルしない)。キーボードの Enter から呼ぶ。 */
+function chooseNode(id) {
+  if (state.selected === id) {
+    revealNode(id);
+    return;
+  }
+  selectNode(id);
+}
+
 function refresh() {
   view = createView(DATA, state);
+  //: 絞り込みや検索語の変更で候補から外れた位置は捨てる。
+  if (cursor !== null && !hits().includes(cursor)) cursor = null;
   renderNodeList();
   renderDetail();
   renderTable();
   applyVisibility();
   applyHighlight();
+  applySearchHits();
   //: 選択の変更・フォーカスの入切・URL からの復元がすべてここを通る。
   syncFocusLayout();
 }
@@ -694,9 +788,37 @@ document.getElementById("tab-table").addEventListener("click", () => {
 });
 document.getElementById("search").addEventListener("input", (event) => {
   state.query = event.target.value;
+  //: 語が変われば候補も変わる。位置は先頭から数え直す。
+  cursor = null;
   renderNodeList();
   renderTable();
+  applySearchHits();
   writeHash(false);
+});
+//: ↑↓ で候補を送り、Enter で決める。入力欄から手を離さずに図を辿れるようにする。
+document.getElementById("search").addEventListener("keydown", (event) => {
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    moveCursor(event.key === "ArrowDown" ? 1 : -1);
+    return;
+  }
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  const target = cursor === null ? hits()[0] : cursor;
+  if (target) chooseNode(target);
+});
+document.getElementById("depth").addEventListener("input", (event) => {
+  state.depth = Number(event.target.value);
+  document.getElementById("depth-value").textContent = depthLabel();
+  //: 描く要素は変わらないので再レイアウトは走らない (色分けと本文だけが変わる)。
+  refresh();
+  //: つまみを動かしている間の 1 段ごとに履歴を積まない。
+  writeHash(false);
+});
+document.getElementById("undirected").addEventListener("change", (event) => {
+  state.undirected = event.target.checked;
+  refresh();
+  writeHash();
 });
 document.getElementById("clear").addEventListener("click", () => {
   state.selected = null;
@@ -743,6 +865,7 @@ window.addEventListener("hashchange", applyHash);
 initGraph();
 renderFilters();
 renderFocusOptions();
+renderImpactControls();
 syncControls();
 renderStats();
 refresh();

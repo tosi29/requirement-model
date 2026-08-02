@@ -38,6 +38,23 @@ jobs:
       - name: 定義ファイルを検証する
         run: req validate examples/sample.py
 
+  mcp:
+    # MCP サーバは追加インストール (`reqmodel[mcp]`) でしか動かない。
+    # 本体側のジョブはコア依存のままにして、SDK 込みの経路だけここで通す。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: インストール
+        run: pip install -e ".[dev,mcp]"
+
+      - name: MCP サーバのテスト
+        run: pytest -q tests/test_mcp.py
+
   site-js:
     # 埋め込み前の JS を、単体で構文検査してユニットテストにかける。
     runs-on: ubuntu-latest

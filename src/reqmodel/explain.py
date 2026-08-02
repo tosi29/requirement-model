@@ -6,12 +6,12 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 from .graph import RequirementGraph
 from .model import Source, edge_specs_for
 
-__all__ = ["impact_set", "explain_text", "subgraph_edges"]
+__all__ = ["impact_set", "explain_text", "impact_json", "subgraph_edges"]
 
 
 def impact_set(
@@ -53,6 +53,34 @@ def subgraph_edges(graph: RequirementGraph, node_ids: set[str]) -> list:
         for edge in graph.edges
         if edge.source in node_ids and edge.target in node_ids
     ]
+
+
+def impact_json(
+    graph: RequirementGraph,
+    targets: Sequence[str],
+    edge_names: Iterable[str] | None = None,
+    depth: int | None = None,
+    undirected: bool = False,
+) -> dict[str, Any]:
+    """影響部分グラフの機械可読表現。
+
+    `req explain --json` と MCP の impact ツールが同じものを返すよう、組み立ては
+    ここ 1 か所に置く。
+    """
+    ancestors, descendants, whole = impact_set(
+        graph, targets, edge_names, depth, undirected
+    )
+    sub = RequirementGraph(
+        [graph.nodes[i] for i in whole if i in graph.nodes], graph.locations
+    )
+    return {
+        "targets": list(targets),
+        "missing": [t for t in targets if t not in graph.nodes],
+        "undirected": undirected,
+        "ancestors": sorted(ancestors),
+        "descendants": sorted(descendants),
+        "subgraph": sub.to_json_obj(),
+    }
 
 
 def _describe(graph: RequirementGraph, node_id: str) -> list[str]:

@@ -6,6 +6,7 @@
     req explain <ID...>    # 影響部分グラフをテキスト化 (LLM コンテキスト用)
     req export             # 正規化 JSON の出力
     req site               # 閲覧用の静的サイト生成 (GitHub Pages 用)
+    req mcp                # MCP サーバ (stdio) として公開する
 """
 
 from __future__ import annotations
@@ -16,10 +17,17 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from .explain import explain_text, impact_set
+from .explain import explain_text, impact_json
 from .findings import FindingList
-from .graph import RequirementGraph
 from .loader import LoadResult, discover_paths, load_paths
+from .mcpserver import (
+    GraphSession,
+    MissingDependency,
+    ReqTools,
+    build_server,
+    run_stdio,
+    tool_specs,
+)
 from .model import EDGE_NAMES
 from .plan import diff_graphs, format_plan, load_revision
 from .render import FORMATS, render
@@ -139,6 +147,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-lexicon", action="store_true", help="曖昧語チェックを行わない"
     )
 
+    mcp_parser = subparsers.add_parser(
+        "mcp",
+        help="MCP サーバ (stdio) として公開し、LLM エージェントから参照できるようにする",
+    )
+    add_common(mcp_parser)
+    mcp_parser.add_argument(
+        "--list-tools",
+        action="store_true",
+        help="公開するツールの一覧を JSON で出して終わる (サーバは起動しない)",
+    )
+
     return parser
 
 
@@ -147,9 +166,14 @@ def build_parser() -> argparse.ArgumentParser:
 # ---------------------------------------------------------------------------
 
 
+def _explicit(args: argparse.Namespace) -> list[str] | None:
+    """コマンドラインで指定された定義ファイル (未指定なら None)。"""
+    given = list(getattr(args, "path", []) or []) + list(args.file or [])
+    return given or None
+
+
 def _paths(args: argparse.Namespace) -> list[Path]:
-    explicit = list(getattr(args, "path", []) or []) + list(args.file or [])
-    return discover_paths(explicit or None)
+    return discover_paths(_explicit(args))
 
 
 def _load(args: argparse.Namespace) -> LoadResult:
@@ -285,20 +309,9 @@ def cmd_explain(args: argparse.Namespace) -> int:
         return EXIT_USAGE
 
     if args.json:
-        ancestors, descendants, whole = impact_set(
+        payload = impact_json(
             result.graph, args.ids, edges, args.depth, args.undirected
         )
-        sub = RequirementGraph(
-            [result.graph.nodes[i] for i in whole if i in result.graph.nodes],
-            result.graph.locations,
-        )
-        payload = {
-            "targets": list(args.ids),
-            "undirected": args.undirected,
-            "ancestors": sorted(ancestors),
-            "descendants": sorted(descendants),
-            "subgraph": sub.to_json_obj(),
-        }
         _write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", args.output)
     else:
         _write(
@@ -338,6 +351,35 @@ def cmd_site(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_mcp(args: argparse.Namespace) -> int:
+    if args.list_tools:
+        print(json.dumps(tool_specs(), ensure_ascii=False, indent=2))
+        return EXIT_OK
+
+    # 層0/層1 のエラーがあってもサーバは起動する。エージェントは validate を
+    # 呼んで理由を知り、定義ファイルを直せばよい (呼ぶたびに読み直される)。
+    session = GraphSession(_explicit(args))
+    result = session.result()
+    try:
+        server = build_server(ReqTools(session))
+    except MissingDependency as exc:
+        print(str(exc), file=sys.stderr)
+        return EXIT_USAGE
+
+    print(
+        f"MCP サーバ (stdio) を開始する: "
+        f"{', '.join(str(p) for p in result.paths)} ({len(result.graph)} ノード)",
+        file=sys.stderr,
+    )
+    if not result.ok:
+        print(
+            "定義ファイルに層0/層1 のエラーがある。validate ツールで確認できる。",
+            file=sys.stderr,
+        )
+    run_stdio(server)
+    return EXIT_OK
+
+
 _COMMANDS = {
     "validate": cmd_validate,
     "plan": cmd_plan,
@@ -345,6 +387,7 @@ _COMMANDS = {
     "explain": cmd_explain,
     "export": cmd_export,
     "site": cmd_site,
+    "mcp": cmd_mcp,
 }
 
 

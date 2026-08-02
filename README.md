@@ -19,7 +19,8 @@
     ├─ validate (層1: 構文 / 層2: 構造)
     ├─ plan     (git 前版との構造 diff + 影響範囲)
     ├─ graph    (Mermaid / DOT 出力)
-    └─ explain  (影響部分グラフ抽出 → LLM 用コンテキスト生成)
+    ├─ explain  (影響部分グラフ抽出 → LLM 用コンテキスト生成)
+    └─ mcp      (MCP サーバ: 上記を LLM エージェントから直接引かせる)
 ```
 
 - Python クラス (Pydantic) = 書くためのインターフェース兼スキーマ。
@@ -35,6 +36,12 @@ $ pip install -e .          # Python 3.11 以上 / 依存は pydantic のみ
 $ req validate examples/sample.py
 ```
 
+LLM エージェントから引かせる (`req mcp`) ときだけ、MCP SDK を追加で入れる。
+
+```console
+$ pip install -e ".[mcp]"   # コア側の依存は増えない
+```
+
 ## 使い方
 
 ```console
@@ -44,6 +51,7 @@ $ req graph    [PATH ...] [--format mermaid|dot] [-o FILE]
 $ req explain  ID [ID ...] [-f PATH]       # 影響部分グラフを LLM 用に整形
 $ req export   [PATH ...] [-o FILE]        # 正規化 JSON の出力
 $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (GitHub Pages 用)
+$ req mcp      [PATH ...]                  # MCP サーバ (stdio) として公開する
 ```
 
 `PATH` を省略するとカレントの `requirements.py` または `requirements/` を探す。
@@ -65,6 +73,7 @@ $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (
 | `--undirected` | explain | エッジの向きを無視して辿る |
 | `--highlight ID,ID` | graph | 指定ノードを強調する |
 | `--title` / `--assets` | site | ページ題名 / 描画ライブラリの参照先 (`cdn` or `local`) |
+| `--list-tools` | mcp | 公開するツールの一覧を JSON で出して終わる |
 
 ## 定義ファイルの規約 (宣言のみ)
 
@@ -305,6 +314,65 @@ $ npm test        # node --test tests/js/*.test.mjs
 ついて Python の `explain_text()` と JS の `nodeContext()` を突き合わせ、一致を保証する
 (絞り込み中は `req explain --edges ...` に対応する)。
 
+## MCP サーバ (LLM エージェント連携)
+
+`req explain` の出力を人がコピペする経路 (site の「影響部分グラフをコピー」ボタンを
+含む) に加えて、エージェント側から要求グラフを**直接引ける**経路を用意する。
+Claude Code 等が、実装やレビューの最中に「この FR は何のためにあるか」「これを
+変えると何が壊れるか」をその場で確かめられる。
+
+```console
+$ pip install -e ".[mcp]"
+$ req mcp examples/sample.py     # stdio で待ち受ける (単体で叩くものではない)
+```
+
+Claude Code への登録は次のとおり。
+
+```console
+$ claude mcp add reqmodel -- req mcp examples/sample.py
+```
+
+```json
+{
+  "mcpServers": {
+    "reqmodel": { "command": "req", "args": ["mcp", "examples/sample.py"] }
+  }
+}
+```
+
+公開するツールは 5 つ。**参照だけで、定義ファイルは書き換えない** (書き換えるのは
+エージェント自身であり、その結果はサーバ側が読み直す)。
+
+| ツール | 返すもの | 対応する CLI |
+|---|---|---|
+| `validate` | 層0〜層2 + 曖昧語の指摘一覧 | `req validate --json` |
+| `explain` | 影響部分グラフの整形テキスト (`ids` / `edges` / `depth` / `undirected`) | `req explain` |
+| `impact` | 影響範囲の ID と部分グラフの正規化 JSON | `req explain --json` |
+| `search` | id・本文の部分一致でノードを探す (型・件数で絞れる) | — |
+| `node` | ノード 1 件の詳細 (属性・出所・出入りのエッジ・そのノードへの指摘) | — |
+
+`req mcp --list-tools` で入力スキーマ込みの一覧が出る (SDK が無くても動く)。
+スキーマはツール実装のシグネチャから導出しており、別に書き起こさない。
+
+設計上の要点。
+
+- **依存はオプショナル**。SDK に触るのは `mcpserver.build_server()` / `run_stdio()` だけで、
+  ツールの中身 (`ReqTools`) は SDK 無しで動く。テストも SDK 無しで回り、
+  SDK を入れた環境でだけ stdio 越しの疎通まで確認する (`tests/test_mcp.py`)。
+  SDK が入っていなければ `req mcp` は導入方法を出して終了コード 2 で止まる。
+- **呼ぶたびにグラフを読み直す**。定義ファイルの更新時刻とサイズが変われば読み直す
+  (実行はしないので AST の解析だけで済む)。エージェントが定義を書き換えた直後に
+  古い答えを返さない。ディレクトリ指定なら、増えたファイルも拾う。
+- **CLI と同じ文字列を返す**。`explain` は `req explain` と、`impact` は
+  `req explain --json` と同じ関数から作る。site の JS が `req explain` と一致することを
+  テストで縛っている (`tests/test_site_js.py`) のと同じ理由で、エージェントに渡る
+  コンテキストが CLI と別物になることを防ぐ。
+- 層0/層1 のエラーがあってもサーバは起動する。理由を返せなければ直しようがないため、
+  `validate` で指摘を返し、直ったら次の呼び出しで読み直す。
+
+「LLM API を直接呼ばない」という非スコープは変わっていない。呼ぶのは LLM 側で、
+こちらは問い合わせに答えるだけである。
+
 ## GitHub Pages への公開
 
 `.github/workflows/pages.yml` が、`main` への push (と手動実行) をきっかけに
@@ -322,6 +390,13 @@ Source を **GitHub Actions** にする。これは API やワークフローか
 $ pip install -e ".[dev]"
 $ pytest
 $ mypy
+```
+
+MCP サーバの stdio 越しの疎通まで回すなら、SDK も入れる (入れなければ skip される)。
+
+```console
+$ pip install -e ".[dev,mcp]"
+$ pytest tests/test_mcp.py
 ```
 
 静的サイトの JS だけを回すなら Node (18 以上) で次を叩く。依存パッケージは無い。
@@ -350,6 +425,7 @@ skip されるので、CI では `.github/workflows/ci.yml` が node を明示�
 ## 非スコープ (初期実装では作らない)
 
 - RDB / 外部ストレージ、Web UI
-- LLM API の直接呼び出し (`explain` はコンテキスト生成まで)
+- LLM API の直接呼び出し (`explain` はコンテキスト生成まで、`req mcp` は
+  エージェントからの問い合わせに答えるまで)
 - i* のアクター依存モデル、KAOS の Obstacle
 - 複数体系の統合メタモデル

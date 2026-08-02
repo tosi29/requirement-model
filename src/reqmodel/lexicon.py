@@ -5,12 +5,16 @@
 
 語によっては単純な部分一致で誤検出する (「同等」の中の「等」など) ため、
 必要なものだけ正規表現で文脈を絞る。
+
+ここにあるのは組み込みの辞書。プロジェクト固有の追加・除外は設定ファイルの
+``[lexicon]`` で行う (``config.LexiconConfig``)。
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Sequence
 
 __all__ = ["AmbiguousTerm", "AMBIGUOUS_TERMS", "find_ambiguous_terms"]
 
@@ -63,10 +67,15 @@ AMBIGUOUS_TERMS: tuple[AmbiguousTerm, ...] = (
 )
 
 
-def find_ambiguous_terms(text: str) -> list[tuple[str, str]]:
-    """文字列に含まれる曖昧語を (表記, 助言) の列で返す。"""
+def find_ambiguous_terms(
+    text: str, terms: Sequence[AmbiguousTerm] | None = None
+) -> list[tuple[str, str]]:
+    """文字列に含まれる曖昧語を (表記, 助言) の列で返す。
+
+    terms を渡さなければ組み込み辞書をそのまま使う。
+    """
     return [
         (term.label, term.advice)
-        for term in AMBIGUOUS_TERMS
+        for term in (AMBIGUOUS_TERMS if terms is None else terms)
         if term.regex().search(text)
     ]

@@ -13,6 +13,7 @@ from typing import Iterable, Sequence
 from pydantic import ValidationError
 
 from .astcheck import ExtractResult, RawNode, extract_file, extract_source
+from .config import active_config
 from .findings import Finding, FindingList
 from .graph import RequirementGraph
 from .model import NODE_TYPES, Node
@@ -121,7 +122,10 @@ def _build(extracts: list[ExtractResult]) -> LoadResult:
             locations[node.id] = location
             nodes.append(node)
 
-    return LoadResult(graph=RequirementGraph(nodes, locations), findings=findings)
+    return LoadResult(
+        graph=RequirementGraph(nodes, locations),
+        findings=active_config().apply(findings),
+    )
 
 
 def _instantiate(raw: RawNode, location: str, findings: FindingList) -> Node | None:

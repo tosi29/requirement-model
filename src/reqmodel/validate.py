@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from .config import Config, active_config
 from .findings import Finding, FindingList
 from .graph import RequirementGraph
 from .lexicon import find_ambiguous_terms
 from .model import (
-    HIGH_PRIORITY_THRESHOLD,
     STATUS_RANK,
     Constraint,
     Decision,
@@ -26,14 +26,22 @@ from .model import (
     edge_specs_for,
 )
 
-__all__ = ["validate_structure", "validate_semantics_lexical", "attach_locations"]
+__all__ = [
+    "validate_structure",
+    "validate_semantics_lexical",
+    "validate_naming",
+    "attach_locations",
+]
 
 #: 上流ノードの承認状態を検査するエッジ。
 _STATUS_EDGES = ("satisfies", "refines", "qualifies", "motivates", "constrains")
 
 
-def validate_structure(graph: RequirementGraph) -> FindingList:
+def validate_structure(
+    graph: RequirementGraph, config: Config | None = None
+) -> FindingList:
     """層2: 構造チェック一式。"""
+    config = config or active_config()
     findings = FindingList()
     _check_edges(graph, findings)
     _check_refines_cycles(graph, findings)
@@ -42,11 +50,11 @@ def validate_structure(graph: RequirementGraph) -> FindingList:
     _check_orphan_quality(graph, findings)
     _check_unused_sources(graph, findings)
     _check_goal_decomposition(graph, findings)
-    _check_conflicts(graph, findings)
+    _check_conflicts(graph, findings, config)
     _check_sources_present(graph, findings)
     _check_acceptance_criteria(graph, findings)
     _check_status_consistency(graph, findings)
-    return attach_locations(graph, findings)
+    return config.apply(attach_locations(graph, findings))
 
 
 def attach_locations(graph: RequirementGraph, findings: FindingList) -> FindingList:
@@ -298,11 +306,13 @@ def _check_goal_decomposition(graph: RequirementGraph, findings: FindingList) ->
 # ---------------------------------------------------------------------------
 
 
-def _is_high_priority(node: Node) -> bool:
-    return node.priority is not None and node.priority <= HIGH_PRIORITY_THRESHOLD
+def _is_high_priority(node: Node, config: Config) -> bool:
+    return node.priority is not None and node.priority <= config.high_priority_threshold
 
 
-def _check_conflicts(graph: RequirementGraph, findings: FindingList) -> None:
+def _check_conflicts(
+    graph: RequirementGraph, findings: FindingList, config: Config
+) -> None:
     resolved: set[frozenset[str]] = set()
     for decision in graph.by_type(Decision):
         for pair in decision.resolves:
@@ -348,7 +358,7 @@ def _check_conflicts(graph: RequirementGraph, findings: FindingList) -> None:
             other = graph.nodes.get(edge.target)
             if other is None:
                 continue
-            high = _is_high_priority(node) and _is_high_priority(other)
+            high = _is_high_priority(node, config) and _is_high_priority(other, config)
             findings.add(
                 Finding(
                     severity="severe" if high else "warning",
@@ -437,14 +447,18 @@ def _check_status_consistency(graph: RequirementGraph, findings: FindingList) ->
 # ---------------------------------------------------------------------------
 
 
-def validate_semantics_lexical(graph: RequirementGraph) -> FindingList:
+def validate_semantics_lexical(
+    graph: RequirementGraph, config: Config | None = None
+) -> FindingList:
+    config = config or active_config()
+    terms = config.lexicon_terms()
     findings = FindingList()
     for node in graph.ordered_nodes():
         texts = [node.text]
         texts.extend(getattr(node, "acceptance_criteria", []) or [])
         reported: set[str] = set()
         for text in texts:
-            for term, advice in find_ambiguous_terms(text):
+            for term, advice in find_ambiguous_terms(text, terms):
                 if term in reported:
                     continue
                 reported.add(term)
@@ -457,4 +471,37 @@ def validate_semantics_lexical(graph: RequirementGraph) -> FindingList:
                         node_id=node.id,
                     )
                 )
-    return attach_locations(graph, findings)
+    return config.apply(attach_locations(graph, findings))
+
+
+# ---------------------------------------------------------------------------
+# ID 命名規則 (設定した型についてだけ走る)
+# ---------------------------------------------------------------------------
+
+
+def validate_naming(
+    graph: RequirementGraph, config: Config | None = None
+) -> FindingList:
+    """設定の ``[id_prefix]`` に照らして ID の接頭辞を検査する。
+
+    設定が無ければ 1 件も出ない (既定では何もしないチェック)。
+    """
+    config = config or active_config()
+    findings = FindingList()
+    if not config.id_prefix:
+        return findings
+    for node in graph.ordered_nodes():
+        prefix = config.id_prefix.get(type(node).__name__)
+        if prefix and not node.id.startswith(prefix):
+            findings.add(
+                Finding(
+                    severity="warning",
+                    code="naming.id_prefix",
+                    layer=1,
+                    message=(
+                        f"{type(node).__name__} の id は「{prefix}」で始めること"
+                    ),
+                    node_id=node.id,
+                )
+            )
+    return config.apply(attach_locations(graph, findings))

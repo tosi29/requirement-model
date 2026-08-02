@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import subprocess
 from pathlib import Path
@@ -199,6 +200,40 @@ def test_plan_command(tmp_path: Path, capsys, monkeypatch):
     out = capsys.readouterr().out
     assert "# 構造 diff (HEAD → 作業ツリー)" in out
     assert "text: 早く精算したい → 今すぐ精算したい" in out
+
+
+def test_doc_command_writes_spec(tmp_path: Path):
+    output = tmp_path / "spec.md"
+    assert main(["doc", SAMPLE, "-o", str(output)]) == 0
+    text = output.read_text(encoding="utf-8")
+    assert text.startswith("# 要求仕様書\n")
+    assert "### G-1 経費精算にかかる全社の工数を半減する" in text
+    assert "##### FR-1 領収書画像から金額と日付を抽出し" in text
+
+
+def test_doc_title_option(capsys):
+    assert main(["doc", "-f", SAMPLE, "--title", "経費精算 要求仕様書"]) == 0
+    assert capsys.readouterr().out.startswith("# 経費精算 要求仕様書\n")
+
+
+def test_doc_matrix_infers_csv_from_output_suffix(tmp_path: Path):
+    output = tmp_path / "trace.csv"
+    assert main(["doc", SAMPLE, "--matrix", "-o", str(output)]) == 0
+    rows = list(csv.reader(output.read_text(encoding="utf-8").splitlines()))
+    assert rows[0][:4] == ["matrix", "edge", "row_type", "row_id"]
+    assert ["Need × FR", "satisfies", "Need", "N-1"] in [row[:4] for row in rows]
+
+
+def test_doc_matrix_markdown(capsys):
+    assert main(["doc", SAMPLE, "--matrix"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("# トレーサビリティマトリクス\n")
+    assert "| Need × FR | FR-1 | FR-2 | FR-3 | FR-4 | FR-5 |" in out
+
+
+def test_doc_rejects_csv_without_matrix(capsys):
+    assert main(["doc", SAMPLE, "--format", "csv"]) == 2
+    assert "--matrix を付けること" in capsys.readouterr().err
 
 
 def test_export_command(capsys):

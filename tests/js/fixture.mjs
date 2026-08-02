@@ -123,6 +123,98 @@ export function fixture(overrides = {}) {
   };
 }
 
+/**
+ * 大きい合成グラフ。`examples/bench.py` と同じ形 (1 本の Goal 木 → Need →
+ * 同じ段に大量に並ぶ FR → QR) を JS 側だけで組む。
+ *
+ * スケール時の振る舞い (探索の計算量・フォーカスの効き) を、Python を通さずに
+ * テストとベンチから使うためのもの。件数を渡せば任意の規模になる。
+ */
+export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sources = 3 } = {}) {
+  const nodes = [];
+  const edges = [];
+  const link = (source, name, target) => edges.push({ source, name, target });
+  const pick = (index, count) => (index % count) + 1;
+
+  for (let i = 1; i <= goals; i++) {
+    const id = `G-${i}`;
+    nodes.push({
+      type: "Goal",
+      id,
+      text: `ゴール ${i}`,
+      status: "approved",
+      priority: i <= 2 ? 1 : null,
+      decomposition: "AND",
+    });
+    //: 二分木にして、Goal を何段かの refines で積む。
+    if (i > 1) link(id, "refines", `G-${Math.floor(i / 2)}`);
+    link(id, "has_source", `SRC-${pick(i, sources)}`);
+  }
+
+  for (let i = 1; i <= needs; i++) {
+    const id = `N-${i}`;
+    nodes.push({ type: "Need", id, text: `ニーズ ${i} を満たしたい`, status: "approved", priority: null });
+    //: 葉に近い Goal (後半) から動機づける。
+    link(`G-${goals - (i % Math.max(1, Math.floor(goals / 2)))}`, "motivates", id);
+    link(id, "has_source", `SRC-${pick(i, sources)}`);
+  }
+
+  for (let i = 1; i <= frs; i++) {
+    const id = `FR-${i}`;
+    nodes.push({
+      type: "FunctionalRequirement",
+      id,
+      text: `機能 ${i} を提供すること`,
+      status: i % 3 === 0 ? "implemented" : "approved",
+      priority: i % 11 === 0 ? 1 : null,
+      acceptance_criteria: [`機能 ${i} の受け入れ基準`],
+    });
+    link(id, "satisfies", `N-${pick(i, needs)}`);
+    link(id, "has_source", `SRC-${pick(i, sources)}`);
+    //: 一部は FR どうしで詳細化する (同じ段に並びきらない枝を作る)。
+    if (i % 5 === 0) link(id, "refines", `FR-${i - 1}`);
+  }
+
+  for (let i = 1; i <= qrs; i++) {
+    const id = `QR-${i}`;
+    nodes.push({
+      type: "QualityRequirement",
+      id,
+      text: `品質 ${i} を保つこと`,
+      status: "proposed",
+      priority: null,
+      acceptance_criteria: [`品質 ${i} の受け入れ基準`],
+    });
+    link(id, "qualifies", `FR-${pick(i, frs)}`);
+    link(id, "has_source", `SRC-${pick(i, sources)}`);
+  }
+
+  for (let i = 1; i <= sources; i++) {
+    nodes.push({
+      type: "Source",
+      id: `SRC-${i}`,
+      text: `源泉 ${i}`,
+      status: "approved",
+      priority: null,
+      kind: "stakeholder",
+    });
+  }
+
+  return {
+    title: "大きいテスト",
+    generated_from: ["bench.py"],
+    types: TYPES,
+    edge_names: EDGE_NAMES,
+    edge_names_by_type: EDGE_NAMES_BY_TYPE,
+    status_rank: STATUS_RANK,
+    nodes,
+    edges,
+    findings: [],
+    stats: { nodes: nodes.length, edges: edges.length, findings: {} },
+    meta: META,
+  };
+}
+
 export const META = {
   types: Object.fromEntries(
     TYPES.map((type) => [type, { shape: "ellipse", fill: "#fff", stroke: "#000" }]),

@@ -7,6 +7,7 @@
  */
 
 import {
+  FOCUS_DEPTHS,
   TABLE_COLUMNS,
   activeEdgeNames,
   bandDefs,
@@ -16,6 +17,7 @@ import {
   decodeHash,
   encodeHash,
   escapeHtml,
+  focusSet,
   graphElements,
   graphStyle,
   isNodeVisible,
@@ -104,6 +106,41 @@ function initGraph() {
  */
 const shownElements = () => cy.elements().not(".hidden");
 
+// --- フォーカス (近傍だけを描く) --------------------------------------------
+//
+// 大きいグラフは全体を 1 枚に収めると横長になり、文字が読める倍率では
+// 目的のノードに辿り着けない。フォーカスを入れると、図に描くのは選択ノードの
+// 近傍だけになる。
+//
+// これは**図の描画だけの絞り込み**である。view (左の一覧・テーブル・詳細ペイン・
+// 「影響部分グラフをコピー」) は全体のまま。ここを view 側で絞ると、上流/下流の
+// 件数もコピー本文も近傍で切られた別物になり、`req explain` と食い違う。
+
+/** 図に描くノードの id。フォーカス無し (または選択無し) なら null = 全部描く。 */
+function focusedIds() {
+  if (!state.focus || !state.selected || !view.byId.has(state.selected)) return null;
+  return focusSet(view, state.selected, state.focus);
+}
+
+//: 直近のレイアウトが対象にしたフォーカス (`深さ:選択ノード`)。
+let laidOutFocus = "";
+
+const focusKey = () => (focusedIds() ? `${state.focus}:${state.selected}` : "");
+
+/**
+ * 描く範囲が変わっていれば並べ直す。
+ *
+ * 種別や status の絞り込みでは位置を保つ (覚えた場所が壊れないように) が、
+ * フォーカスは描く範囲そのものが変わるので並べ直す。近傍だけを並べ直した
+ * 結果に `fitInitial()` が掛かり、読める倍率に戻る。
+ */
+function syncFocusLayout() {
+  const key = focusKey();
+  if (key === laidOutFocus) return;
+  laidOutFocus = key;
+  runLayout();
+}
+
 /**
  * Goal / Need の帯を図の上 (LR なら左) に並べ直し、枠を掛け直す。
  * dagre の副軸方向の並びは保つので、「整列」のたびに図の形が大きく変わる
@@ -149,9 +186,14 @@ function runLayout() {
 /** 絞り込みの反映。再レイアウトはせず、表示・非表示だけを切り替える。 */
 function applyVisibility() {
   if (!cy) return;
-  const nodes = new Set(view.nodes.map((node) => node.id));
-  const edges = new Set(view.edges);
-  const types = new Set(view.nodes.map((node) => node.type));
+  const focused = focusedIds();
+  const shown = focused ? view.nodes.filter((node) => focused.has(node.id)) : view.nodes;
+  const nodes = new Set(shown.map((node) => node.id));
+  //: 端点が描かれないエッジは描かない (絞り込みでの扱いと同じ)。
+  const edges = new Set(
+    view.edges.filter((edge) => nodes.has(edge.source) && nodes.has(edge.target)),
+  );
+  const types = new Set(shown.map((node) => node.type));
   cy.batch(() => {
     cy.nodes().not(".band").forEach((element) => {
       element.toggleClass("hidden", !nodes.has(element.id()));
@@ -420,10 +462,19 @@ function renderFilters() {
   }
 }
 
+/** 近傍の深さの選択肢。深さの一覧は `FOCUS_DEPTHS` を唯一の出典とする。 */
+function renderFocusOptions() {
+  document.getElementById("focus").innerHTML = [
+    '<option value="0">フォーカス: 切</option>',
+    ...FOCUS_DEPTHS.map((depth) => `<option value="${depth}">近傍 ${depth} ホップ</option>`),
+  ].join("");
+}
+
 /** 入力欄・チェック・タブを state に合わせ直す。ハッシュから復元したとき用。 */
 function syncControls() {
   document.getElementById("search").value = state.query;
   document.getElementById("direction").value = state.direction;
+  document.getElementById("focus").value = String(state.focus);
   for (const [attribute, key] of FILTER_SETS) {
     document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
       input.checked = state[key].has(input.dataset[attribute]);
@@ -629,6 +680,8 @@ function refresh() {
   renderTable();
   applyVisibility();
   applyHighlight();
+  //: 選択の変更・フォーカスの入切・URL からの復元がすべてここを通る。
+  syncFocusLayout();
 }
 
 document.getElementById("tab-graph").addEventListener("click", () => {
@@ -653,6 +706,12 @@ document.getElementById("clear").addEventListener("click", () => {
 document.getElementById("direction").addEventListener("change", (event) => {
   state.direction = event.target.value;
   relayout();
+  writeHash();
+});
+document.getElementById("focus").addEventListener("change", (event) => {
+  state.focus = Number(event.target.value);
+  //: 描く範囲が変わるので、refresh() の中の syncFocusLayout() が並べ直す。
+  refresh();
   writeHash();
 });
 document.getElementById("relayout").addEventListener("click", relayout);
@@ -683,6 +742,7 @@ window.addEventListener("hashchange", applyHash);
 
 initGraph();
 renderFilters();
+renderFocusOptions();
 syncControls();
 renderStats();
 refresh();

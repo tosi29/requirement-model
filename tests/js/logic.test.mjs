@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  TABLE_COLUMNS,
   activeEdgeNames,
   allEdgeNames,
   createView,
@@ -12,8 +13,12 @@ import {
   graphStyle,
   isNodeVisible,
   layoutOptions,
+  matchesQuery,
+  nextSort,
   nodeContext,
   reach,
+  sortRows,
+  tableRows,
   truncate,
   wrapLabel,
 } from "../../src/reqmodel/site_logic.js";
@@ -129,6 +134,145 @@ test("wrapLabel は割り切れるとき空行を作らない", () => {
 
 test("escapeHtml は < & > だけを潰す", () => {
   assert.equal(escapeHtml('<a href="x">&</a>'), '&lt;a href="x"&gt;&amp;&lt;/a&gt;');
+});
+
+// --- テーブル --------------------------------------------------------------
+
+const FINDINGS = [
+  { code: "structure.orphan_qr", severity: "warning", layer: 1, node_id: "QR-1", message: "x" },
+  { code: "structure.missing_source", severity: "error", layer: 1, node_id: "QR-1", message: "y" },
+  { code: "text.vague", severity: "info", layer: 2, node_id: "FR-1", message: "z" },
+  { code: "graph.cycle", severity: "severe", layer: 1, node_id: null, message: "全体" },
+];
+
+const rowsOf = (state, query) => {
+  const data = fixture({ findings: FINDINGS });
+  const view = createView(data, { ...allOn(data), ...state });
+  return { view, rows: tableRows(view, query) };
+};
+
+const idsSortedBy = (key, asc) => {
+  const { view, rows } = rowsOf();
+  return sortRows(view, rows, { key, asc }).map((row) => row.id);
+};
+
+test("tableRows は 1 ノード 1 行にし、受け入れ基準と指摘を数える", () => {
+  const { rows } = rowsOf();
+
+  assert.equal(rows.length, 5);
+  assert.deepEqual(rows.find((row) => row.id === "FR-1"), {
+    id: "FR-1",
+    type: "FunctionalRequirement",
+    text: "領収書画像から金額を抽出すること",
+    status: "proposed",
+    priority: 2,
+    criteria: 1,
+    findings: 1,
+    severity: "info",
+  });
+  // 受け入れ基準を持たない型は 0 件、指摘の無いノードは 0 件。
+  const source = rows.find((row) => row.id === "SRC-1");
+  assert.equal(source.criteria, 0);
+  assert.equal(source.findings, 0);
+  assert.equal(source.severity, null);
+});
+
+test("行の severity は最も重い指摘のもの", () => {
+  const { rows } = rowsOf();
+  const qr = rows.find((row) => row.id === "QR-1");
+
+  assert.equal(qr.findings, 2);
+  assert.equal(qr.severity, "error");
+});
+
+test("ノードに紐づかない指摘はどの行にも数えない", () => {
+  const { rows } = rowsOf();
+  assert.equal(rows.reduce((total, row) => total + row.findings, 0), 3);
+});
+
+test("テーブルは絞り込み後のノードだけを出す", () => {
+  const types = new Set(fixture().types);
+  types.delete("Source");
+  const { rows } = rowsOf({ types });
+
+  assert.ok(!rows.some((row) => row.id === "SRC-1"));
+});
+
+test("検索語は id と本文の部分一致で効く", () => {
+  assert.deepEqual(rowsOf({}, "fr-").rows.map((row) => row.id), ["FR-1"]);
+  assert.deepEqual(rowsOf({}, "領収書").rows.map((row) => row.id), ["N-1", "FR-1"]);
+  assert.equal(rowsOf({}, "  ").rows.length, 5);
+});
+
+test("matchesQuery は空の検索語をすべて通す", () => {
+  const node = { id: "FR-1", text: "領収書画像から金額を抽出すること" };
+  assert.equal(matchesQuery(node, ""), true);
+  assert.equal(matchesQuery(node, "金額"), true);
+  assert.equal(matchesQuery(node, "見積"), false);
+});
+
+test("文字の列は素直に昇順・降順", () => {
+  assert.deepEqual(idsSortedBy("id", true), ["FR-1", "G-1", "N-1", "QR-1", "SRC-1"]);
+  assert.deepEqual(idsSortedBy("id", false), ["SRC-1", "QR-1", "N-1", "G-1", "FR-1"]);
+});
+
+test("type は種別の定義順に並ぶ (辞書順ではない)", () => {
+  assert.deepEqual(idsSortedBy("type", true), ["G-1", "N-1", "FR-1", "QR-1", "SRC-1"]);
+});
+
+test("status は成熟度の順に並ぶ (辞書順ではない)", () => {
+  assert.deepEqual(idsSortedBy("status", true), ["FR-1", "QR-1", "SRC-1", "G-1", "N-1"]);
+});
+
+test("値の無い行は向きに関わらず末尾に置く", () => {
+  assert.deepEqual(idsSortedBy("priority", true), ["G-1", "FR-1", "N-1", "QR-1", "SRC-1"]);
+  assert.deepEqual(idsSortedBy("priority", false), ["FR-1", "G-1", "N-1", "QR-1", "SRC-1"]);
+});
+
+test("指摘の多い順に並べられる", () => {
+  assert.deepEqual(idsSortedBy("findings", false), ["QR-1", "FR-1", "G-1", "N-1", "SRC-1"]);
+});
+
+test("同値の行は正規化 JSON の並び (型順 → id 順) で決まる", () => {
+  // 指摘 0 件の 3 行は、昇順でも降順でも常にこの並びになる。
+  const ascending = idsSortedBy("findings", true).slice(0, 3);
+  assert.deepEqual(ascending, ["G-1", "N-1", "SRC-1"]);
+});
+
+test("sortRows は渡された配列を書き換えない", () => {
+  const { view, rows } = rowsOf();
+  const before = rows.map((row) => row.id);
+  sortRows(view, rows, { key: "id", asc: false });
+
+  assert.deepEqual(rows.map((row) => row.id), before);
+});
+
+test("同じ列を押すと向きが反転する", () => {
+  assert.deepEqual(nextSort({ key: "id", asc: true }, "id"), { key: "id", asc: false });
+  assert.deepEqual(nextSort({ key: "id", asc: false }, "id"), { key: "id", asc: true });
+});
+
+test("別の列を押すと、数の列は多い順・文字の列は昇順から始まる", () => {
+  assert.deepEqual(nextSort({ key: "id", asc: true }, "findings"), {
+    key: "findings",
+    asc: false,
+  });
+  assert.deepEqual(nextSort({ key: "findings", asc: false }, "status"), {
+    key: "status",
+    asc: true,
+  });
+});
+
+test("知らない列を押しても並び順は変わらない", () => {
+  const sort = { key: "id", asc: true };
+  assert.equal(nextSort(sort, "unknown"), sort);
+});
+
+test("列の定義には issue の求める項目が揃っている", () => {
+  assert.deepEqual(
+    TABLE_COLUMNS.map((column) => column.key),
+    ["id", "type", "text", "status", "priority", "criteria", "findings"],
+  );
 });
 
 // --- コピー本文 ------------------------------------------------------------

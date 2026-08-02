@@ -22,6 +22,13 @@ export const EDGE_NAMES_BY_TYPE = {
   Source: [],
 };
 
+export const STATUS_RANK = {
+  proposed: 0,
+  approved: 1,
+  implemented: 2,
+  verified: 3,
+};
+
 export const TYPES = [
   "Goal",
   "Need",
@@ -106,6 +113,7 @@ export function fixture(overrides = {}) {
     types: TYPES,
     edge_names: EDGE_NAMES,
     edge_names_by_type: EDGE_NAMES_BY_TYPE,
+    status_rank: STATUS_RANK,
     nodes,
     edges,
     findings: [],

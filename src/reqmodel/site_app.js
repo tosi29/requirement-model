@@ -7,6 +7,7 @@
  */
 
 import {
+  TABLE_COLUMNS,
   activeEdgeNames,
   createView,
   escapeHtml,
@@ -14,8 +15,12 @@ import {
   graphStyle,
   isNodeVisible,
   layoutOptions,
+  matchesQuery,
+  nextSort,
   nodeContext,
   reach,
+  sortRows,
+  tableRows,
   truncate,
 } from "./site_logic.js";
 
@@ -27,6 +32,12 @@ const state = {
   edges: new Set(DATA.edge_names),
   selected: null,
   direction: "TD",
+  //: 中央ペインに出しているもの。"graph" か "table"。
+  mode: "graph",
+  //: 検索語。左の一覧とテーブルの両方に効く。
+  query: "",
+  //: テーブルの並び順。
+  sort: { key: "id", asc: true },
 };
 
 /** 絞り込みを反映した現在のグラフ。refresh() で作り直す。 */
@@ -152,7 +163,8 @@ const REVEAL_DURATION_MS = 180;
  * (グラフ上のノードを直接クリックしたときはこちらに来る)。
  */
 function revealSelected() {
-  if (!cy || !state.selected || !view.byId.has(state.selected)) return;
+  if (!cy || state.mode !== "graph") return;
+  if (!state.selected || !view.byId.has(state.selected)) return;
   const node = cy.getElementById(state.selected);
   if (node.empty() || node.hasClass("hidden")) return;
   if (isNodeVisible(cy.extent(), node.boundingBox(), REVEAL_MARGIN_PX / cy.zoom())) return;
@@ -224,7 +236,7 @@ function renderDetail() {
 
   const nodeFindings = DATA.findings.filter((finding) => finding.node_id === node.id);
   if (nodeFindings.length) {
-    rows.push("<h2>このノードへの指摘</h2>");
+    rows.push('<h2 id="node-findings">このノードへの指摘</h2>');
     for (const finding of nodeFindings) rows.push(findingHtml(finding));
   }
 
@@ -267,14 +279,8 @@ function findingHtml(finding) {
 // --- 左サイドバー ----------------------------------------------------------
 
 function renderNodeList() {
-  const query = document.getElementById("search").value.trim().toLowerCase();
   const list = document.getElementById("node-list");
-  const matched = view.nodes.filter(
-    (node) =>
-      !query ||
-      node.id.toLowerCase().includes(query) ||
-      node.text.toLowerCase().includes(query),
-  );
+  const matched = view.nodes.filter((node) => matchesQuery(node, state.query));
   list.innerHTML = matched
     .map(
       (node) => `<li><button class="node-btn ${node.id === state.selected ? "active" : ""}" data-id="${node.id}">
@@ -352,6 +358,104 @@ function renderStats() {
   });
 }
 
+// --- テーブルビュー --------------------------------------------------------
+//
+// グラフと同じ view / state を見るので、絞り込みも選択もそのまま共有される。
+// 中央ペインの表示を差し替えるだけで、グラフ側は作り直さない。
+
+function renderTable() {
+  // 隠れている間は作らない。テーブルに切り替えたときに setMode() が作り直す。
+  if (state.mode !== "table") return;
+  const rows = sortRows(view, tableRows(view, state.query), state.sort);
+  const head = TABLE_COLUMNS.map((column) => {
+    const active = state.sort.key === column.key;
+    const order = active ? (state.sort.asc ? "ascending" : "descending") : "none";
+    const arrow = active ? (state.sort.asc ? "▲" : "▼") : "";
+    return `<th class="${column.numeric ? "num" : ""}" aria-sort="${order}">
+      <button data-key="${column.key}" title="この列で並べ替える">${column.label}<span class="arrow">${arrow}</span></button></th>`;
+  }).join("");
+
+  //: 値が無いこと (priority 無し・受け入れ基準 0 件) を空欄と区別して見せる。
+  const DASH = '<td class="num dash">—</td>';
+  const cell = (row, key) => {
+    switch (key) {
+      case "text":
+        return `<td class="text">${escapeHtml(row.text)}</td>`;
+      case "findings":
+        return row.findings
+          ? `<td class="num"><button class="finding-count ${row.severity || ""}" data-findings="${row.id}" title="このノードへの指摘を見る">${row.findings}</button></td>`
+          : DASH;
+      // priority は 0 も有効な値なので、null だけを空欄にする。
+      case "priority":
+        return row.priority === null ? DASH : `<td class="num">${row.priority}</td>`;
+      case "criteria":
+        return row.criteria ? `<td class="num">${row.criteria}</td>` : DASH;
+      default:
+        return `<td class="${key}">${escapeHtml(row[key])}</td>`;
+    }
+  };
+
+  const body = rows.length
+    ? rows
+        .map(
+          (row) => `<tr data-id="${row.id}" class="${row.id === state.selected ? "sel" : ""}">
+            ${TABLE_COLUMNS.map((column) => cell(row, column.key)).join("")}</tr>`,
+        )
+        .join("")
+    : `<tr><td class="empty" colspan="${TABLE_COLUMNS.length}">条件に合うノードは無い。</td></tr>`;
+
+  const table = document.getElementById("node-table");
+  table.innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
+  document.getElementById("table-note").textContent =
+    `${rows.length} 件を表示中 (全 ${DATA.nodes.length} 件)。` +
+    " 行をクリックすると右ペインに詳細が出る。列見出しで並べ替える。";
+
+  table.querySelectorAll("thead button[data-key]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.sort = nextSort(state.sort, button.dataset.key);
+      renderTable();
+    });
+  });
+  table.querySelectorAll("tbody tr[data-id]").forEach((tr) => {
+    tr.addEventListener("click", () => selectNode(tr.dataset.id));
+  });
+  table.querySelectorAll("button[data-findings]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      showFindings(button.dataset.findings);
+    });
+  });
+}
+
+/** 指摘数から検証結果へ辿る。そのノードを選び、右ペインの指摘まで送る。 */
+function showFindings(id) {
+  if (state.selected !== id) selectNode(id);
+  const heading = document.getElementById("node-findings");
+  if (heading) heading.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+/** 中央ペインの表示切り替え。グラフは消さず、隠すだけ。 */
+function setMode(mode) {
+  state.mode = mode;
+  document.getElementById("graph-frame").hidden = mode !== "graph";
+  document.getElementById("table-frame").hidden = mode !== "table";
+  for (const element of document.querySelectorAll(".graph-only")) {
+    element.hidden = mode !== "graph";
+  }
+  for (const [id, name] of [["tab-graph", "graph"], ["tab-table", "table"]]) {
+    const tab = document.getElementById(id);
+    tab.classList.toggle("active", mode === name);
+    tab.setAttribute("aria-selected", String(mode === name));
+  }
+  if (mode === "table") {
+    renderTable();
+    return;
+  }
+  // 隠している間にコンテナの大きさが変わっているので、測り直してから追従する。
+  if (cy) cy.resize();
+  revealSelected();
+}
+
 // --- 操作 ------------------------------------------------------------------
 
 function selectNode(id) {
@@ -364,11 +468,18 @@ function refresh() {
   view = createView(DATA, state);
   renderNodeList();
   renderDetail();
+  renderTable();
   applyVisibility();
   applyHighlight();
 }
 
-document.getElementById("search").addEventListener("input", renderNodeList);
+document.getElementById("tab-graph").addEventListener("click", () => setMode("graph"));
+document.getElementById("tab-table").addEventListener("click", () => setMode("table"));
+document.getElementById("search").addEventListener("input", (event) => {
+  state.query = event.target.value;
+  renderNodeList();
+  renderTable();
+});
 document.getElementById("clear").addEventListener("click", () => {
   state.selected = null;
   refresh();

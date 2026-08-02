@@ -91,10 +91,7 @@ export function reach(view, start, forward) {
   return seen;
 }
 
-// --- LLM 用コンテキスト -----------------------------------------------------
-//
-// 以下は `explain.py` の explain_text() / _describe() / _all_edge_names() の写し。
-// 出力が 1 文字でもずれるとテストが落ちるので、片方を直したら両方を直すこと。
+// --- 並びの土台 ------------------------------------------------------------
 
 const MISSING_RANK = 10 ** 6;
 
@@ -103,6 +100,120 @@ const rankOf = (view, id) =>
   view.order.has(id) ? view.order.get(id) : MISSING_RANK;
 
 const compare = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+// --- テーブル --------------------------------------------------------------
+//
+// 棚卸し (全件を順に確認する作業) 用の一覧。グラフと同じ view から作るので、
+// 種別・エッジ種別の絞り込みはそのまま効く。
+
+/** 表の列。並びがそのまま左からの列順になる。 */
+export const TABLE_COLUMNS = [
+  { key: "id", label: "id" },
+  { key: "type", label: "type" },
+  { key: "text", label: "本文" },
+  { key: "status", label: "status" },
+  { key: "priority", label: "優先度", numeric: true },
+  { key: "criteria", label: "受入基準", numeric: true },
+  { key: "findings", label: "指摘", numeric: true },
+];
+
+/** 重い順。行の指摘数に色を付けるときの「最も重い指摘」を決めるのに使う。 */
+export const SEVERITY_ORDER = ["error", "severe", "warning", "info"];
+
+/** 検索欄の絞り込み。id と本文の部分一致 (大文字小文字は区別しない)。 */
+export function matchesQuery(node, query) {
+  const needle = (query || "").trim().toLowerCase();
+  if (!needle) return true;
+  return (
+    node.id.toLowerCase().includes(needle) ||
+    node.text.toLowerCase().includes(needle)
+  );
+}
+
+/**
+ * 表に出す行。view に見えているノードだけを、検索語で更に絞る。
+ * 指摘は「そのノードに紐づくもの」だけを数え、色付け用に最も重い severity を添える。
+ */
+export function tableRows(view, query = "") {
+  const counts = new Map();
+  const worst = new Map();
+  for (const finding of view.data.findings || []) {
+    if (!finding.node_id) continue;
+    counts.set(finding.node_id, (counts.get(finding.node_id) || 0) + 1);
+    const rank = SEVERITY_ORDER.indexOf(finding.severity);
+    const known = worst.get(finding.node_id);
+    if (rank >= 0 && (known === undefined || rank < known)) {
+      worst.set(finding.node_id, rank);
+    }
+  }
+  return view.nodes
+    .filter((node) => matchesQuery(node, query))
+    .map((node) => ({
+      id: node.id,
+      type: node.type,
+      text: node.text,
+      status: node.status,
+      priority: node.priority ?? null,
+      criteria: (node.acceptance_criteria || []).length,
+      findings: counts.get(node.id) || 0,
+      severity: worst.has(node.id) ? SEVERITY_ORDER[worst.get(node.id)] : null,
+    }));
+}
+
+//: 値を持たない行 (priority 無し等) の並び。向きに関わらず末尾に置く。
+const MISSING_VALUE = Number.POSITIVE_INFINITY;
+
+/**
+ * 並び替えに使う値。type は種別の定義順、status は成熟度 (`STATUS_RANK`) で、
+ * どちらも Python 側から渡ってきた並びを唯一の出典とする。
+ */
+function sortValue(view, row, key) {
+  switch (key) {
+    case "type":
+      return view.data.types.indexOf(row.type);
+    case "status": {
+      const rank = (view.data.status_rank || {})[row.status];
+      return rank === undefined ? MISSING_VALUE : rank;
+    }
+    case "priority":
+      return row.priority === null ? MISSING_VALUE : row.priority;
+    default:
+      return row[key];
+  }
+}
+
+/**
+ * 行の並び替え。同値のときは正規化 JSON の並び (型順 → id 順) で決めるので、
+ * 何度押しても結果が揺れない。
+ */
+export function sortRows(view, rows, sort) {
+  const sign = sort.asc ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const left = sortValue(view, a, sort.key);
+    const right = sortValue(view, b, sort.key);
+    let diff = 0;
+    if (left === MISSING_VALUE && right !== MISSING_VALUE) diff = 1;
+    else if (right === MISSING_VALUE && left !== MISSING_VALUE) diff = -1;
+    else diff = sign * compare(left, right);
+    return diff || rankOf(view, a.id) - rankOf(view, b.id);
+  });
+}
+
+/**
+ * 列見出しを押したときの新しい並び順。同じ列なら向きを反転し、別の列なら
+ * その列の既定の向き (数の列は多い順、文字の列は昇順) から始める。
+ */
+export function nextSort(sort, key) {
+  const column = TABLE_COLUMNS.find((item) => item.key === key);
+  if (!column) return sort;
+  if (sort.key === key) return { key, asc: !sort.asc };
+  return { key, asc: !column.numeric };
+}
+
+// --- LLM 用コンテキスト -----------------------------------------------------
+//
+// 以下は `explain.py` の explain_text() / _describe() / _all_edge_names() の写し。
+// 出力が 1 文字でもずれるとテストが落ちるので、片方を直したら両方を直すこと。
 
 /** ノード 1 件の記述。`explain.py` の `_describe()` と同じ整形。 */
 function describe(view, id) {

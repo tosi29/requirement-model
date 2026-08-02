@@ -88,6 +88,66 @@ main {
 .graph-frame { flex: 1; position: relative; min-height: 480px; }
 #graph { position: absolute; inset: 0; }
 #graph .empty { padding: 14px; }
+[hidden] { display: none !important; }
+.tabs, .tool-group { display: flex; gap: 6px; align-items: center; }
+.tabs { margin-right: 6px; }
+.tabs button { background: none; }
+.tabs button.active { background: var(--panel); border-color: var(--accent); font-weight: 600; }
+.table-frame { flex: 1; overflow: auto; min-height: 0; padding: 0 0 14px; }
+.table-note { padding: 8px 12px; color: var(--muted); font-size: 12px; }
+table.nodes { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.nodes th, table.nodes td {
+  border-bottom: 1px solid var(--border);
+  padding: 5px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+table.nodes thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0;
+  white-space: nowrap;
+}
+table.nodes thead th button {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  text-align: inherit;
+  padding: 7px 10px;
+}
+table.nodes thead th button:hover { color: var(--fg); background: var(--panel); }
+table.nodes thead th[aria-sort="none"] button { color: var(--muted); }
+table.nodes thead th:not([aria-sort="none"]) button { color: var(--fg); }
+table.nodes .arrow { font-size: 9px; margin-left: 4px; }
+table.nodes tbody tr { cursor: pointer; }
+table.nodes tbody tr:hover { background: var(--panel); }
+table.nodes tbody tr.sel { background: var(--panel); }
+table.nodes tbody tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+table.nodes th:last-child button, table.nodes td:last-child { padding-right: 14px; }
+table.nodes td.num, table.nodes th.num, table.nodes th.num button { text-align: right; }
+table.nodes td.id { font-weight: 600; white-space: nowrap; }
+table.nodes td.type, table.nodes td.status { color: var(--muted); font-size: 12px; white-space: nowrap; }
+table.nodes td.text { min-width: 14em; }
+table.nodes td.dash { color: var(--border); }
+table.nodes .finding-count {
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--panel);
+}
+table.nodes .finding-count.error { color: var(--error); border-color: var(--error); }
+table.nodes .finding-count.severe { color: var(--severe); border-color: var(--severe); }
+table.nodes .finding-count.warning { color: var(--warning); border-color: var(--warning); }
+table.nodes tbody td.empty { padding: 14px; }
 h2 {
   font-size: 12px;
   text-transform: uppercase;
@@ -187,19 +247,29 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
 
   <section class="graph-pane">
     <div class="toolbar">
-      <button id="zoom-out" title="縮小">−</button>
-      <button id="zoom-in" title="拡大">＋</button>
-      <button id="zoom-reset">等倍</button>
-      <button id="zoom-fit">全体表示</button>
-      <select id="direction">
-        <option value="TD">縦 (TD)</option>
-        <option value="LR">横 (LR)</option>
-      </select>
-      <button id="relayout" title="表示中のノードだけで並べ直す">整列</button>
+      <span class="tabs" role="tablist">
+        <button id="tab-graph" role="tab" class="active" aria-selected="true" aria-controls="graph-frame">グラフ</button>
+        <button id="tab-table" role="tab" aria-selected="false" aria-controls="table-frame">テーブル</button>
+      </span>
+      <span class="tool-group graph-only" id="graph-tools">
+        <button id="zoom-out" title="縮小">−</button>
+        <button id="zoom-in" title="拡大">＋</button>
+        <button id="zoom-reset">等倍</button>
+        <button id="zoom-fit">全体表示</button>
+        <select id="direction">
+          <option value="TD">縦 (TD)</option>
+          <option value="LR">横 (LR)</option>
+        </select>
+        <button id="relayout" title="表示中のノードだけで並べ直す">整列</button>
+      </span>
       <button id="clear">選択解除</button>
-      <span class="legend" id="legend"></span>
+      <span class="legend graph-only" id="legend"></span>
     </div>
-    <div class="graph-frame"><div id="graph"></div></div>
+    <div class="graph-frame" id="graph-frame"><div id="graph"></div></div>
+    <div class="table-frame" id="table-frame" hidden>
+      <p class="table-note" id="table-note"></p>
+      <table class="nodes" id="node-table"></table>
+    </div>
   </section>
 
   <aside class="pane detail">

@@ -12,6 +12,8 @@ dependencies = ["pydantic>=2.6"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "mypy>=1.8"]
+# `req mcp` (MCP サーバ) だけが使う。コアは pydantic のみに保つ。
+mcp = ["mcp>=2.0"]
 
 [project.scripts]
 req = "reqmodel.cli:main"

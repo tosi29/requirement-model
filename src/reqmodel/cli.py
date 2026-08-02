@@ -5,6 +5,7 @@
     req graph [--format mermaid|dot]
     req explain <ID...>    # 影響部分グラフをテキスト化 (LLM コンテキスト用)
     req doc                # 仕様書 / トレーサビリティ表の生成
+    req stats              # モデルの健全性メトリクス
     req export             # 正規化 JSON の出力
     req site               # 閲覧用の静的サイト生成 (GitHub Pages 用)
 """
@@ -33,6 +34,7 @@ from .model import EDGE_NAMES
 from .plan import diff_graphs, format_plan, load_revision
 from .render import FORMATS, render
 from .site import DEFAULT_TITLE, SITE_ASSETS, asset_srcs, build_site
+from .stats import collect_stats, render_stats
 from .validate import validate_semantics_lexical, validate_structure
 from .waivers import WaiverResult, apply_waivers
 
@@ -145,6 +147,18 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     doc_parser.add_argument("--title", help="文書のタイトル")
+
+    stats_parser = subparsers.add_parser(
+        "stats", help="モデルの健全性メトリクスを表示する"
+    )
+    add_common(stats_parser)
+    stats_parser.add_argument("-o", "--output", help="出力先ファイル (既定: 標準出力)")
+    stats_parser.add_argument(
+        "--json", action="store_true", help="メトリクスを JSON で出力する"
+    )
+    stats_parser.add_argument(
+        "--no-lexicon", action="store_true", help="曖昧語密度を測らない"
+    )
 
     export_parser = subparsers.add_parser(
         "export", help="正規化 JSON を出力する (真のソース・オブ・トゥルース)"
@@ -392,6 +406,21 @@ def cmd_doc(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_stats(args: argparse.Namespace) -> int:
+    """健全性メトリクスの表示。判定はしないので、終了コードは常に 0。"""
+    result = _load(args)
+    _require_loadable(result)
+    stats = collect_stats(result.graph, lexicon=not args.no_lexicon)
+    sources = [str(p) for p in result.paths]
+
+    if args.json:
+        payload = {"files": sources, **stats.to_json_obj()}
+        _write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", args.output)
+    else:
+        _write(render_stats(stats, sources), args.output)
+    return EXIT_OK
+
+
 def cmd_export(args: argparse.Namespace) -> int:
     result = _load(args)
     _require_loadable(result)
@@ -430,6 +459,7 @@ _COMMANDS = {
     "graph": cmd_graph,
     "explain": cmd_explain,
     "doc": cmd_doc,
+    "stats": cmd_stats,
     "export": cmd_export,
     "site": cmd_site,
 }

@@ -33,6 +33,7 @@ from .model import (
     System,
     Waiver,
 )
+from .stats import Ambiguity, Ratio, Stats, collect_stats
 from .validate import validate_semantics_lexical, validate_structure
 from .waivers import WaiverResult, apply_waivers
 
@@ -67,6 +68,10 @@ __all__ = [
     "validate_semantics_lexical",
     "apply_waivers",
     "WaiverResult",
+    "collect_stats",
+    "Stats",
+    "Ratio",
+    "Ambiguity",
     "Finding",
     "FindingList",
     "Severity",

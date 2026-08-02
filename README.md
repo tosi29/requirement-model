@@ -20,7 +20,8 @@
     ├─ plan     (git 前版との構造 diff + 影響範囲)
     ├─ graph    (Mermaid / DOT 出力)
     ├─ explain  (影響部分グラフ抽出 → LLM 用コンテキスト生成)
-    └─ doc      (仕様書 / トレーサビリティ表の生成)
+    ├─ doc      (仕様書 / トレーサビリティ表の生成)
+    └─ stats    (充足率・成熟度の分布などの健全性メトリクス)
 ```
 
 - Python クラス (Pydantic) = 書くためのインターフェース兼スキーマ。
@@ -44,6 +45,7 @@ $ req plan     [PATH ...] [--rev HEAD]     # git 前版との構造 diff → 影
 $ req graph    [PATH ...] [--format mermaid|dot] [-o FILE]
 $ req explain  ID [ID ...] [-f PATH]       # 影響部分グラフを LLM 用に整形
 $ req doc      [PATH ...] [--matrix] [-o FILE]  # 仕様書 / トレーサビリティ表の生成
+$ req stats    [PATH ...] [--json]         # モデルの健全性メトリクス
 $ req export   [PATH ...] [-o FILE]        # 正規化 JSON の出力
 $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (GitHub Pages 用)
 ```
@@ -59,8 +61,8 @@ $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (
 | オプション | コマンド | 意味 |
 |---|---|---|
 | `--strict` | validate | warning / severe もエラー扱いにする |
-| `--json` | validate, explain | 機械可読な出力 |
-| `--no-lexicon` | validate | 曖昧語チェックを行わない |
+| `--json` | validate, explain, stats | 機械可読な出力 |
+| `--no-lexicon` | validate, stats | 曖昧語チェックを行わない |
 | `--show-suppressed` | validate | 抑制した指摘を理由付きで表示する |
 | `--rev REV` | plan | 比較先のリビジョン (既定: `HEAD`) |
 | `--edges a,b` | plan, explain | 辿るエッジ種別を限定する |
@@ -345,6 +347,102 @@ Goal × Need,motivates,Goal,G-2,申請 1 件あたりの入力の手間を減ら
 
 `req doc` は検証をしない。「未カバー」は表に出すが、指摘として数えるのは
 `req validate` の役目 (`structure.orphan_*`) であり、二重に判定しない。
+
+## 健全性メトリクス
+
+`req validate` は個別の指摘を列挙するだけで、全体の傾向 (充足率・成熟度の分布) は
+読み取れない。`req stats` はモデルを数える。
+
+```console
+$ req stats examples/sample.py
+```
+
+```markdown
+# モデル統計
+
+- 対象: examples/sample.py
+- 規模: 20 ノード / 34 エッジ
+- 判定はしない。閾値を置かず、数と割合だけを出す。
+
+## 1. ノード数 (型 × 状態)
+
+| 型 | proposed | approved | implemented | verified | 計 |
+|---|---|---|---|---|---|
+| Goal | 0 | 3 | 0 | 0 | 3 |
+| Need | 0 | 3 | 0 | 0 | 3 |
+| FunctionalRequirement | 1 | 4 | 0 | 0 | 5 |
+| QualityRequirement | 0 | 2 | 0 | 0 | 2 |
+| Constraint | 0 | 1 | 0 | 0 | 1 |
+| Decision | 0 | 1 | 0 | 0 | 1 |
+| System | 0 | 1 | 0 | 0 | 1 |
+| Source | 0 | 4 | 0 | 0 | 4 |
+| 計 | 1 | 19 | 0 | 0 | 20 |
+
+## 2. エッジ数 (種別)
+
+- has_source 16 / refines 3 / motivates 3 / satisfies 5 / conflicts 1 / qualifies 2 / constrains 2 / resolves 2
+
+## 3. 充足率・保有率
+
+- Need の充足率 (satisfies されている): 100.0% (3/3)
+- FR の受け入れ基準保有率: 100.0% (5/5)
+- QR の受け入れ基準保有率: 100.0% (2/2)
+- 源泉トレース率 (has_source を持つ要求): 100.0% (14/14)
+
+## 4. 曖昧語密度
+
+- 指摘 0 件 / 20 ノード = 0.00 件/ノード
+- 指摘の出たノード: 0 件
+```
+
+率が 100% に満たないときは、その行に未達のノード id が並ぶ
+(`0.0% (0/1) 未達: N-1`。6 件目からは件数だけ)。母数が 0 のときの率は `-` とする。
+
+**`req stats` は判定をしない。** 閾値を持たず、終了コードは常に 0 である。
+「充足率 80% が良いのか」はモデルが置かれた文脈次第で、機械が決められるのは数と
+割合までだからで、CI を落とす役目は `req validate --strict` に置く。
+
+同じ理由で、抑制 (`suppress`) はメトリクスに影響しない。stats が測るのは CI の
+成否ではなくモデルの素の状態なので、黙らせた曖昧語も 1 件として数える。
+
+`--json` は同じ内容を機械可読にする。推移をグラフに描く、ダッシュボードに出す、
+といった用途はこちらを使う。
+
+```console
+$ req stats examples/sample.py --json
+```
+
+```json
+{
+  "files": ["examples/sample.py"],
+  "totals": {"nodes": 20, "edges": 34},
+  "nodes": {
+    "by_type": {"Goal": 3, "Need": 3, "FunctionalRequirement": 5, "...": 0},
+    "by_status": {"proposed": 1, "approved": 19, "implemented": 0, "verified": 0},
+    "by_type_status": {"Goal": {"proposed": 0, "approved": 3, "...": 0}}
+  },
+  "edges": {"by_name": {"has_source": 16, "refines": 3, "...": 0}},
+  "ratios": [
+    {
+      "key": "need_satisfied",
+      "label": "Need の充足率 (satisfies されている)",
+      "covered": 3,
+      "total": 3,
+      "rate": 1.0,
+      "missing": []
+    }
+  ],
+  "ambiguity": {
+    "findings": 0,
+    "nodes_with_findings": 0,
+    "total_nodes": 20,
+    "density": 0.0
+  }
+}
+```
+
+`rate` は母数が 0 なら `null`、`ambiguity` は `--no-lexicon` を付けたとき
+(測っていないとき) に `null` になる。0 と「測っていない」を混同させないため。
 
 ## 可視化
 

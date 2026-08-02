@@ -66,6 +66,79 @@ def test_no_lexicon_option(tmp_path: Path, capsys):
     assert "semantics.ambiguous_term" not in capsys.readouterr().out
 
 
+#: 源泉付きの Need 1 つ。放っておくと structure.orphan_need だけが出る。
+WAIVER_HEADER = (
+    "from reqmodel import Need, Source\n"
+    's = Source(id="S-1", text="経理部長", kind="stakeholder")\n'
+)
+
+
+def waived(code: str) -> str:
+    """指定コードを抑制した Need の定義ファイル。"""
+    return (
+        WAIVER_HEADER + 'n = Need(id="N-1", text="早く精算したい", has_source=[s],\n'
+        f'         suppress=[("{code}", "この版では FR を書かない")])\n'
+    )
+
+
+def test_strict_passes_when_the_finding_is_suppressed(tmp_path: Path, capsys):
+    definition = tmp_path / "requirements.py"
+    definition.write_text(waived("structure.orphan_need"), encoding="utf-8")
+
+    assert main(["validate", str(definition), "--strict"]) == 0
+    out = capsys.readouterr().out
+    assert "structure.orphan_need" not in out
+    assert "結果: error=0 severe=0 warning=0 info=0 (抑制 1 件)" in out
+
+
+def test_show_suppressed_lists_the_reason(tmp_path: Path, capsys):
+    definition = tmp_path / "requirements.py"
+    definition.write_text(waived("structure.orphan_need"), encoding="utf-8")
+
+    assert main(["validate", str(definition), "--show-suppressed"]) == 0
+    out = capsys.readouterr().out
+    assert "structure.orphan_need" in out
+    assert "[抑制: この版では FR を書かない]" in out
+
+
+def test_validate_json_reports_suppressed_findings(tmp_path: Path, capsys):
+    definition = tmp_path / "requirements.py"
+    definition.write_text(waived("structure.orphan_need"), encoding="utf-8")
+
+    assert main(["validate", str(definition), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["findings"] == []
+    assert payload["suppressed"] == [
+        {
+            "severity": "warning",
+            "code": "structure.orphan_need",
+            "layer": 2,
+            "message": "どの FR からも satisfies されていない (置き去りのニーズ)",
+            "node_id": "N-1",
+            "location": f"{definition}:3",
+            "reason": "この版では FR を書かない",
+        }
+    ]
+
+
+def test_stale_waiver_fails_strict(tmp_path: Path, capsys):
+    definition = tmp_path / "requirements.py"
+    definition.write_text(waived("structure.orphan_qr"), encoding="utf-8")
+
+    assert main(["validate", str(definition), "--strict"]) == 1
+    out = capsys.readouterr().out
+    assert "waiver.stale" in out
+    assert "structure.orphan_qr の抑制が残っているが" in out
+
+
+def test_unsuppressible_code_is_a_layer1_error(tmp_path: Path, capsys):
+    definition = tmp_path / "requirements.py"
+    definition.write_text(waived("structure.dangling_ref"), encoding="utf-8")
+
+    assert main(["validate", str(definition)]) == 1
+    assert "structure.dangling_ref は抑制できない" in capsys.readouterr().out
+
+
 @pytest.mark.parametrize("fmt", ["mermaid", "dot"])
 def test_graph_command(fmt, capsys):
     assert main(["graph", SAMPLE, "--format", fmt]) == 0

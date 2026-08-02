@@ -18,6 +18,7 @@ from reqmodel.site import (
     site_data,
 )
 from reqmodel.validate import validate_structure
+from reqmodel.waivers import apply_waivers
 
 SAMPLE = str(Path(__file__).resolve().parents[1] / "examples" / "sample.py")
 
@@ -129,6 +130,45 @@ def test_findings_are_embedded(tmp_path: Path):
     codes = {finding["code"] for finding in data["findings"]}
     assert "structure.orphan_qr" in codes
     assert data["stats"]["findings"]["warning"] >= 1
+
+
+def test_suppressed_findings_are_dropped_but_counted(tmp_path: Path):
+    s = source("S-1")
+    graph = build(
+        s,
+        qr(
+            "QR-1",
+            has_source=[s],
+            suppress=[("structure.orphan_qr", "この版では張らない")],
+        ),
+    )
+    waived = apply_waivers(graph, validate_structure(graph))
+    index = build_site(graph, waived.findings, tmp_path, suppressed=waived.count)
+    data = embedded_data(index.read_text(encoding="utf-8"))
+
+    assert [finding["code"] for finding in data["findings"]] == []
+    assert data["stats"]["suppressed"] == 1
+    # 抑制した理由はノードに残るので、ページ側で読める。
+    assert data["nodes"][0]["suppress"] == [["structure.orphan_qr", "この版では張らない"]]
+
+
+def test_site_command_applies_waivers(tmp_path: Path, capsys):
+    definition = tmp_path / "requirements.py"
+    definition.write_text(
+        "from reqmodel import QualityRequirement\n"
+        'QualityRequirement(id="QR-1", text="5 秒以内とすること",\n'
+        '                   acceptance_criteria=["5.0 秒以下"],\n'
+        '                   suppress=[("structure.orphan_qr", "この版では張らない"),\n'
+        '                             ("structure.missing_source", "源泉は次版で書く")])\n',
+        encoding="utf-8",
+    )
+    output = tmp_path / "site"
+    assert main(["site", str(definition), "-o", str(output)]) == 0
+    assert "(抑制 2 件)" in capsys.readouterr().err
+
+    data = embedded_data((output / "index.html").read_text(encoding="utf-8"))
+    assert data["findings"] == []
+    assert data["stats"]["suppressed"] == 2
 
 
 def test_libraries_can_be_pointed_at_local_copies(tmp_path: Path):

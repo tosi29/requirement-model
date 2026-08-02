@@ -31,8 +31,10 @@ from .model import (
     Sourced,
     Status,
     System,
+    Waiver,
 )
 from .validate import validate_semantics_lexical, validate_structure
+from .waivers import WaiverResult, apply_waivers
 
 __version__ = "0.1.0"
 
@@ -54,6 +56,7 @@ __all__ = [
     "Requirement",
     "Ref",
     "Status",
+    "Waiver",
     # ツール API
     "RequirementGraph",
     "Edge",
@@ -62,6 +65,8 @@ __all__ = [
     "load_sources",
     "validate_structure",
     "validate_semantics_lexical",
+    "apply_waivers",
+    "WaiverResult",
     "Finding",
     "FindingList",
     "Severity",

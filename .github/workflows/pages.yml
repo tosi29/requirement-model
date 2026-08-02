@@ -42,14 +42,17 @@ jobs:
           req site examples/sample.py \
             --output site \
             --title "要求グラフ (examples/sample.py)" \
-            --mermaid mermaid.min.js
+            --assets local
 
-      - name: Mermaid を同梱する
+      - name: 描画ライブラリを同梱する
         # 公開ページから外部への通信を無くすため、描画ライブラリを一緒に置く。
-        # URL (バージョン込み) は reqmodel 側の定義を唯一の出典とする。
+        # ファイル名と URL (バージョン込み) は reqmodel 側の定義を唯一の出典とする。
         run: |
-          curl -fsSL --retry 3 -o site/mermaid.min.js \
-            "$(python -c 'from reqmodel.site import MERMAID_URL; print(MERMAID_URL)')"
+          python -c "from reqmodel.site import SITE_ASSETS
+          print('\n'.join(f'{a.file} {a.url}' for a in SITE_ASSETS))" |
+          while read -r file url; do
+            curl -fsSL --retry 3 -o "site/$file" "$url"
+          done
 
       - uses: actions/upload-pages-artifact@v3
         with:

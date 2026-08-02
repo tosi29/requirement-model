@@ -7,6 +7,7 @@
  */
 
 import {
+  PRIORITY_BUCKETS,
   TABLE_COLUMNS,
   activeEdgeNames,
   createView,
@@ -15,11 +16,14 @@ import {
   graphStyle,
   isNodeVisible,
   layoutOptions,
+  legendGroups,
   matchesQuery,
   nextSort,
   nodeContext,
+  priorityFilters,
   reach,
   sortRows,
+  statusFilters,
   tableRows,
   truncate,
 } from "./site_logic.js";
@@ -30,6 +34,9 @@ const DATA = JSON.parse(document.getElementById("model-data").textContent);
 const state = {
   types: new Set(DATA.types),
   edges: new Set(DATA.edge_names),
+  //: status と優先度区分の絞り込み。種別・エッジと同じく、影響範囲の計算にも効く。
+  statuses: new Set(Object.keys(DATA.meta.statuses)),
+  priorities: new Set(PRIORITY_BUCKETS.map((bucket) => bucket.key)),
   selected: null,
   direction: "TD",
   //: 中央ペインに出しているもの。"graph" か "table"。
@@ -293,37 +300,60 @@ function renderNodeList() {
   });
 }
 
-function renderFilters() {
-  const typeCounts = {};
-  for (const node of DATA.nodes) typeCounts[node.type] = (typeCounts[node.type] || 0) + 1;
-  document.getElementById("type-filters").innerHTML = DATA.types
+/** チェックボックス 1 群。`items` は `{ key, label, count }` の配列。 */
+function renderToggles(containerId, attribute, items) {
+  document.getElementById(containerId).innerHTML = items
     .map(
-      (type) => `<label class="toggle"><input type="checkbox" data-type="${type}" checked>
-        ${type}<span class="count">${typeCounts[type] || 0}</span></label>`,
+      (item) => `<label class="toggle"><input type="checkbox" data-${attribute}="${item.key}" checked>
+        ${escapeHtml(item.label)}<span class="count">${item.count}</span></label>`,
     )
     .join("");
+}
+
+/** チェックの付け外しを state の集合に写す。 */
+function bindToggles(attribute, set) {
+  document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
+    const key = input.dataset[attribute];
+    input.addEventListener("change", () => {
+      input.checked ? set.add(key) : set.delete(key);
+      refresh();
+    });
+  });
+}
+
+function renderFilters() {
+  const countBy = (keyOf) => {
+    const counts = {};
+    for (const node of DATA.nodes) counts[keyOf(node)] = (counts[keyOf(node)] || 0) + 1;
+    return counts;
+  };
+
+  const typeCounts = countBy((node) => node.type);
+  renderToggles(
+    "type-filters",
+    "type",
+    DATA.types.map((type) => ({ key: type, label: type, count: typeCounts[type] || 0 })),
+  );
+
+  renderToggles("status-filters", "status", statusFilters(DATA));
+  renderToggles("priority-filters", "priority", priorityFilters(DATA));
 
   const edgeCounts = {};
   for (const edge of DATA.edges) edgeCounts[edge.name] = (edgeCounts[edge.name] || 0) + 1;
-  document.getElementById("edge-filters").innerHTML = DATA.edge_names
-    .map(
-      (name) => `<label class="toggle"><input type="checkbox" data-edge="${name}" checked>
-        ${name}<span class="count">${edgeCounts[name] || 0}</span></label>`,
-    )
-    .join("");
+  renderToggles(
+    "edge-filters",
+    "edge",
+    DATA.edge_names.map((name) => ({
+      key: name,
+      label: name,
+      count: edgeCounts[name] || 0,
+    })),
+  );
 
-  document.querySelectorAll("input[data-type]").forEach((input) => {
-    input.addEventListener("change", () => {
-      input.checked ? state.types.add(input.dataset.type) : state.types.delete(input.dataset.type);
-      refresh();
-    });
-  });
-  document.querySelectorAll("input[data-edge]").forEach((input) => {
-    input.addEventListener("change", () => {
-      input.checked ? state.edges.add(input.dataset.edge) : state.edges.delete(input.dataset.edge);
-      refresh();
-    });
-  });
+  bindToggles("type", state.types);
+  bindToggles("status", state.statuses);
+  bindToggles("priority", state.priorities);
+  bindToggles("edge", state.edges);
 }
 
 function renderStats() {
@@ -341,10 +371,20 @@ function renderStats() {
   if (DATA.stats.suppressed) chips.push(`<span class="chip">抑制 ${DATA.stats.suppressed} 件</span>`);
   document.getElementById("stats").innerHTML = chips.join("");
   document.getElementById("sources").textContent = DATA.generated_from.join(", ");
-  document.getElementById("legend").innerHTML = DATA.types
-    .map((type) => {
-      const meta = DATA.meta.types[type];
-      return `<span><i class="swatch" style="background:${meta.fill};border-color:${meta.stroke}"></i>${type}</span>`;
+  document.getElementById("legend").innerHTML = legendGroups(DATA.meta)
+    .map((group) => {
+      const items = group.items
+        .map(({ label, swatch }) => {
+          const style = [
+            `background:${swatch.background}`,
+            `border-color:${swatch.borderColor || "currentColor"}`,
+            `border-style:${swatch.borderStyle}`,
+            `border-width:${swatch.borderWidth}px`,
+          ].join(";");
+          return `<span><i class="swatch" style="${style}"></i>${escapeHtml(label)}</span>`;
+        })
+        .join("");
+      return `<span class="legend-group"><b>${escapeHtml(group.title)}</b>${items}</span>`;
     })
     .join("");
 

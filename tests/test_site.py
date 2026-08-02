@@ -9,7 +9,14 @@ from pathlib import Path
 from conftest import build, fr, goal, need, qr, source
 from reqmodel.cli import main
 from reqmodel.findings import FindingList
-from reqmodel.site import SITE_ASSETS, asset_srcs, build_site, site_data
+from reqmodel.site import (
+    SITE_ASSETS,
+    SITE_SCRIPTS,
+    app_js,
+    asset_srcs,
+    build_site,
+    site_data,
+)
 from reqmodel.validate import validate_structure
 
 SAMPLE = str(Path(__file__).resolve().parents[1] / "examples" / "sample.py")
@@ -45,6 +52,9 @@ def test_site_data_contains_graph_findings_and_render_meta():
     assert "has_source" in data["meta"]["dashed_edges"]
     assert set(data["meta"]["impact_colors"]) == {"selected", "upstream", "downstream"}
     assert "satisfies" in data["edge_names"]
+    # ページ側が「このグラフに現れうるエッジ」を CLI と同じ手順で数えるための材料。
+    assert data["edge_names_by_type"]["Goal"] == ["has_source", "refines", "motivates"]
+    assert data["edge_names_by_type"]["Source"] == []
 
 
 def test_build_site_writes_page_and_raw_outputs(tmp_path: Path):
@@ -57,12 +67,49 @@ def test_build_site_writes_page_and_raw_outputs(tmp_path: Path):
 
     html = index.read_text(encoding="utf-8")
     assert "<title>要求グラフ</title>" in html
-    for placeholder in ("__TITLE__", "__SCRIPTS__", "__DATA__"):
+    for placeholder in ("__TITLE__", "__SCRIPTS__", "__DATA__", "__APP_JS__"):
         assert placeholder not in html
     for asset in SITE_ASSETS:
         assert f'<script src="{asset.url}"></script>' in html
     assert embedded_data(html)["stats"]["nodes"] == 4
     assert json.loads((tmp_path / "model.json").read_text(encoding="utf-8"))["nodes"]
+
+
+def test_app_js_is_the_concatenation_of_the_source_modules():
+    """配布は 1 ファイルのまま、開発は分割したファイルで行う。"""
+    js = app_js()
+
+    for name in SITE_SCRIPTS:
+        assert f"// --- {name}" in js
+    # 連結して 1 つのモジュールにするので、ファイル間の import / export は残らない。
+    assert 'from "./site_logic.js"' not in js
+    assert not re.search(r"^\s*export\s", js, re.M)
+    assert not re.search(r"^\s*import\s", js, re.M)
+    # 中身そのものは落とさない。
+    assert "function nodeContext(" in js
+    assert "function initGraph(" in js
+    # site_logic.js が先。site_app.js がその定義を参照するため。
+    assert js.index("function nodeContext(") < js.index("function initGraph(")
+
+
+def test_page_carries_the_app_js_inline(tmp_path: Path):
+    index = build_site(chain(), FindingList(), tmp_path)
+    html = index.read_text(encoding="utf-8")
+
+    assert '<script type="module">' in html
+    assert app_js() in html
+    # 外部 JS ファイルは書き出さない (単一ファイルで自己完結する)。
+    assert not list(tmp_path.glob("*.js"))
+
+
+def test_definition_text_is_never_treated_as_a_placeholder(tmp_path: Path):
+    """定義ファイル由来の文字列がテンプレートの穴として解釈されないこと。"""
+    graph = build(fr("FR-1", text="__APP_JS__ と __SCRIPTS__ を出すこと"))
+    index = build_site(graph, FindingList(), tmp_path)
+
+    assert embedded_data(index.read_text(encoding="utf-8"))["nodes"][0]["text"] == (
+        "__APP_JS__ と __SCRIPTS__ を出すこと"
+    )
 
 
 def test_embedded_json_cannot_break_out_of_the_script_tag(tmp_path: Path):

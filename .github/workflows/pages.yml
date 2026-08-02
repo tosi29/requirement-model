@@ -28,6 +28,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      # tests/test_site_js.py が node を呼ぶ (無ければ skip されてしまう)。
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: インストール
         run: pip install -e ".[dev]"
 

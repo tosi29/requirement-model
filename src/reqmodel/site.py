@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from html import escape
 from importlib import resources
@@ -18,14 +19,16 @@ from typing import Any, Sequence
 
 from .findings import FindingList
 from .graph import RequirementGraph
-from .model import EDGE_NAMES, TYPE_ORDER
+from .model import EDGE_NAMES, TYPE_ORDER, edge_specs_for
 from .render import render_dot, render_meta, render_mermaid
 
 __all__ = [
     "build_site",
     "site_data",
+    "app_js",
     "Asset",
     "SITE_ASSETS",
+    "SITE_SCRIPTS",
     "asset_srcs",
     "DEFAULT_TITLE",
 ]
@@ -79,6 +82,12 @@ def site_data(
         "schema_version": graph.to_json_obj()["schema_version"],
         "types": [node_type.__name__ for node_type in TYPE_ORDER],
         "edge_names": list(EDGE_NAMES),
+        # ノード型ごとのエッジ種別。ページ側が「このグラフに現れうるエッジ」を
+        # CLI (explain._all_edge_names) と同じ手順で数えるために渡す。
+        "edge_names_by_type": {
+            node_type.__name__: list(edge_specs_for(node_type))
+            for node_type in TYPE_ORDER
+        },
         "nodes": graph.to_json_obj()["nodes"],
         "edges": [
             {"source": edge.source, "name": edge.name, "target": edge.target}
@@ -98,12 +107,29 @@ def site_data(
     }
 
 
-def _template() -> str:
-    return (
-        resources.files("reqmodel")
-        .joinpath("site_template.html")
-        .read_text(encoding="utf-8")
-    )
+def _read(name: str) -> str:
+    return resources.files("reqmodel").joinpath(name).read_text(encoding="utf-8")
+
+
+#: ページに載せる自前の JS。依存する側を後に置く (この順で連結する)。
+SITE_SCRIPTS: tuple[str, ...] = ("site_logic.js", "site_app.js")
+
+#: 連結して 1 つのモジュールにするので、ファイル間の import / export は落とす。
+#: これは「単体で lint / テストできる ES モジュール」を単一ファイル配布に
+#: 載せるための最小の橋渡しであり、これ以上の変換 (最小化・トランスパイル) はしない。
+_JS_IMPORT = re.compile(r'^import\s[^;]*?from\s+"\./[\w.-]+\.js";?[ \t]*\n', re.M)
+_JS_EXPORT = re.compile(r"^export\s+(?=(?:async\s+)?(?:function|const|let|var|class)\b)", re.M)
+
+
+def app_js() -> str:
+    """`SITE_SCRIPTS` を 1 つのモジュールに連結したもの。"""
+    parts = []
+    for name in SITE_SCRIPTS:
+        source = _JS_EXPORT.sub("", _JS_IMPORT.sub("", _read(name)))
+        if "</script" in source:
+            raise ValueError(f"{name} に </script> が含まれている")
+        parts.append(f"// --- {name} " + "-" * (60 - len(name)) + f"\n\n{source.strip()}\n")
+    return "\n".join(parts)
 
 
 def build_site(
@@ -126,10 +152,13 @@ def build_site(
         for src in (asset_srcs() if scripts is None else scripts)
     )
 
+    # __DATA__ の差し込みは最後に行う。定義ファイル由来の文字列が
+    # 他のプレースホルダとして解釈されないようにするため。
     html = (
-        _template()
+        _read("site_template.html")
         .replace("__TITLE__", escape(title))
         .replace("__SCRIPTS__", tags)
+        .replace("__APP_JS__", app_js())
         .replace("__DATA__", payload)
     )
 

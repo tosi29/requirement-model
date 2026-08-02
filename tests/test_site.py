@@ -82,6 +82,58 @@ def test_render_meta_maps_status_to_a_line_style():
     assert widths == sorted(widths)
 
 
+#: Cytoscape.js が持つノード形状の多角形 (外形の矩形に内接するよう正規化された座標)。
+#: 係数の検算をこの実物と突き合わせるための写しで、出典は cytoscape の
+#: ``nodeShapes`` (v3.34.0)。ellipse だけは多角形ではないので別に見る。
+_SHAPE_POINTS: dict[str, list[tuple[float, float]]] = {
+    "hexagon": [(-0.5, -1), (-1, 0), (-0.5, 1), (0.5, 1), (1, 0), (0.5, -1)],
+    "rhomboid": [(-1, -1), (0.333, -1), (1, 1), (-0.333, 1)],
+    "tag": [(-1, -1), (0.25, -1), (1, 0), (0.25, 1), (-1, 1)],
+    "diamond": [(0, 1), (1, 0), (0, -1), (-1, 0)],
+}
+
+
+def _inside(polygon: list[tuple[float, float]], point: tuple[float, float]) -> bool:
+    """凸多角形の内側 (辺の上を含む) か。頂点は反時計回り・時計回りのどちらでもよい。"""
+    signs = []
+    for index, (x1, y1) in enumerate(polygon):
+        x2, y2 = polygon[(index + 1) % len(polygon)]
+        cross = (x2 - x1) * (point[1] - y1) - (y2 - y1) * (point[0] - x1)
+        if abs(cross) > 1e-9:
+            signs.append(cross > 0)
+    return len(set(signs)) == 1
+
+
+def test_shape_fit_keeps_the_label_inside_every_shape():
+    """外形の係数は、ラベルが図形からはみ出さないことを幾何で保証する。
+
+    ``width: "label"`` (ラベルの外接矩形) のままだと、六角形・菱形・平行四辺形では
+    文字が図形の外に出る。係数は「中央に置いたテキスト矩形の、外形に対する比」の
+    上限を決めるもの。余白 (pad) は比を更に小さくするだけなので、余白 0 の極限
+    (= 比の上限そのもの) で内側に入るなら、どんな長さのラベルでも内側に入る。
+    """
+    for type_meta in render_meta()["types"].values():
+        shape, fit = type_meta["shape"], type_meta["fit"]
+        assert fit["wpad"] > 0 and fit["hpad"] > 0, shape
+        # テキスト幅 → ∞ の極限での比。実際はこれより必ず小さい。
+        half_w, half_h = 1 / fit["wmul"], 1 / fit["hmul"]
+
+        if shape in _SHAPE_POINTS:
+            corners = [
+                (sx * half_w, sy * half_h) for sx in (-1, 1) for sy in (-1, 1)
+            ]
+            for corner in corners:
+                assert _inside(_SHAPE_POINTS[shape], corner), (shape, corner)
+        elif shape == "ellipse":
+            assert half_w**2 + half_h**2 <= 1, shape
+        else:
+            # 矩形系 (round-rectangle / cut-rectangle / barrel)。隅の落ちや丸みは
+            # 比ではなく実寸 (8px / 高さの 5%) なので、余白で吸収する。
+            assert shape in ("round-rectangle", "cut-rectangle", "barrel"), shape
+            assert (half_w, half_h) == (1.0, 1.0), shape
+            assert fit["wpad"] >= 20 and fit["hpad"] >= 14, shape
+
+
 def test_render_meta_carries_the_high_priority_threshold():
     """しきい値はページ側に焼き込まず、validate と同じ定数を渡す。"""
     priority = render_meta()["priority"]

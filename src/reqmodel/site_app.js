@@ -7,6 +7,7 @@
  */
 
 import {
+  LABEL_FONT,
   TABLE_COLUMNS,
   activeEdgeNames,
   bandDefs,
@@ -66,6 +67,28 @@ const palette = () => ({
 
 let cy = null;
 
+/**
+ * ラベル 1 行の実測幅 (px) を返す関数。ノードの外形を決めるのに使う。
+ *
+ * Cytoscape と同じ字体で canvas に測らせる (`LABEL_FONT` が両者の唯一の出典)。
+ * canvas が使えない環境では undefined を返し、ロジック側の概算に任せる。
+ * 同じ文字列を何度も測るので結果は覚えておく (152 ノードで数百回になる)。
+ */
+function labelMeasurer() {
+  const context = document.createElement("canvas").getContext("2d");
+  if (!context) return undefined;
+  context.font = `${LABEL_FONT.size}px ${LABEL_FONT.family}`;
+  const cache = new Map();
+  return (text) => {
+    let width = cache.get(text);
+    if (width === undefined) {
+      width = context.measureText(text).width;
+      cache.set(text, width);
+    }
+    return width;
+  };
+}
+
 function initGraph() {
   try {
     //: 初期レイアウトはコンストラクタに任せる (要素の計測が済んでから走る)。
@@ -73,7 +96,7 @@ function initGraph() {
     //: 直後の applyBanding() が正しい位置と大きさに直す。
     cy = cytoscape({
       container: graphEl,
-      elements: graphElements(DATA),
+      elements: graphElements(DATA, labelMeasurer()),
       style: graphStyle(DATA.meta, palette()),
       layout: layoutOptions(state.direction),
       wheelSensitivity: 0.25,

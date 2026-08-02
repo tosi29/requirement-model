@@ -67,6 +67,36 @@ _CYTOSCAPE_SHAPE: dict[type[Node], str] = {
     Source: "tag",
 }
 
+#: Cytoscape.js の形状 → ラベルを内側に収めるための外形の係数。
+#: ``(幅の倍率, 幅の余白, 高さの倍率, 高さの余白)`` で、外形は
+#: ``(テキスト幅 * 倍率 + 余白, テキスト高 * 倍率 + 余白)``。
+#:
+#: ラベルの外接矩形にそのまま合わせる (Cytoscape の ``width: "label"``) と、
+#: 内側が矩形より狭い図形では文字が図形からはみ出す。中央に置いたテキスト矩形の
+#: 大きさを外形に対する割合 (a = 幅の比, b = 高さの比) で見ると、図形ごとに
+#: ``a <= f(b)`` の形の制約になる (Cytoscape の多角形は外形の矩形に内接するよう
+#: 正規化されているので、比だけで決まる):
+#:
+#:   hexagon  … a <= 1 - b/2      左右の頂点に向かう斜辺が食い込む
+#:   rhomboid … a <= 2/3 - b/3    上下の辺が幅の 1/3 ずつずれた平行四辺形
+#:   tag      … a <= 1 - 3b/4     右端が尖る
+#:   diamond  … a <= 1 - b
+#:   ellipse  … a^2 + b^2 <= 1
+#:   矩形系   … a <= 1            (cut-rectangle の隅の落ち・barrel の丸みは余白で吸収)
+#:
+#: b を決めれば倍率が決まる (高さの倍率 = 1/b、幅の倍率 = 1/f(b))。f はどれも b の
+#: 非増加関数なので、余白を足して実際の a・b を狙いより小さくする限り制約は破れない。
+_SHAPE_FIT: dict[str, tuple[float, float, float, float]] = {
+    "round-rectangle": (1.0, 20, 1.0, 14),
+    "cut-rectangle": (1.0, 26, 1.0, 20),
+    "barrel": (1.0, 20, 1.0, 22),
+    "hexagon": (1.70, 18, 1.25, 12),  # b = 0.80
+    "rhomboid": (2.55, 18, 1.25, 12),  # b = 0.80
+    "tag": (2.20, 16, 1.40, 12),  # b = 0.71
+    "diamond": (2.05, 16, 2.05, 12),  # b = 0.49
+    "ellipse": (1.42, 14, 1.42, 10),  # b = 1/√2
+}
+
 #: 影響範囲の色分け (選択 / 上流 / 下流)。
 _IMPACT_COLORS = {
     "selected": "#d93025",
@@ -114,6 +144,11 @@ _EDGE_STYLE_MERMAID = {
 }
 
 
+def _fit_of(shape: str) -> dict[str, float]:
+    wmul, wpad, hmul, hpad = _SHAPE_FIT[shape]
+    return {"wmul": wmul, "wpad": wpad, "hmul": hmul, "hpad": hpad}
+
+
 def render_meta() -> dict[str, Any]:
     """型・status・優先度ごとの描画情報。ブラウザ側 (Cytoscape.js) の初期化に使う。
 
@@ -126,6 +161,8 @@ def render_meta() -> dict[str, Any]:
                 "shape": _CYTOSCAPE_SHAPE[node_type],
                 "fill": _PALETTE[node_type.__name__][0],
                 "stroke": _PALETTE[node_type.__name__][1],
+                # ラベルが図形の内側に収まる外形の決め方 (_SHAPE_FIT を参照)。
+                "fit": _fit_of(_CYTOSCAPE_SHAPE[node_type]),
             }
             for node_type in TYPE_ORDER
         },

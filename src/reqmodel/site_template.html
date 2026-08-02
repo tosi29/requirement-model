@@ -148,6 +148,7 @@ ul.plain li { padding: 3px 0; }
 .finding.warning { border-left-color: var(--warning); }
 .finding.info { border-left-color: var(--info); }
 .finding .code { color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; }
+.loc { color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
 .detail h3 { margin: 0 0 4px; font-size: 15px; }
 .detail .text { margin: 0 0 10px; }
 .detail dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0 0 12px; font-size: 13px; }
@@ -534,6 +535,7 @@ function renderDetail() {
   if (node.priority !== null && node.priority !== undefined) rows.push(`<dt>priority</dt><dd>${node.priority}</dd>`);
   if (node.kind) rows.push(`<dt>kind</dt><dd>${node.kind}</dd>`);
   if (node.decomposition) rows.push(`<dt>分解</dt><dd>${node.decomposition}</dd>`);
+  if (node.location) rows.push(`<dt>出所</dt><dd class="loc">${escapeHtml(node.location)}</dd>`);
   rows.push(`<dt>上流</dt><dd>${up.length} 件</dd>`);
   rows.push(`<dt>下流</dt><dd>${down.length} 件</dd>`);
   rows.push("</dl>");
@@ -586,9 +588,13 @@ const escapeHtml = (text) =>
 
 function findingHtml(finding) {
   const where = finding.node_id ? ` (${finding.node_id})` : "";
+  const at = finding.location
+    ? `<div class="loc">${escapeHtml(finding.location)}</div>`
+    : "";
   return `<div class="finding ${finding.severity}" data-id="${finding.node_id || ""}">
     <div class="code">${finding.severity.toUpperCase()} · L${finding.layer} · ${finding.code}${where}</div>
     <div>${escapeHtml(finding.message)}</div>
+    ${at}
   </div>`;
 }
 

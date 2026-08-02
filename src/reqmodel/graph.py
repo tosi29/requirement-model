@@ -8,13 +8,17 @@ from __future__ import annotations
 import json
 from collections import deque
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator, TypeVar
+from typing import Any, Iterable, Iterator, Mapping, TypeVar
 
 from .model import NODE_TYPES, TYPE_INDEX, Node, edge_specs_for
 
-__all__ = ["Edge", "RequirementGraph", "SCHEMA_VERSION"]
+__all__ = ["Edge", "RequirementGraph", "SCHEMA_VERSION", "LOCATION_KEY"]
 
-SCHEMA_VERSION = 1
+#: 2: ノードごとの出所 (location) を正規化 JSON に含めるようになった。
+SCHEMA_VERSION = 2
+
+#: 正規化 JSON でノードの出所を入れる鍵。ノードの属性ではなくメタ情報である。
+LOCATION_KEY = "location"
 
 NodeT = TypeVar("NodeT", bound=Node)
 
@@ -32,12 +36,24 @@ class Edge:
 
 
 class RequirementGraph:
-    """ノード集合とエッジ集合。エッジはノードのフィールドから導出される。"""
+    """ノード集合とエッジ集合。エッジはノードのフィールドから導出される。
 
-    def __init__(self, nodes: Iterable[Node]):
+    ノードの出所 (``file.py:42``) は ``locations`` に横持ちする。ノード本体の
+    属性にはしない。定義ファイルの書き手が触るものではないうえ、diff の対象に
+    なってしまうと「行が動いただけ」が変更として出てしまうため。
+    """
+
+    def __init__(
+        self, nodes: Iterable[Node], locations: Mapping[str, str] | None = None
+    ):
         self.nodes: dict[str, Node] = {}
         for node in nodes:
             self.nodes[node.id] = node
+        self.locations: dict[str, str] = {
+            node_id: where
+            for node_id, where in (locations or {}).items()
+            if node_id in self.nodes
+        }
         self.edges: list[Edge] = []
         self._out: dict[str, list[Edge]] = {}
         self._in: dict[str, list[Edge]] = {}
@@ -73,6 +89,10 @@ class RequirementGraph:
             self.nodes.values(),
             key=lambda n: (TYPE_INDEX.get(type(n).__name__, 99), n.id),
         )
+
+    def location_of(self, node_id: str) -> str | None:
+        """ノードの出所 (``file.py:42``)。分からなければ None。"""
+        return self.locations.get(node_id)
 
     def by_type(self, *types: type[NodeT]) -> list[NodeT]:
         return [n for n in self.ordered_nodes() if isinstance(n, types)]
@@ -219,8 +239,16 @@ class RequirementGraph:
     def to_json_obj(self) -> dict[str, Any]:
         return {
             "schema_version": SCHEMA_VERSION,
-            "nodes": [node_to_json_obj(node) for node in self.ordered_nodes()],
+            "nodes": [self._node_record(node) for node in self.ordered_nodes()],
         }
+
+    def _node_record(self, node: Node) -> dict[str, Any]:
+        """出力用のノード 1 件。出所が分かっていれば末尾に添える。"""
+        record = node_to_json_obj(node)
+        where = self.locations.get(node.id)
+        if where is not None:
+            record[LOCATION_KEY] = where
+        return record
 
     def to_json(self) -> str:
         return json.dumps(self.to_json_obj(), ensure_ascii=False, indent=2) + "\n"
@@ -228,11 +256,16 @@ class RequirementGraph:
     @classmethod
     def from_json_obj(cls, obj: dict[str, Any]) -> "RequirementGraph":
         nodes: list[Node] = []
+        locations: dict[str, str] = {}
         for record in obj.get("nodes", []):
             data = dict(record)
             type_name = data.pop("type")
-            nodes.append(NODE_TYPES[type_name](**data))
-        return cls(nodes)
+            where = data.pop(LOCATION_KEY, None)
+            node = NODE_TYPES[type_name](**data)
+            nodes.append(node)
+            if where is not None:
+                locations[node.id] = where
+        return cls(nodes, locations)
 
     @classmethod
     def from_json(cls, text: str) -> "RequirementGraph":
@@ -240,5 +273,10 @@ class RequirementGraph:
 
 
 def node_to_json_obj(node: Node) -> dict[str, Any]:
-    """ノード 1 件の正規化表現。型名を先頭に置く。"""
+    """ノード 1 件の正規化表現。型名を先頭に置く。
+
+    出所 (location) は**含めない**。ここが diff (``req plan``) の比較単位なので、
+    定義の行が動いただけの変更を「変更」として出さないためである。
+    出所込みの表現が要るときは ``RequirementGraph.to_json_obj()`` を使う。
+    """
     return {"type": type(node).__name__, **node.model_dump(mode="json")}

@@ -28,6 +28,30 @@ def test_definition_file_is_never_executed(tmp_path: Path):
     assert "S-1" in result.graph.nodes
 
 
+def test_node_locations_are_recorded():
+    result = load(
+        's = Source(id="S-1", text="経理部長", kind="stakeholder")\n'
+        'n = Need(\n'
+        '    id="N-1",\n'
+        '    text="早く精算したい",\n'
+        '    has_source=[s],\n'
+        ')\n'
+    )
+    assert result.ok
+    assert result.graph.location_of("S-1") == "<test>:2"
+    assert result.graph.location_of("N-1") == "<test>:3"
+
+
+def test_node_location_points_at_the_file(tmp_path: Path):
+    definition = tmp_path / "requirements.py"
+    definition.write_text(
+        HEADER + 's = Source(id="S-1", text="経理部長", kind="stakeholder")\n',
+        encoding="utf-8",
+    )
+    result = load_paths([definition])
+    assert result.graph.location_of("S-1") == f"{definition}:2"
+
+
 def test_layer0_violation_becomes_a_finding():
     result = load("for i in [1]:\n    pass\n")
     assert not result.ok

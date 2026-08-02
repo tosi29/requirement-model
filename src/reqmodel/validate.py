@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from .findings import Finding, FindingList
 from .graph import RequirementGraph
 from .lexicon import find_ambiguous_terms
@@ -24,7 +26,7 @@ from .model import (
     edge_specs_for,
 )
 
-__all__ = ["validate_structure", "validate_semantics_lexical"]
+__all__ = ["validate_structure", "validate_semantics_lexical", "attach_locations"]
 
 #: 上流ノードの承認状態を検査するエッジ。
 _STATUS_EDGES = ("satisfies", "refines", "qualifies", "motivates", "constrains")
@@ -44,7 +46,21 @@ def validate_structure(graph: RequirementGraph) -> FindingList:
     _check_sources_present(graph, findings)
     _check_acceptance_criteria(graph, findings)
     _check_status_consistency(graph, findings)
-    return findings
+    return attach_locations(graph, findings)
+
+
+def attach_locations(graph: RequirementGraph, findings: FindingList) -> FindingList:
+    """node_id しか持たない指摘に、そのノードの出所 (file:line) を補う。
+
+    個々のチェックは構造だけを見ればよく、出所の解決はここに一箇所だけ置く。
+    """
+    resolved = FindingList()
+    for finding in findings:
+        where = graph.location_of(finding.node_id or "")
+        if finding.location is None and where is not None:
+            finding = replace(finding, location=where)
+        resolved.add(finding)
+    return resolved
 
 
 # ---------------------------------------------------------------------------
@@ -441,4 +457,4 @@ def validate_semantics_lexical(graph: RequirementGraph) -> FindingList:
                         node_id=node.id,
                     )
                 )
-    return findings
+    return attach_locations(graph, findings)

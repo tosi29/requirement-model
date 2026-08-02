@@ -113,6 +113,12 @@ def test_site_command(tmp_path: Path, capsys):
     assert data["generated_from"] == [SAMPLE]
     assert data["findings"] == []
 
+    model = json.loads((output / "model.json").read_text(encoding="utf-8"))
+    assert all(re.fullmatch(rf"{re.escape(SAMPLE)}:\d+", n["location"]) for n in model["nodes"])
+    assert [n["location"] for n in data["nodes"]] == [
+        n["location"] for n in model["nodes"]
+    ]
+
 
 def test_site_command_refuses_broken_definitions(tmp_path: Path):
     definition = tmp_path / "requirements.py"

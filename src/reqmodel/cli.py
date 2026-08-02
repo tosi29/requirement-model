@@ -289,7 +289,8 @@ def cmd_explain(args: argparse.Namespace) -> int:
             result.graph, args.ids, edges, args.depth, args.undirected
         )
         sub = RequirementGraph(
-            [result.graph.nodes[i] for i in whole if i in result.graph.nodes]
+            [result.graph.nodes[i] for i in whole if i in result.graph.nodes],
+            result.graph.locations,
         )
         payload = {
             "targets": list(args.ids),

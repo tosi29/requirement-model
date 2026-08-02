@@ -65,6 +65,8 @@ $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (
 | `--undirected` | explain | エッジの向きを無視して辿る |
 | `--highlight ID,ID` | graph | 指定ノードを強調する |
 | `--title` / `--assets` | site | ページ題名 / 描画ライブラリの参照先 (`cdn` or `local`) |
+| `--config PATH` | 全コマンド | 設定ファイルを明示指定する |
+| `--no-config` | 全コマンド | 設定ファイルを読まない (既定の挙動で実行する) |
 
 ## 定義ファイルの規約 (宣言のみ)
 
@@ -130,8 +132,8 @@ FR と QR は型を分ける (qualifies を出せるのは QR のみ、孤立検
 ### 共通属性
 
 `id` / `text` / `status` (`proposed` → `approved` → `implemented` → `verified`) / `priority`。
-`priority` は小さいほど高優先で、2 以下を「高優先度」として扱う
-(`reqmodel.model.HIGH_PRIORITY_THRESHOLD`)。
+`priority` は小さいほど高優先で、既定では 2 以下を「高優先度」として扱う
+(設定の `high_priority_threshold` で変えられる)。
 FR / QR には `acceptance_criteria: list[str]` が加わる。
 
 ### エッジ型と型規則
@@ -186,8 +188,77 @@ FR / QR には `acceptance_criteria: list[str]` が加わる。
 | `structure.status_inconsistent` | warning | approved 以上のノードが proposed のノードを参照 |
 | `semantics.ambiguous_term` | warning | 曖昧語 (「高速に」「適切に」等) |
 
+このほか、設定で `[id_prefix]` を書いたときだけ `naming.id_prefix` (warning) が加わる。
+
 「FR から Goal への到達」は `FR --refines--> FR --satisfies--> Need <--motivates-- Goal`
-の経路で判定する。曖昧語辞書は `src/reqmodel/lexicon.py` で編集できる。
+の経路で判定する。組み込みの曖昧語辞書は `src/reqmodel/lexicon.py` にあるが、
+プロジェクト固有の追加・除外は設定ファイルで行う (次節)。
+
+## プロジェクト設定 (reqmodel.toml)
+
+曖昧語・チェックの重大度・語尾規則・ID 命名規則・高優先度しきい値は、リポジトリ
+ルートに置いた設定ファイルで変えられる (ライブラリのソースを編集しなくてよい)。
+設定ファイル自体も Git 管理されるので、「テキストで diff が取れる」設計思想と整合する。
+
+読む場所は、カレントディレクトリから上へ辿って最初に見つかった次のもの。
+
+1. `reqmodel.toml`
+2. `pyproject.toml` の `[tool.reqmodel]` (キーの構成は `reqmodel.toml` と同じ)
+
+`--config PATH` で明示指定、`--no-config` で読まない。
+**設定ファイルが無ければ、従来と完全に同一の挙動になる。**
+
+```toml
+# reqmodel.toml — 全項目を書いた例。どの項目も省略できる。
+
+high_priority_threshold = 2         # priority がこの値以下なら「高優先度」
+
+[checks]                            # チェックコード単位の重大度上書き・無効化
+"structure.unused_source"  = "off"       # off なら報告しない
+"structure.missing_source" = "error"     # error / severe / warning / info
+
+[lexicon]
+exclude = ["など", "等"]            # 組み込み辞書から外す語 (label で指定)
+
+[[lexicon.extend]]                  # 曖昧語を足す
+label  = "そのうち"
+advice = "期限を日付または相対日数で書くこと"
+# pattern = "..."                   # 省略時は label の完全一致。誤検出を絞るときだけ書く
+
+[suffix]
+strict = true                       # Need「〜したい」/ FR「〜すること」に厳格化
+# need = ["たい", "ほしい"]          # 直接並べてもよい ([] にすると語尾検査をしない)
+# functional_requirement = ["こと"]
+
+[id_prefix]                         # 型ごとの ID 接頭辞 (naming.id_prefix / warning)
+Need = "N-"
+FR   = "FR-"
+QR   = "QR-"
+```
+
+補足:
+
+- `[checks]` の上書きは全層の指摘に効く。ただし層0/層1 の error を下げても
+  **読めなかったノードが読めるようになるわけではない**。語尾規則を緩めたいときは
+  `[suffix]` を使う。
+- `[lexicon] exclude` が効くのは組み込みの語だけ。同じ label を `exclude` と
+  `[[lexicon.extend]]` の両方に書けば「組み込みの語を自前の定義で置き換える」になる。
+- `[id_prefix]` は設定した型についてだけ検査する。設定が無ければ 1 件も出ない。
+- キーの綴り間違い・未知のノード型・未知の重大度は起動時にエラー (終了コード 2)。
+  黙って無視しない。
+
+ライブラリとして使うときは `use_config()` で囲む。語尾規則は Pydantic の validator
+として効くので、**読み込みも同じブロックの中に入れる**。
+
+```python
+from pathlib import Path
+
+from reqmodel import load_config, load_paths, use_config, validate_structure
+
+with use_config(load_config()):
+    result = load_paths([Path("requirements.py")])
+    findings = validate_structure(result.graph)
+```
 
 ## 変更影響分析
 
@@ -300,8 +371,8 @@ $ mypy
 - **FR の語尾規則**: 指示書は「〜すること」。同様に「読み取ること」「送ること」を弾くため、
   **「〜こと」**で判定する。
 
-いずれも末尾の句点は許容する。厳密に「〜したい」「〜すること」に戻すなら
-`src/reqmodel/model.py` の `_check_suffix` 2 か所を変えるだけでよい。
+いずれも末尾の句点は許容する。厳密に「〜したい」「〜すること」に戻すなら、
+設定ファイルに `[suffix] strict = true` と書く (ソースの編集は不要)。
 
 ## 非スコープ (初期実装では作らない)
 

@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from .config import CONFIG_FILENAME, Config, ConfigError, load_config, use_config
 from .explain import explain_text, impact_set
 from .findings import FindingList
 from .graph import RequirementGraph
@@ -24,7 +25,7 @@ from .model import EDGE_NAMES
 from .plan import diff_graphs, format_plan, load_revision
 from .render import FORMATS, render
 from .site import DEFAULT_TITLE, SITE_ASSETS, asset_srcs, build_site
-from .validate import validate_semantics_lexical, validate_structure
+from .validate import validate_naming, validate_semantics_lexical, validate_structure
 
 __all__ = ["main", "build_parser"]
 
@@ -53,6 +54,16 @@ def build_parser() -> argparse.ArgumentParser:
             action="append",
             default=[],
             help="定義ファイルまたはディレクトリ (複数指定可)",
+        )
+        sub.add_argument(
+            "--config",
+            help=(
+                f"設定ファイル (既定: 上位ディレクトリを辿って {CONFIG_FILENAME} "
+                "または pyproject.toml の [tool.reqmodel] を探す)"
+            ),
+        )
+        sub.add_argument(
+            "--no-config", action="store_true", help="設定ファイルを読まない"
         )
 
     validate_parser = subparsers.add_parser(
@@ -197,14 +208,15 @@ def _require_loadable(result: LoadResult) -> None:
 # ---------------------------------------------------------------------------
 
 
-def cmd_validate(args: argparse.Namespace) -> int:
+def cmd_validate(args: argparse.Namespace, config: Config) -> int:
     result = _load(args)
     findings = FindingList(list(result.findings))
 
     if result.ok:
-        findings.extend(validate_structure(result.graph).items)
+        findings.extend(validate_structure(result.graph, config).items)
+        findings.extend(validate_naming(result.graph, config).items)
         if not args.no_lexicon:
-            findings.extend(validate_semantics_lexical(result.graph).items)
+            findings.extend(validate_semantics_lexical(result.graph, config).items)
         skipped = False
     else:
         skipped = True
@@ -212,6 +224,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
     if args.json:
         payload = {
             "files": [str(p) for p in result.paths],
+            "config": str(config.source) if config.source else None,
             "node_count": len(result.graph),
             "structure_checked": not skipped,
             "findings": [f.to_dict() for f in findings.sorted()],
@@ -225,6 +238,8 @@ def cmd_validate(args: argparse.Namespace) -> int:
             f"対象: {', '.join(str(p) for p in result.paths)} "
             f"({len(result.graph)} ノード / {len(result.graph.edges)} エッジ)"
         )
+        if config.source is not None:
+            print(f"設定: {config.source}")
         print(f"結果: {findings.summary()}")
         if skipped:
             print("層2 の構造チェックは、層0/層1 のエラーのため未実行。")
@@ -236,7 +251,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def cmd_plan(args: argparse.Namespace) -> int:
+def cmd_plan(args: argparse.Namespace, config: Config) -> int:
     paths = _paths(args)
     current = load_paths(paths)
     _require_loadable(current)
@@ -260,7 +275,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def cmd_graph(args: argparse.Namespace) -> int:
+def cmd_graph(args: argparse.Namespace, config: Config) -> int:
     result = _load(args)
     _require_loadable(result)
     highlight = (
@@ -274,7 +289,7 @@ def cmd_graph(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def cmd_explain(args: argparse.Namespace) -> int:
+def cmd_explain(args: argparse.Namespace, config: Config) -> int:
     result = _load(args)
     _require_loadable(result)
     edges = _edge_filter(args.edges)
@@ -308,20 +323,21 @@ def cmd_explain(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def cmd_export(args: argparse.Namespace) -> int:
+def cmd_export(args: argparse.Namespace, config: Config) -> int:
     result = _load(args)
     _require_loadable(result)
     _write(result.graph.to_json(), args.output)
     return EXIT_OK
 
 
-def cmd_site(args: argparse.Namespace) -> int:
+def cmd_site(args: argparse.Namespace, config: Config) -> int:
     result = _load(args)
     _require_loadable(result)
 
-    findings = FindingList(validate_structure(result.graph).items)
+    findings = FindingList(validate_structure(result.graph, config).items)
+    findings.extend(validate_naming(result.graph, config).items)
     if not args.no_lexicon:
-        findings.extend(validate_semantics_lexical(result.graph).items)
+        findings.extend(validate_semantics_lexical(result.graph, config).items)
 
     index = build_site(
         result.graph,
@@ -351,8 +367,17 @@ _COMMANDS = {
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
     try:
-        return _COMMANDS[args.command](args)
+        config = load_config(args.config, enabled=not args.no_config)
+    except ConfigError as exc:
+        print(str(exc), file=sys.stderr)
+        return EXIT_USAGE
+
+    try:
+        # 語尾規則は Pydantic の validator が読むため、読み込みも設定の中で行う。
+        with use_config(config):
+            return _COMMANDS[args.command](args, config)
     except FileNotFoundError as exc:
         print(str(exc), file=sys.stderr)
         return EXIT_USAGE

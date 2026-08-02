@@ -12,6 +12,14 @@
 
 from __future__ import annotations
 
+from .config import (
+    Config,
+    ConfigError,
+    active_config,
+    find_config_file,
+    load_config,
+    use_config,
+)
 from .findings import Finding, FindingList, Severity
 from .graph import Edge, RequirementGraph
 from .loader import LoadResult, load_paths, load_sources
@@ -32,7 +40,7 @@ from .model import (
     Status,
     System,
 )
-from .validate import validate_semantics_lexical, validate_structure
+from .validate import validate_naming, validate_semantics_lexical, validate_structure
 
 __version__ = "0.1.0"
 
@@ -62,6 +70,14 @@ __all__ = [
     "load_sources",
     "validate_structure",
     "validate_semantics_lexical",
+    "validate_naming",
+    # 設定
+    "Config",
+    "ConfigError",
+    "load_config",
+    "find_config_file",
+    "active_config",
+    "use_config",
     "Finding",
     "FindingList",
     "Severity",

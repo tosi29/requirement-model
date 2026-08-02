@@ -23,6 +23,8 @@ from typing import (
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, field_validator
 
+from .config import DEFAULT_HIGH_PRIORITY_THRESHOLD, active_config
+
 __all__ = [
     "Node",
     "Sourced",
@@ -62,8 +64,10 @@ STATUS_RANK: dict[str, int] = {
     "verified": 3,
 }
 
-#: priority は「小さいほど高優先」。この値以下を高優先度として扱う。
-HIGH_PRIORITY_THRESHOLD = 2
+#: priority は「小さいほど高優先」。この値以下を高優先度として扱う (既定値)。
+#: 実際の判定は設定 (``high_priority_threshold``) を見るので、検査からは
+#: ``active_config().high_priority_threshold`` を参照すること。
+HIGH_PRIORITY_THRESHOLD = DEFAULT_HIGH_PRIORITY_THRESHOLD
 
 
 class RefMarker:
@@ -90,6 +94,14 @@ Ref = Annotated[Union[T, str], BeforeValidator(_to_id), RefMarker()]
 
 def _strip_terminator(text: str) -> str:
     return text.strip().rstrip("。.")
+
+
+def _require_suffix(value: str, suffixes: tuple[str, ...], head: str) -> str:
+    """語尾規則。許容語尾は設定で変えられる (空なら検査しない)。"""
+    if suffixes and not _strip_terminator(value).endswith(suffixes):
+        allowed = "/".join(f"「〜{suffix}」" for suffix in suffixes)
+        raise ValueError(f"{head}{allowed}で終わること")
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -151,14 +163,15 @@ class Need(Sourced):
 
     指示書の例示は「〜したい」だが、「気づきたい」「知りたい」のように
     サ変以外の願望形も同じ語尾規則の対象とみなし、「〜たい」で判定する。
+    厳格に「〜したい」へ戻すなら設定の ``[suffix] strict = true``。
     """
 
     @field_validator("text")
     @classmethod
     def _check_suffix(cls, value: str) -> str:
-        if not _strip_terminator(value).endswith("たい"):
-            raise ValueError("Need の text は願望形「〜したい」/「〜たい」で終わること")
-        return value
+        return _require_suffix(
+            value, active_config().suffix.need, "Need の text は願望形"
+        )
 
 
 class FunctionalRequirement(Requirement):
@@ -166,6 +179,7 @@ class FunctionalRequirement(Requirement):
 
     指示書の例示は「〜すること」だが、「読み取ること」「送ること」のように
     サ変以外の動詞も同じ語尾規則の対象とみなし、「〜こと」で判定する。
+    厳格に「〜すること」へ戻すなら設定の ``[suffix] strict = true``。
     """
 
     satisfies: list[Ref[Need]] = []
@@ -175,11 +189,11 @@ class FunctionalRequirement(Requirement):
     @field_validator("text")
     @classmethod
     def _check_suffix(cls, value: str) -> str:
-        if not _strip_terminator(value).endswith("こと"):
-            raise ValueError(
-                "FunctionalRequirement の text は「〜すること」/「〜こと」で終わること"
-            )
-        return value
+        return _require_suffix(
+            value,
+            active_config().suffix.functional_requirement,
+            "FunctionalRequirement の text は",
+        )
 
 
 class QualityRequirement(Requirement):

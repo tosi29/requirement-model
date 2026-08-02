@@ -59,6 +59,7 @@ $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (
 | `--strict` | validate | warning / severe もエラー扱いにする |
 | `--json` | validate, explain | 機械可読な出力 |
 | `--no-lexicon` | validate | 曖昧語チェックを行わない |
+| `--show-suppressed` | validate | 抑制した指摘を理由付きで表示する |
 | `--rev REV` | plan | 比較先のリビジョン (既定: `HEAD`) |
 | `--edges a,b` | plan, explain | 辿るエッジ種別を限定する |
 | `--depth N` | explain | 探索の深さ上限 |
@@ -129,7 +130,8 @@ FR と QR は型を分ける (qualifies を出せるのは QR のみ、孤立検
 
 ### 共通属性
 
-`id` / `text` / `status` (`proposed` → `approved` → `implemented` → `verified`) / `priority`。
+`id` / `text` / `status` (`proposed` → `approved` → `implemented` → `verified`) / `priority` /
+`suppress` ([指摘の抑制](#指摘の抑制-waiver))。
 `priority` は小さいほど高優先で、2 以下を「高優先度」として扱う
 (`reqmodel.model.HIGH_PRIORITY_THRESHOLD`)。
 FR / QR には `acceptance_criteria: list[str]` が加わる。
@@ -185,9 +187,37 @@ FR / QR には `acceptance_criteria: list[str]` が加わる。
 | `structure.missing_acceptance_criteria` | warning | 受け入れ基準の無い FR / QR |
 | `structure.status_inconsistent` | warning | approved 以上のノードが proposed のノードを参照 |
 | `semantics.ambiguous_term` | warning | 曖昧語 (「高速に」「適切に」等) |
+| `waiver.stale` | warning | 陳腐化した抑制 (対象の指摘が出ていない) |
 
 「FR から Goal への到達」は `FR --refines--> FR --satisfies--> Need <--motivates-- Goal`
 の経路で判定する。曖昧語辞書は `src/reqmodel/lexicon.py` で編集できる。
+
+### 指摘の抑制 (waiver)
+
+`--strict` は全か無かなので、既知で意図的な指摘が 1 件でも常在すると CI で使えない。
+ノード属性 `suppress` に **(チェックコード, 理由)** の組を書くと、そのノードに出る
+そのコードの指摘だけが消える。
+
+```python
+constraint_vpn = Constraint(
+    id="C-9",
+    text="社内 VPN の外からは接続させないこと",
+    constrains=[fr_ocr],
+    suppress=[("structure.missing_source", "情報システム部との口頭合意。文書化は次版")],
+)
+```
+
+- **理由は必須。** 理由の無い抑制は層1 のエラーになる (`suppress=["..."]` は書けない)
+- **エラーは抑制できない。** 抑制できるのは severe / warning / info、つまり `--strict`
+  の成否を左右する指摘だけ。存在しないコードや抑制できないコードも層1 で弾かれる
+  (コード表は `src/reqmodel/codes.py`)
+- **消えても数は残る。** サマリは `結果: ... (抑制 2 件)` の形になる。中身は
+  `req validate --show-suppressed` か `--json` の `suppressed` で読める
+- **陳腐化を検出する。** 抑制を書いたのに対象の指摘が出ていなければ `waiver.stale`
+  を warning として出す。定義が直った後に抑制だけが残り続けることを防ぐ
+
+サイトでも同じで、抑制された指摘は指摘一覧から消え、統計に「抑制 N 件」が出る。
+ノードを選ぶと、そのノードが抑制している指摘と理由が読める。
 
 ## 変更影響分析
 

@@ -23,6 +23,8 @@ from typing import (
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, field_validator
 
+from .codes import CHECK_CODES, SUPPRESSIBLE_CODES
+
 __all__ = [
     "Node",
     "Sourced",
@@ -40,6 +42,7 @@ __all__ = [
     "Ref",
     "Status",
     "EdgeSpec",
+    "Waiver",
     "NODE_TYPES",
     "TYPE_ORDER",
     "edge_specs_for",
@@ -64,6 +67,9 @@ STATUS_RANK: dict[str, int] = {
 
 #: priority は「小さいほど高優先」。この値以下を高優先度として扱う。
 HIGH_PRIORITY_THRESHOLD = 2
+
+#: 指摘の抑制 1 件。(チェックコード, 理由)。理由は必須 (下の validator を参照)。
+Waiver = tuple[str, str]
 
 
 class RefMarker:
@@ -106,6 +112,9 @@ class Node(BaseModel):
     text: str
     status: Status = "proposed"
     priority: int | None = None
+    #: 既知・意図的な指摘を黙らせる waiver。``[("structure.missing_source", "理由")]``
+    #: の形で、コードと理由の組を並べる。理由の無い抑制は書けない。
+    suppress: list[Waiver] = []
 
     @field_validator("id")
     @classmethod
@@ -122,6 +131,48 @@ class Node(BaseModel):
         if not value.strip():
             raise ValueError("text は空にできない")
         return value
+
+    @field_validator("suppress", mode="before")
+    @classmethod
+    def _check_suppress(cls, value: Any) -> Any:
+        """抑制の宣言を、書いた時点 (層1) で検査する。
+
+        抑制は「既知だと分かっている」という主張なので、対象コードが実在し、
+        抑制可能で、理由が書かれていることをここで担保する。
+        """
+        if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
+            raise ValueError("suppress は (コード, 理由) の組のリストで書くこと")
+
+        seen: set[str] = set()
+        waivers: list[Waiver] = []
+        for entry in value:
+            if isinstance(entry, str):
+                raise ValueError(
+                    f"抑制 {entry!r} に理由が無い。(\"{entry}\", \"理由\") の組で書くこと"
+                )
+            if not isinstance(entry, (list, tuple)) or len(entry) != 2:
+                raise ValueError("suppress の要素は (コード, 理由) の 2 要素の組で書くこと")
+            code, reason = entry
+            if not isinstance(code, str) or not isinstance(reason, str):
+                raise ValueError("suppress のコードと理由はどちらも文字列で書くこと")
+            known = CHECK_CODES.get(code)
+            if known is None:
+                raise ValueError(
+                    f"未知のチェックコード {code!r} を抑制しようとしている "
+                    f"(抑制できるコード: {', '.join(SUPPRESSIBLE_CODES)})"
+                )
+            if not known.suppressible:
+                raise ValueError(
+                    f"{code} は抑制できない ({known.summary}: エラーは既知として"
+                    "飼い慣らす対象ではない)"
+                )
+            if not reason.strip():
+                raise ValueError(f"{code} の抑制には理由が要る")
+            if code in seen:
+                raise ValueError(f"{code} の抑制が重複している")
+            seen.add(code)
+            waivers.append((code, reason.strip()))
+        return waivers
 
 
 class Sourced(Node):

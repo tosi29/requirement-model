@@ -25,6 +25,7 @@ from .plan import diff_graphs, format_plan, load_revision
 from .render import FORMATS, render
 from .site import DEFAULT_TITLE, SITE_ASSETS, asset_srcs, build_site
 from .validate import validate_semantics_lexical, validate_structure
+from .waivers import WaiverResult, apply_waivers
 
 __all__ = ["main", "build_parser"]
 
@@ -67,6 +68,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate_parser.add_argument(
         "--json", action="store_true", help="指摘を JSON で出力する"
+    )
+    validate_parser.add_argument(
+        "--show-suppressed",
+        action="store_true",
+        help="suppress で抑制された指摘を理由付きで表示する",
     )
 
     plan_parser = subparsers.add_parser(
@@ -206,8 +212,14 @@ def cmd_validate(args: argparse.Namespace) -> int:
         if not args.no_lexicon:
             findings.extend(validate_semantics_lexical(result.graph).items)
         skipped = False
+        # 抑制は層2 まで通ったときだけ適用する。読めていないノードがあると
+        # 「出ていない指摘」と「そもそも走っていないチェック」を区別できず、
+        # 陳腐化の警告が当てにならないため。
+        waived = apply_waivers(result.graph, findings)
     else:
         skipped = True
+        waived = WaiverResult(findings=findings)
+    findings = waived.findings
 
     if args.json:
         payload = {
@@ -215,17 +227,24 @@ def cmd_validate(args: argparse.Namespace) -> int:
             "node_count": len(result.graph),
             "structure_checked": not skipped,
             "findings": [f.to_dict() for f in findings.sorted()],
+            "suppressed": [
+                {**item.finding.to_dict(), "reason": item.reason}
+                for item in waived.suppressed
+            ],
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         for finding in findings.sorted():
             print(finding.format())
+        if args.show_suppressed:
+            for item in waived.suppressed:
+                print(item.format())
         print("")
         print(
             f"対象: {', '.join(str(p) for p in result.paths)} "
             f"({len(result.graph)} ノード / {len(result.graph.edges)} エッジ)"
         )
-        print(f"結果: {findings.summary()}")
+        print(f"結果: {waived.summary()}")
         if skipped:
             print("層2 の構造チェックは、層0/層1 のエラーのため未実行。")
 
@@ -322,17 +341,19 @@ def cmd_site(args: argparse.Namespace) -> int:
     findings = FindingList(validate_structure(result.graph).items)
     if not args.no_lexicon:
         findings.extend(validate_semantics_lexical(result.graph).items)
+    waived = apply_waivers(result.graph, findings)
 
     index = build_site(
         result.graph,
-        findings,
+        waived.findings,
         Path(args.output),
         title=args.title,
         sources=[str(p) for p in result.paths],
         scripts=asset_srcs(local=args.assets == "local"),
+        suppressed=waived.count,
     )
     print(
-        f"生成した: {index} ({len(result.graph)} ノード / {findings.summary()})",
+        f"生成した: {index} ({len(result.graph)} ノード / {waived.summary()})",
         file=sys.stderr,
     )
     return EXIT_OK

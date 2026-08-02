@@ -15,7 +15,8 @@ from .model import NODE_TYPES, TYPE_INDEX, Node, edge_specs_for
 __all__ = ["Edge", "RequirementGraph", "SCHEMA_VERSION", "LOCATION_KEY"]
 
 #: 2: ノードごとの出所 (location) を正規化 JSON に含めるようになった。
-SCHEMA_VERSION = 2
+#: 3: 全ノードが suppress (指摘の抑制) を持つようになった。
+SCHEMA_VERSION = 3
 
 #: 正規化 JSON でノードの出所を入れる鍵。ノードの属性ではなくメタ情報である。
 LOCATION_KEY = "location"

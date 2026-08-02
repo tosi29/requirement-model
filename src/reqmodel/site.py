@@ -74,8 +74,13 @@ def site_data(
     findings: FindingList,
     title: str,
     sources: Sequence[str],
+    suppressed: int = 0,
 ) -> dict[str, Any]:
-    """ページに埋め込むデータ一式。"""
+    """ページに埋め込むデータ一式。
+
+    findings は抑制 (waiver) 適用後の指摘。抑制した件数は消さずに
+    ``stats.suppressed`` として残す。
+    """
     return {
         "title": title,
         "generated_from": list(sources),
@@ -102,6 +107,7 @@ def site_data(
                 severity: findings.count(severity)  # type: ignore[arg-type]
                 for severity in ("error", "severe", "warning", "info")
             },
+            "suppressed": suppressed,
         },
         "meta": render_meta(),
     }
@@ -139,13 +145,14 @@ def build_site(
     title: str = DEFAULT_TITLE,
     sources: Sequence[str] = (),
     scripts: Sequence[str] | None = None,
+    suppressed: int = 0,
 ) -> Path:
     """out_dir に index.html と生データを書き出し、index.html のパスを返す。
 
     scripts に相対パス (``asset_srcs(local=True)``) を渡し、同じディレクトリへ
     その UMD ビルドを置けば、外部への通信が無い自己完結のサイトになる。
     """
-    data = site_data(graph, findings, title, sources)
+    data = site_data(graph, findings, title, sources, suppressed)
     payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
     tags = "\n".join(
         f'<script src="{escape(src, quote=True)}"></script>'

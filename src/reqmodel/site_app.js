@@ -202,6 +202,14 @@ function renderDetail() {
     rows.push("</ul>");
   }
 
+  if ((node.suppress || []).length) {
+    rows.push("<h2>抑制中の指摘</h2><ul>");
+    for (const [code, reason] of node.suppress) {
+      rows.push(`<li><code>${escapeHtml(code)}</code>: ${escapeHtml(reason)}</li>`);
+    }
+    rows.push("</ul>");
+  }
+
   const edgeList = (edges, direction) =>
     edges
       .map((edge) => {
@@ -324,6 +332,7 @@ function renderStats() {
   if (!counts.error && !counts.severe && !counts.warning && !counts.info) {
     chips.push('<span class="chip">指摘なし</span>');
   }
+  if (DATA.stats.suppressed) chips.push(`<span class="chip">抑制 ${DATA.stats.suppressed} 件</span>`);
   document.getElementById("stats").innerHTML = chips.join("");
   document.getElementById("sources").textContent = DATA.generated_from.join(", ");
   document.getElementById("legend").innerHTML = DATA.types

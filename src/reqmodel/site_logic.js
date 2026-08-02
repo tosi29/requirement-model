@@ -499,13 +499,29 @@ export function nodeContext(view, id) {
 //
 // 生成するのはただのオブジェクトなので、ライブラリを読み込まなくてもテストできる。
 
+/** 帯 (枠) の定義。meta に無ければ空。 */
+export function bandDefs(data) {
+  return ((data.meta || {}).bands || []).filter((band) =>
+    data.nodes.some((node) => node.type === band.type),
+  );
+}
+
+/** 帯枠ノードの id。ノード id と衝突しない接頭辞を付ける。 */
+export const bandId = (type) => `band:${type}`;
+
 /**
  * 図の要素定義。ノードとエッジの全件を一度だけ作る。
  *
  * status と優先度区分をデータに載せておくと、スタイル側は属性セレクタ
  * (`node[status = "..."]`) で拾える。絞り込みで作り直す必要が無い。
+ *
+ * meta.bands に挙がった型 (Goal / Need) には帯枠を 1 つずつ足す。compound node
+ * は使わない (cytoscape-dagre は子ノードを見ると dagre を compound モードに
+ * してしまい、レイアウトが壊れる)。枠はただの背面ノードで、位置と大きさは
+ * `bandedLayout()` の結果 (frames) から与える。
  */
 export function graphElements(data) {
+  const bands = bandDefs(data);
   return [
     ...data.nodes.map((node) => ({
       data: {
@@ -525,6 +541,20 @@ export function graphElements(data) {
         target: edge.target,
         name: edge.name,
       },
+    })),
+    ...bands.map((band) => ({
+      //: w / h は applyBanding が実測で入れ直すまでの仮の値。
+      data: {
+        id: bandId(band.type),
+        band: true,
+        bandType: band.type,
+        label: band.label,
+        w: 10,
+        h: 10,
+      },
+      classes: "band",
+      selectable: false,
+      grabbable: false,
     })),
   ];
 }
@@ -596,6 +626,36 @@ export function graphStyle(meta, palette) {
         shape: typeMeta.shape,
         "background-color": typeMeta.fill,
         "border-color": typeMeta.stroke,
+      },
+    });
+  }
+
+  // 2.5. 帯 (枠)。ノード・エッジの下に敷く背面ノードで、型の配色を薄く使う。
+  //      events: "no" なのでクリックは素通りし、選択や影響範囲には関わらない。
+  //      status / priorityClass を持たないので 3. 以降の規則には掛からない。
+  for (const band of meta.bands || []) {
+    const typeMeta = meta.types[band.type] || {};
+    style.push({
+      selector: `node.band[bandType = "${band.type}"]`,
+      style: {
+        shape: "round-rectangle",
+        width: "data(w)",
+        height: "data(h)",
+        padding: "0px",
+        "background-color": typeMeta.fill || palette.bg,
+        "background-opacity": 0.3,
+        "border-color": typeMeta.stroke || palette.border,
+        "border-width": 1,
+        "border-style": "dashed",
+        //: ラベルは枠の上辺の外に出す。中に置くと最上段のノードと重なる。
+        "text-valign": "top",
+        "text-halign": "center",
+        "text-margin-y": -2,
+        "font-size": 11,
+        "font-weight": "bold",
+        color: typeMeta.stroke || palette.muted,
+        "z-compound-depth": "bottom",
+        events: "no",
       },
     });
   }
@@ -758,4 +818,165 @@ export function layoutOptions(direction) {
     fit: true,
     padding: 18,
   };
+}
+
+// --- 帯レイアウト -----------------------------------------------------------
+//
+// エッジの向きが混在している (motivates は Goal→Need と下向き、satisfies は
+// FR→Need と上向き) ため、dagre に任せるだけでは Goal と FR が同じ高さに並ぶ。
+// meta.bands に挙がった型 (Goal / Need) を主軸方向の帯にまとめ、常に図の上
+// (LR なら左) に出す。dagre の結果の副軸方向の並びは保つので、交差の少なさは
+// おおむね引き継がれる。
+
+//: 帯の中の行間 (refines で親子になった Goal の段差)。
+const BAND_ROW_GAP = 30;
+//: 帯の中の横の間隔。dagre の nodeSep (24) に合わせる。
+const BAND_SIBLING_GAP = 26;
+//: 帯と帯・帯とその他の間隔。枠の余白とラベルのぶん広めに取る。
+const BAND_GAP = 96;
+//: ノードの外接矩形から枠までの余白。
+const BAND_FRAME_PAD = 14;
+
+/**
+ * 帯の中の行分け。refines (子 → 親) で親を上の行に置く。
+ * 親子が無い型 (Need) は 1 行になる。閉路は validate が指摘するので、
+ * ここでは無限ループしないことだけを保証する。
+ */
+function bandRows(members, edges) {
+  const ids = new Set(members.map((node) => node.id));
+  const parents = new Map();
+  for (const edge of edges) {
+    if (edge.name !== "refines" || !ids.has(edge.source) || !ids.has(edge.target)) continue;
+    if (!parents.has(edge.source)) parents.set(edge.source, []);
+    parents.get(edge.source).push(edge.target);
+  }
+  const depth = new Map();
+  const depthOf = (id, trail) => {
+    if (depth.has(id)) return depth.get(id);
+    if (trail.has(id)) return 0;
+    trail.add(id);
+    const above = (parents.get(id) || []).map((parent) => depthOf(parent, trail));
+    const value = above.length ? Math.max(...above) + 1 : 0;
+    depth.set(id, value);
+    return value;
+  };
+  const rows = [];
+  for (const node of members) {
+    const row = depthOf(node.id, new Set());
+    (rows[row] ||= []).push(node);
+  }
+  return rows.filter(Boolean);
+}
+
+/**
+ * dagre の結果を帯に並べ直した位置と、帯を囲む枠。
+ *
+ * bands は `bandDefs()` の並び (上からの帯の順)、placed は表示中の (帯枠以外の)
+ * ノードと寸法 `{ id, type, x, y, w, h }`、edges は表示中のエッジ。
+ *
+ * 返り値は `{ positions, frames }`。positions は id → `{ x, y }` の Map で、
+ * 全ノードぶん返す (帯に入らないノードは形を保ったまま帯の下へ平行移動する)。
+ * frames は型 → `{ x, y, w, h }` (枠の中心と大きさ) の Map。
+ * 帯のノードが 1 つも無ければ両方とも空。
+ *
+ * **枠は図の全幅に揃える**。帯ごとに中身の外接矩形を掛けると幅も左端もばらばらに
+ * なり、「上に積んだ層」に見えない。等幅・同位置の枠が縦に並ぶ形にし、中身は
+ * その中央に寄せる (帯の中の相対位置は変えない)。
+ */
+export function bandedLayout(bands, placed, edges, direction) {
+  const positions = new Map();
+  const frames = new Map();
+  const membersOf = bands.map((band) =>
+    placed.filter((node) => node.type === band.type),
+  );
+  if (!membersOf.some((members) => members.length)) return { positions, frames };
+
+  //: TD では y が主軸 (帯の積み方向)・x が副軸。LR では逆になる。
+  const vertical = direction !== "LR";
+  const pri = (node) => (vertical ? node.y : node.x);
+  const sec = (node) => (vertical ? node.x : node.y);
+  const priSize = (node) => (vertical ? node.h : node.w);
+  const secSize = (node) => (vertical ? node.w : node.h);
+  const at = (secValue, priValue) =>
+    vertical ? { x: secValue, y: priValue } : { x: priValue, y: secValue };
+  const topOf = (nodes) => Math.min(...nodes.map((node) => pri(node) - priSize(node) / 2));
+
+  // 1. 帯ごとに行へ分けて積む。主軸方向の占有範囲 (spans) を控えておく。
+  const banded = new Set();
+  const spans = new Map();
+  let cursor = topOf(placed);
+  for (let index = 0; index < bands.length; index++) {
+    const members = membersOf[index];
+    if (!members.length) continue;
+    for (const node of members) banded.add(node.id);
+    const from = cursor;
+    for (const row of bandRows(members, edges)) {
+      const height = Math.max(...row.map(priSize));
+      //: 副軸は dagre の並びを保ち、重なりだけを右 (下) に押して解消する。
+      row.sort((a, b) => sec(a) - sec(b));
+      let occupied = -Infinity;
+      for (const node of row) {
+        const half = secSize(node) / 2;
+        const center = Math.max(sec(node), occupied + BAND_SIBLING_GAP + half);
+        positions.set(node.id, at(center, cursor + height / 2));
+        occupied = center + half;
+      }
+      cursor += height + BAND_ROW_GAP;
+    }
+    spans.set(index, { from, to: cursor - BAND_ROW_GAP });
+    cursor += BAND_GAP - BAND_ROW_GAP;
+  }
+
+  // 2. 帯に入らないノードは、形を保ったまま帯の下へ送る。
+  const rest = placed.filter((node) => !banded.has(node.id));
+  if (rest.length) {
+    const shift = cursor - topOf(rest);
+    for (const node of rest) {
+      positions.set(node.id, at(sec(node), pri(node) + shift));
+    }
+  }
+
+  // 3. 図の全幅 (副軸方向の範囲) を測る。枠の幅と、中身を寄せる中心になる。
+  const secCenter = (node) => {
+    const position = positions.get(node.id);
+    return vertical ? position.x : position.y;
+  };
+  let secMin = Infinity;
+  let secMax = -Infinity;
+  for (const node of placed) {
+    secMin = Math.min(secMin, secCenter(node) - secSize(node) / 2);
+    secMax = Math.max(secMax, secCenter(node) + secSize(node) / 2);
+  }
+  const secMiddle = (secMin + secMax) / 2;
+  const frameSecSize = secMax - secMin + BAND_FRAME_PAD * 2;
+
+  // 4. 帯の中身を中央へ寄せ、全幅の枠を掛ける。
+  for (let index = 0; index < bands.length; index++) {
+    const members = membersOf[index];
+    if (!members.length) continue;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const node of members) {
+      min = Math.min(min, secCenter(node) - secSize(node) / 2);
+      max = Math.max(max, secCenter(node) + secSize(node) / 2);
+    }
+    const shift = secMiddle - (min + max) / 2;
+    for (const node of members) {
+      const position = positions.get(node.id);
+      positions.set(
+        node.id,
+        vertical
+          ? { x: position.x + shift, y: position.y }
+          : { x: position.x, y: position.y + shift },
+      );
+    }
+    const span = spans.get(index);
+    const framePriSize = span.to - span.from + BAND_FRAME_PAD * 2;
+    frames.set(bands[index].type, {
+      ...at(secMiddle, (span.from + span.to) / 2),
+      w: vertical ? frameSecSize : framePriSize,
+      h: vertical ? framePriSize : frameSecSize,
+    });
+  }
+  return { positions, frames };
 }

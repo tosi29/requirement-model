@@ -90,6 +90,14 @@ def test_render_meta_carries_the_high_priority_threshold():
     assert priority["outline"].startswith("#")
 
 
+def test_render_meta_lists_goal_and_need_bands():
+    """帯 (枠) にする型は Python 側が唯一の出典。並びは上からの帯の順。"""
+    bands = render_meta()["bands"]
+
+    assert [band["type"] for band in bands] == ["Goal", "Need"]
+    assert all(band["label"] for band in bands)
+
+
 def test_site_data_carries_status_and_priority_of_every_node():
     """status / priority フィルタの材料はノードにそのまま入っている。"""
     graph = build(

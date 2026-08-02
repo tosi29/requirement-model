@@ -9,6 +9,9 @@
 import {
   TABLE_COLUMNS,
   activeEdgeNames,
+  bandDefs,
+  bandId,
+  bandedLayout,
   createView,
   decodeHash,
   encodeHash,
@@ -65,6 +68,9 @@ let cy = null;
 
 function initGraph() {
   try {
+    //: 初期レイアウトはコンストラクタに任せる (要素の計測が済んでから走る)。
+    //: 帯枠もこの dagre に混ざるが、孤立した小さなノードなので邪魔にならず、
+    //: 直後の applyBanding() が正しい位置と大きさに直す。
     cy = cytoscape({
       container: graphEl,
       elements: graphElements(DATA),
@@ -82,10 +88,61 @@ function initGraph() {
   for (const name of DATA.meta.dashed_edges) {
     cy.edges(`[name = "${name}"]`).addClass("dashed");
   }
+  //: 帯枠は events: "no" なのでノードの tap は飛んでこない (クリックは素通り)。
   cy.on("tap", "node", (event) => selectNode(event.target.id()));
   cy.on("tap", (event) => {
     if (event.target === cy && state.selected) selectNode(state.selected);
   });
+  applyBanding();
+  fitInitial();
+}
+
+/**
+ * いま表示している要素。絞り込みの状態はこちらが管理する `.hidden` クラスが
+ * 唯一の出典なので、それを見る。`:visible` はスタイル計算が終わるまで
+ * 一部の要素しか返さないことがあり (初期化直後)、レイアウト対象には使えない。
+ */
+const shownElements = () => cy.elements().not(".hidden");
+
+/**
+ * Goal / Need の帯を図の上 (LR なら左) に並べ直し、枠を掛け直す。
+ * dagre の副軸方向の並びは保つので、「整列」のたびに図の形が大きく変わる
+ * ことは無い。
+ */
+function applyBanding() {
+  if (!cy) return;
+  const bands = bandDefs(DATA);
+  if (!bands.length) return;
+  const placed = [];
+  shownElements().nodes().not(".band").forEach((element) => {
+    const position = element.position();
+    placed.push({
+      id: element.id(),
+      type: element.data("type"),
+      x: position.x,
+      y: position.y,
+      w: element.outerWidth(),
+      h: element.outerHeight(),
+    });
+  });
+  if (!placed.length) return;
+  const { positions, frames } = bandedLayout(bands, placed, view.edges, state.direction);
+  cy.batch(() => {
+    for (const [id, position] of positions) cy.getElementById(id).position(position);
+    for (const [type, frame] of frames) {
+      const element = cy.getElementById(bandId(type));
+      if (element.empty()) continue;
+      element.data({ w: frame.w, h: frame.h });
+      element.position({ x: frame.x, y: frame.y });
+    }
+  });
+}
+
+/** dagre → 帯の並べ直し → 倍率合わせ。初期表示・「整列」・向きの変更が通る。 */
+function runLayout() {
+  if (!cy) return;
+  shownElements().not(".band").layout(layoutOptions(state.direction)).run();
+  applyBanding();
   fitInitial();
 }
 
@@ -94,9 +151,14 @@ function applyVisibility() {
   if (!cy) return;
   const nodes = new Set(view.nodes.map((node) => node.id));
   const edges = new Set(view.edges);
+  const types = new Set(view.nodes.map((node) => node.type));
   cy.batch(() => {
-    cy.nodes().forEach((element) => {
+    cy.nodes().not(".band").forEach((element) => {
       element.toggleClass("hidden", !nodes.has(element.id()));
+    });
+    //: 帯枠は、その型のノードが 1 つも見えていないときだけ隠す。
+    cy.nodes(".band").forEach((element) => {
+      element.toggleClass("hidden", !types.has(element.data("bandType")));
     });
     cy.edges().forEach((element) => {
       element.toggleClass("hidden", !edges.has(DATA.edges[element.data("index")]));
@@ -113,7 +175,8 @@ function applyHighlight() {
     const up = reach(view, state.selected, false);
     const down = reach(view, state.selected, true);
     const inScope = new Set([state.selected, ...up, ...down]);
-    cy.nodes().forEach((element) => {
+    //: 帯枠は減光の対象にしない (子の強調が読めるよう、枠は常に薄いまま)。
+    cy.nodes().not(".band").forEach((element) => {
       const id = element.id();
       if (id === state.selected) element.addClass("sel");
       else if (up.has(id)) element.addClass("up");
@@ -130,13 +193,11 @@ function applyHighlight() {
 
 /** 表示中のノードだけで並べ直す。方向を変えたときと「整列」ボタンから呼ぶ。 */
 function relayout() {
-  if (!cy) return;
-  cy.elements(":visible").layout(layoutOptions(state.direction)).run();
-  fitInitial();
+  runLayout();
 }
 
 function fitToView() {
-  if (cy) cy.fit(cy.elements(":visible"), 18);
+  if (cy) cy.fit(shownElements(), 18);
 }
 
 //: これ以上縮めると文字が読めなくなる倍率。
@@ -147,7 +208,7 @@ function fitInitial() {
   if (!cy) return;
   fitToView();
   if (cy.zoom() >= MIN_READABLE_ZOOM) return;
-  const box = cy.elements(":visible").boundingBox();
+  const box = shownElements().boundingBox();
   cy.zoom(MIN_READABLE_ZOOM);
   cy.pan({ x: 18 - box.x1 * MIN_READABLE_ZOOM, y: 18 - box.y1 * MIN_READABLE_ZOOM });
 }

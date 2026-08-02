@@ -8,6 +8,9 @@ import {
   TABLE_COLUMNS,
   activeEdgeNames,
   allEdgeNames,
+  bandDefs,
+  bandId,
+  bandedLayout,
   createView,
   decodeHash,
   defaultState,
@@ -562,7 +565,8 @@ test("allEdgeNames はノード型から現れうるエッジ種別を数える"
 test("graphElements はノードとエッジをそのまま要素にする", () => {
   const elements = graphElements(fixture());
 
-  assert.equal(elements.length, 11);
+  // ノード 5 + エッジ 6 + 帯枠 2 (Goal / Need)。枠は末尾に足す。
+  assert.equal(elements.length, 13);
   assert.equal(elements[0].data.id, "G-1");
   assert.equal(elements[0].data.type, "Goal");
   assert.match(elements[0].data.label, /^G-1\n/);
@@ -691,6 +695,189 @@ test("status / 優先度の定義が無い meta でも凡例と描画は壊れ�
     legendGroups(meta).map((group) => group.title),
     ["種別"],
   );
+});
+
+// --- 帯 (Goal / Need の枠) ---------------------------------------------------
+
+test("graphElements は帯の枠ノードを末尾に足す (compound は使わない)", () => {
+  const elements = graphElements(fixture());
+  const byId = new Map(elements.map((element) => [element.data.id, element]));
+
+  //: compound にすると cytoscape-dagre が dagre を compound モードにして
+  //: レイアウトが壊れるので、どのノードも parent を持たない。
+  assert.ok(elements.every((element) => !("parent" in element.data)));
+
+  const goalBand = byId.get(bandId("Goal"));
+  assert.deepEqual(goalBand.data, {
+    id: "band:Goal",
+    band: true,
+    bandType: "Goal",
+    label: "Goal (最上位)",
+    w: 10,
+    h: 10,
+  });
+  assert.equal(goalBand.classes, "band");
+  assert.equal(goalBand.selectable, false);
+  assert.equal(goalBand.grabbable, false);
+  assert.ok(byId.has(bandId("Need")));
+});
+
+test("その型のノードが無い帯は枠を作らない", () => {
+  const data = fixture();
+  data.nodes = data.nodes.filter((node) => node.type !== "Need");
+  const elements = graphElements(data);
+
+  assert.ok(elements.some((element) => element.data.id === "band:Goal"));
+  assert.ok(!elements.some((element) => element.data.id === "band:Need"));
+});
+
+test("meta に bands が無ければ従来どおりの要素になる", () => {
+  const data = fixture();
+  data.meta = { ...data.meta }; // 共有の META を書き換えない
+  delete data.meta.bands;
+  const elements = graphElements(data);
+
+  assert.equal(elements.length, 11);
+  assert.ok(elements.every((element) => !("parent" in element.data)));
+  assert.equal(bandDefs(data).length, 0);
+});
+
+test("graphStyle は帯枠に型の配色を薄く写す", () => {
+  const meta = fixture().meta;
+  meta.types.Goal = { shape: "hexagon", fill: "#e8f0fe", stroke: "#3b6fd4" };
+  const style = graphStyle(meta, { fg: "#111", bg: "#fff", border: "#ddd", muted: "#666" });
+
+  const band = style.find(
+    (rule) => rule.selector === 'node.band[bandType = "Goal"]',
+  );
+  assert.equal(band.style["border-color"], "#3b6fd4");
+  assert.equal(band.style["background-color"], "#e8f0fe");
+  assert.ok(band.style["background-opacity"] < 1);
+  // 枠のラベルは上辺に出す。中央だと帯の中のノードと重なる。
+  assert.equal(band.style["text-valign"], "top");
+  // 枠は一番下に敷き、クリックを素通しする。
+  assert.equal(band.style["z-compound-depth"], "bottom");
+  assert.equal(band.style.events, "no");
+});
+
+//: 幅 60 / 高さ 30 のノードを (x, y) 中心に置いた placed 1 件。
+const placedNode = (id, type, x, y) => ({ id, type, x, y, w: 60, h: 30 });
+
+const BANDS = [
+  { type: "Goal", label: "Goal (最上位)" },
+  { type: "Need", label: "Need (上位)" },
+];
+
+test("bandedLayout は Goal 帯 → Need 帯 → その他 の順に上から並べる", () => {
+  // dagre が Goal と FR を同じ高さ (y=0) に置いてしまった状態。
+  const placed = [
+    placedNode("G-1", "Goal", 0, 0),
+    placedNode("FR-1", "FunctionalRequirement", 100, 0),
+    placedNode("N-1", "Need", 50, 80),
+  ];
+  const { positions } = bandedLayout(BANDS, placed, [], "TD");
+
+  const goal = positions.get("G-1");
+  const need = positions.get("N-1");
+  const fr = positions.get("FR-1");
+  assert.ok(goal.y < need.y, "Goal は Need より上");
+  assert.ok(need.y < fr.y, "Need は FR より上");
+  // 帯に入らない FR は副軸 (x) を動かさない。
+  assert.equal(fr.x, 100);
+});
+
+test("bandedLayout は帯の中の並び順を保ったまま中央へ寄せる", () => {
+  const placed = [
+    placedNode("G-1", "Goal", 0, 0),
+    placedNode("G-2", "Goal", 100, 0),
+    placedNode("FR-1", "FunctionalRequirement", 400, 60),
+  ];
+  const { positions } = bandedLayout([BANDS[0]], placed, [], "TD");
+
+  const first = positions.get("G-1");
+  const second = positions.get("G-2");
+  assert.ok(first.x < second.x, "帯の中の左右の並びは変わらない");
+  assert.equal(second.x - first.x, 100, "帯の中の間隔も変わらない");
+  // 図の全幅 (-30 〜 430) の中心 200 に、2 件の中心 (50) が寄る。
+  assert.equal((first.x + second.x) / 2, 200);
+});
+
+test("bandedLayout の枠は図の全幅に揃い、等幅で縦に並ぶ", () => {
+  const placed = [
+    placedNode("G-1", "Goal", 0, 0),
+    placedNode("N-1", "Need", 50, 80),
+    placedNode("FR-1", "FunctionalRequirement", 300, 160),
+  ];
+  const { positions, frames } = bandedLayout(BANDS, placed, [], "TD");
+
+  const goal = frames.get("Goal");
+  const need = frames.get("Need");
+  // 全幅 = 外接矩形 (-30 〜 330 = 360) + 余白 14 × 2。
+  assert.equal(goal.w, 388);
+  assert.equal(need.w, goal.w, "2 つの枠は等幅");
+  assert.equal(need.x, goal.x, "左端も揃う");
+  assert.ok(goal.y < need.y, "縦に並ぶ");
+  // 高さは中身 1 行ぶん (30) + 余白。枠は中身の上下に掛かる。
+  assert.equal(goal.h, 30 + 28);
+  assert.equal(goal.y, positions.get("G-1").y);
+});
+
+test("bandedLayout は refines の親 Goal を子 Goal より上の行に置く", () => {
+  const placed = [
+    placedNode("G-1", "Goal", 0, 100), // 親 (dagre は下に置いた)
+    placedNode("G-2", "Goal", 0, 0), // 子
+  ];
+  const edges = [{ source: "G-2", name: "refines", target: "G-1" }];
+  const { positions } = bandedLayout([BANDS[0]], placed, edges, "TD");
+
+  assert.ok(positions.get("G-1").y < positions.get("G-2").y);
+});
+
+test("bandedLayout は帯の中の重なりを副軸方向へ押して解消する", () => {
+  const placed = [
+    placedNode("N-1", "Need", 0, 0),
+    placedNode("N-2", "Need", 10, 40), // 幅 60 なので N-1 と重なる
+  ];
+  const { positions } = bandedLayout([BANDS[1]], placed, [], "TD");
+
+  const left = positions.get("N-1");
+  const right = positions.get("N-2");
+  assert.equal(left.y, right.y, "同じ行に並ぶ");
+  assert.ok(right.x - left.x >= 60, "ノード幅ぶん以上離れる");
+});
+
+test("bandedLayout の LR は帯を左に積み、縦の並びを保つ", () => {
+  const placed = [
+    placedNode("G-1", "Goal", 0, 0),
+    placedNode("FR-1", "FunctionalRequirement", 0, 100),
+  ];
+  const { positions } = bandedLayout(BANDS, placed, [], "LR");
+
+  assert.ok(positions.get("G-1").x < positions.get("FR-1").x, "Goal は FR より左");
+  assert.equal(positions.get("FR-1").y, 100, "副軸 (y) は動かさない");
+});
+
+test("bandedLayout は帯のノードが無ければ何も返さない", () => {
+  const placed = [placedNode("FR-1", "FunctionalRequirement", 0, 0)];
+  const { positions, frames } = bandedLayout(BANDS, placed, [], "TD");
+
+  assert.equal(positions.size, 0);
+  assert.equal(frames.size, 0);
+});
+
+test("bandedLayout は帯以外のノードの相対位置を保ったまま平行移動する", () => {
+  const placed = [
+    placedNode("G-1", "Goal", 0, 50),
+    placedNode("FR-1", "FunctionalRequirement", 20, 0),
+    placedNode("QR-1", "QualityRequirement", 80, 90),
+  ];
+  const { positions } = bandedLayout([BANDS[0]], placed, [], "TD");
+
+  const fr = positions.get("FR-1");
+  const qr = positions.get("QR-1");
+  assert.equal(qr.x - fr.x, 60);
+  assert.equal(qr.y - fr.y, 90);
+  assert.ok(positions.get("G-1").y < fr.y);
 });
 
 test("layoutOptions は TD / LR を dagre の rankDir に写す", () => {

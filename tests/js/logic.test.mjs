@@ -17,9 +17,12 @@ import {
   defaultState,
   encodeHash,
   escapeHtml,
+  explainCommand,
   focusSet,
   graphElements,
   graphStyle,
+  impactScope,
+  impactSets,
   isNodeVisible,
   layoutOptions,
   legendGroups,
@@ -29,8 +32,11 @@ import {
   priorityBucket,
   priorityFilters,
   reach,
+  related,
+  searchHits,
   sortRows,
   statusFilters,
+  stepHit,
   tableRows,
   truncate,
   wrapLabel,
@@ -179,6 +185,96 @@ test("知らない id からは何も辿れない", () => {
 
   assert.equal(reach(view, "NOPE", true).size, 0);
   assert.equal(reach(view, "NOPE", false).size, 0);
+});
+
+// --- 深さ / 無向 (req explain --depth / --undirected 相当) --------------------
+
+test("深さを指定すると、そのホップ数までしか辿らない", () => {
+  const view = viewOf();
+
+  // QR-1 → FR-1 → N-1 → (SRC-1)
+  assert.deepEqual([...reach(view, "QR-1", true, 1)], ["FR-1"]);
+  assert.deepEqual([...reach(view, "QR-1", true, 2)].sort(), ["FR-1", "N-1", "SRC-1"]);
+  assert.deepEqual(
+    [...reach(view, "QR-1", true, 5)].sort(),
+    [...reach(view, "QR-1", true)].sort(),
+  );
+});
+
+test("深さ null は無制限 (既定)", () => {
+  const view = viewOf();
+
+  assert.deepEqual([...reach(view, "QR-1", true, null)].sort(), ["FR-1", "N-1", "SRC-1"]);
+});
+
+test("無向で辿ると向きを問わず集まる", () => {
+  const view = viewOf();
+
+  // 有向では FR-1 の上流は QR-1 だけだが、無向なら Goal 側の文脈まで届く。
+  assert.deepEqual([...related(view, "FR-1", 1)].sort(), ["N-1", "QR-1", "SRC-1"]);
+  assert.ok(related(view, "FR-1", 2).has("G-1"));
+  assert.ok(!related(view, "FR-1").has("FR-1"));
+});
+
+test("無向の探索は焦点 (focusSet) と同じ範囲になる", () => {
+  const view = viewOf();
+
+  assert.deepEqual(
+    [...focusSet(view, "FR-1", 2)].sort(),
+    ["FR-1", ...related(view, "FR-1", 2)].sort(),
+  );
+});
+
+test("impactSets は上流・下流・全体を返す", () => {
+  const view = viewOf();
+  const impact = impactSets(view, "FR-1", { depth: null, undirected: false });
+
+  assert.deepEqual([...impact.upstream], ["QR-1"]);
+  assert.deepEqual([...impact.downstream].sort(), ["N-1", "SRC-1"]);
+  assert.deepEqual([...impact.whole].sort(), ["FR-1", "N-1", "QR-1", "SRC-1"]);
+  assert.equal(impact.undirected, false);
+});
+
+test("無向のときは全件を下流側に入れる (impact_set と同じ切り分け)", () => {
+  const view = viewOf();
+  const impact = impactSets(view, "FR-1", { depth: 1, undirected: true });
+
+  assert.equal(impact.upstream.size, 0);
+  assert.deepEqual([...impact.downstream].sort(), ["N-1", "QR-1", "SRC-1"]);
+  assert.equal(impact.undirected, true);
+});
+
+test("scope を省略すると view の state から取る", () => {
+  const data = fixture();
+  const view = createView(data, { ...allOn(data), depth: 1, undirected: true });
+
+  assert.deepEqual(
+    [...impactSets(view, "FR-1").downstream].sort(),
+    ["N-1", "QR-1", "SRC-1"],
+  );
+});
+
+test("impactScope は深さ 0 と知らない値を無制限に倒す", () => {
+  assert.deepEqual(impactScope({ depth: 0 }), { depth: null, undirected: false });
+  assert.deepEqual(impactScope({ depth: 9 }), { depth: null, undirected: false });
+  assert.deepEqual(impactScope({}), { depth: null, undirected: false });
+  assert.deepEqual(impactScope({ depth: 2, undirected: true }), {
+    depth: 2,
+    undirected: true,
+  });
+});
+
+test("深さ・向きの設定は絞り込みと重ねて効く", () => {
+  const data = fixture();
+  const edges = new Set(data.edge_names);
+  edges.delete("has_source");
+  const view = createView(data, { ...allOn(data), edges });
+
+  // has_source を外したので、無向 1 ホップからも SRC-1 が消える。
+  assert.deepEqual([...impactSets(view, "FR-1", { depth: 1, undirected: true }).downstream].sort(), [
+    "N-1",
+    "QR-1",
+  ]);
 });
 
 /** 隣接マップを使わない素朴な実装 (書き換え前の reach())。突き合わせ用。 */
@@ -409,6 +505,45 @@ test("matchesQuery は空の検索語をすべて通す", () => {
   assert.equal(matchesQuery(node, "見積"), false);
 });
 
+// --- 検索ヒット (グラフのハイライトとキーボード選択) -------------------------
+
+test("searchHits は一覧と同じ並びでヒットした id を返す", () => {
+  assert.deepEqual(searchHits(viewOf(), "領収書"), ["N-1", "FR-1"]);
+});
+
+test("検索語が空ならヒット無し (全件ではない)", () => {
+  assert.deepEqual(searchHits(viewOf(), ""), []);
+  assert.deepEqual(searchHits(viewOf(), "   "), []);
+});
+
+test("絞り込みで消えたノードはヒットに入らない", () => {
+  const data = fixture();
+  const types = new Set(data.types);
+  types.delete("Need");
+
+  assert.deepEqual(searchHits(createView(data, { ...allOn(data), types }), "領収書"), [
+    "FR-1",
+  ]);
+});
+
+test("↑↓ は候補を送り、端で巻き戻す", () => {
+  const hits = ["N-1", "FR-1", "QR-1"];
+
+  assert.equal(stepHit(hits, "N-1", 1), "FR-1");
+  assert.equal(stepHit(hits, "QR-1", 1), "N-1");
+  assert.equal(stepHit(hits, "N-1", -1), "QR-1");
+});
+
+test("位置が無いときは端から始める", () => {
+  const hits = ["N-1", "FR-1"];
+
+  assert.equal(stepHit(hits, null, 1), "N-1");
+  assert.equal(stepHit(hits, null, -1), "FR-1");
+  //: 絞り込みで候補から外れた id も「位置が無い」扱い。
+  assert.equal(stepHit(hits, "SRC-1", 1), "N-1");
+  assert.equal(stepHit([], null, 1), null);
+});
+
 test("文字の列は素直に昇順・降順", () => {
   assert.deepEqual(idsSortedBy("id", true), ["FR-1", "G-1", "N-1", "QR-1", "SRC-1"]);
   assert.deepEqual(idsSortedBy("id", false), ["SRC-1", "QR-1", "N-1", "G-1", "FR-1"]);
@@ -521,6 +656,20 @@ test("フォーカスの深さも載る (切のときは書かない)", () => {
   assert.equal(hashOf({ focus: 0 }), "");
 });
 
+test("影響範囲の深さ・向きも載る (既定のときは書かない)", () => {
+  assert.equal(hashOf({ depth: 2 }), "#depth=2");
+  assert.equal(hashOf({ undirected: true }), "#undir=1");
+  assert.equal(hashOf({ depth: 0, undirected: false }), "");
+});
+
+test("知らない深さ・向きの値は既定に倒す", () => {
+  assert.equal(stateOf("#depth=9").depth, 0);
+  assert.equal(stateOf("#depth=x").depth, 0);
+  assert.equal(stateOf("#undir=0").undirected, false);
+  assert.equal(stateOf("#depth=3&undir=1").depth, 3);
+  assert.equal(stateOf("#depth=3&undir=1").undirected, true);
+});
+
 test("ハッシュが無ければ既定の状態", () => {
   const data = fixture();
   assert.deepEqual(decodeHash("", data), defaultState(data));
@@ -539,6 +688,8 @@ test("状態 → ハッシュ → 状態で元に戻る", () => {
     mode: "table",
     query: "領収書 画像",
     focus: 2,
+    depth: 3,
+    undirected: true,
     sort: { key: "priority", asc: false },
   };
 
@@ -549,8 +700,8 @@ test("ハッシュ → 状態 → ハッシュでも元に戻る", () => {
   const data = fixture();
   const hash =
     "#node=QR-1&types=Goal,QualityRequirement&edges=qualifies&status=proposed" +
-    `&priority=high,normal&dir=LR&view=table&focus=1&q=${encodeURIComponent("3 秒")}` +
-    "&sort=criteria:desc";
+    "&priority=high,normal&dir=LR&view=table&focus=1&depth=2&undir=1" +
+    `&q=${encodeURIComponent("3 秒")}&sort=criteria:desc`;
 
   assert.equal(encodeHash(decodeHash(hash, data), data), hash);
 });
@@ -654,6 +805,44 @@ test("絞り込みが無ければフィルタ行は出ない", () => {
   assert.ok(!nodeContext(viewOf(), "FR-1").includes("エッジ種別フィルタ"));
 });
 
+test("深さを指定すると探索深さの行が出て、範囲もそこで切れる", () => {
+  const text = nodeContext(viewOf(), "QR-1", { depth: 1, undirected: false });
+
+  assert.match(text, /対象 1 件 \/ 上流 0 件 \/ 下流 1 件 \/ 合計 2 件/);
+  assert.match(text, /探索深さ: 1/);
+  assert.ok(!text.includes("SRC-1"));
+});
+
+test("無向のときは関連ノードを 1 ブロックにまとめる", () => {
+  const text = nodeContext(viewOf(), "FR-1", { depth: null, undirected: true });
+
+  //: 無向なら FR-1 から Goal 側 (G-1) まで届く (有向の上流は QR-1 だけ)。
+  assert.match(text, /対象 1 件 \/ 関連 4 件 \/ 合計 5 件/);
+  assert.match(text, /探索方向: 無向 \(エッジの向きを無視\)/);
+  assert.match(text, /## 関連ノード \(向きを問わず繋がっているノード\) \(4 件\)/);
+  assert.ok(!text.includes("## 上流"));
+  assert.ok(!text.includes("## 下流"));
+});
+
+test("nodeContext は scope を省略すると view の state を見る", () => {
+  const data = fixture();
+  const view = createView(data, { ...allOn(data), depth: 1, undirected: true });
+
+  assert.equal(nodeContext(view, "FR-1"), nodeContext(view, "FR-1", { depth: 1, undirected: true }));
+  assert.match(nodeContext(view, "FR-1"), /探索深さ: 1/);
+});
+
+test("explainCommand は画面の設定をそのまま引数にする", () => {
+  const data = fixture();
+  const edges = new Set(["satisfies", "motivates"]);
+
+  assert.equal(explainCommand(viewOf(), "FR-1"), "req explain FR-1");
+  assert.equal(
+    explainCommand(createView(data, { ...allOn(data), edges, depth: 2, undirected: true }), "FR-1"),
+    "req explain FR-1 --edges motivates,satisfies --depth 2 --undirected",
+  );
+});
+
 test("部分グラフに現れなかったエッジ種別を末尾に並べる", () => {
   const text = nodeContext(viewOf(), "FR-1");
 
@@ -713,6 +902,31 @@ test("graphStyle は render_meta の形状・配色をそのまま使う", () =>
   const edge = style.find((rule) => rule.selector === "edge");
   assert.equal(edge.style["line-color"], "#ddd");
   assert.equal(edge.style.color, "#666");
+});
+
+test("検索ヒットは枠線を使わず暈し (underlay) で示す", () => {
+  const meta = fixture().meta;
+  const style = graphStyle(meta, { fg: "#111", bg: "#fff", border: "#ddd", muted: "#666" });
+  const hit = style.find((rule) => rule.selector === "node.hit");
+
+  assert.equal(hit.style["underlay-color"], meta.search.hit);
+  //: 影響範囲 (枠線) と優先度 (輪) のどちらとも property が衝突しない。
+  for (const key of Object.keys(hit.style)) {
+    assert.ok(!key.startsWith("border-") && !key.startsWith("outline-"), key);
+  }
+  //: 検索の規則は影響範囲より後ろ = 減光より後に置く (dim でも暈しが残る)。
+  assert.ok(
+    style.findIndex((rule) => rule.selector === "node.dim.hit") >
+      style.findIndex((rule) => rule.selector === ".dim"),
+  );
+});
+
+test("無向で辿ったノードは関連の色で塗る", () => {
+  const meta = fixture().meta;
+  const style = graphStyle(meta, { fg: "#111", bg: "#fff", border: "#ddd", muted: "#666" });
+  const rel = style.find((rule) => rule.selector === "node.rel");
+
+  assert.equal(rel.style["border-color"], meta.impact_colors.related);
 });
 
 test("graphElements は status と優先度区分をデータに載せる", () => {

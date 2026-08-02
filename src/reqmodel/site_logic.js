@@ -161,24 +161,100 @@ export function activeEdgeNames(view) {
 }
 
 /**
- * start から辿れるノード (start 自身は含まない)。forward=false なら向きを逆に辿る。
- * 見えているエッジだけを使うので、絞り込みは影響範囲の計算にも効く。
+ * start から辿れるノード (start 自身は含まない)。
+ *
+ * direction は `"out"` / `"in"` / `"both"` ("both" は向きを無視する)。depth は
+ * ホップ数の上限で、null なら無制限。`graph.py` の `_reach()` / `related()` と
+ * 同じ数え方 (start からの距離が depth 以下のノードまで) にしてある。
+ *
+ * 距離で切るために段 (frontier) ごとに進める。見えているグラフの隣接マップだけを
+ * 見るので、絞り込みはそのまま探索にも効く。
  */
-export function reach(view, start, forward) {
-  const direction = forward ? "out" : "in";
+function walk(view, start, direction, depth = null) {
   const seen = new Set();
-  //: 配列を先頭から削らず読み進める (shift() は要素数に比例する)。
-  const queue = [start];
-  for (let at = 0; at < queue.length; at++) {
-    const links = view.adjacency.get(queue[at]);
-    if (!links) continue;
-    for (const next of links[direction]) {
-      if (next === start || seen.has(next)) continue;
-      seen.add(next);
-      queue.push(next);
+  if (!view.adjacency.has(start)) return seen;
+  let frontier = [start];
+  for (let step = 0; frontier.length && (depth === null || step < depth); step++) {
+    const next = [];
+    for (const id of frontier) {
+      const links = view.adjacency.get(id);
+      const neighbours = direction === "both" ? [...links.out, ...links.in] : links[direction];
+      for (const other of neighbours) {
+        if (other === start || seen.has(other)) continue;
+        seen.add(other);
+        next.push(other);
+      }
     }
+    frontier = next;
   }
   return seen;
+}
+
+/**
+ * start から辿れるノード (start 自身は含まない)。forward=false なら向きを逆に辿る。
+ * depth はホップ数の上限 (null なら無制限)。
+ * 見えているエッジだけを使うので、絞り込みは影響範囲の計算にも効く。
+ */
+export function reach(view, start, forward, depth = null) {
+  return walk(view, start, forward ? "out" : "in", depth);
+}
+
+/**
+ * 向きを無視して辿れるノード (`req explain --undirected` と同じ)。
+ * 「この FR はなぜ作るのか (Goal)」のように、有向では繋がらない文脈を集める。
+ */
+export function related(view, start, depth = null) {
+  return walk(view, start, "both", depth);
+}
+
+// --- 影響範囲 --------------------------------------------------------------
+//
+// 影響範囲の切り出しは `explain.py` の `impact_set()` と同じにする。ここが
+// 画面の色分けと「影響部分グラフをコピー」の両方の出典なので、片方だけが
+// 深さや向きの設定を見ている状態を作らない。
+
+/** 選べる探索の深さ (ホップ数)。0 は無制限で、この一覧には入れない。 */
+export const IMPACT_DEPTHS = [1, 2, 3, 4, 5];
+
+/**
+ * state から探索設定を取り出す。`{ depth: number|null, undirected: boolean }`。
+ * state.depth の 0 (既定) は「無制限」なので null に写す。
+ */
+export function impactScope(state) {
+  const depth = (state || {}).depth;
+  return {
+    depth: IMPACT_DEPTHS.includes(depth) ? depth : null,
+    undirected: Boolean((state || {}).undirected),
+  };
+}
+
+/**
+ * 影響範囲。`explain.py` の `impact_set()` と同じ切り分けで
+ * `{ upstream, downstream, whole, undirected }` を返す。
+ *
+ * undirected のときは上流/下流の区別が付かないので、CLI と同じく全件を
+ * downstream 側に入れる (呼び出し側は 1 つの「関連ノード」として扱う)。
+ * scope を省略すると view の state から取る。
+ */
+export function impactSets(view, id, scope = null) {
+  const { depth, undirected } = scope || impactScope(view.state);
+  if (undirected) {
+    const neighbours = related(view, id, depth);
+    return {
+      upstream: new Set(),
+      downstream: neighbours,
+      whole: new Set([id, ...neighbours]),
+      undirected: true,
+    };
+  }
+  const upstream = reach(view, id, false, depth);
+  const downstream = reach(view, id, true, depth);
+  return {
+    upstream,
+    downstream,
+    whole: new Set([id, ...upstream, ...downstream]),
+    undirected: false,
+  };
 }
 
 // --- フォーカス (近傍だけを描く) --------------------------------------------
@@ -201,21 +277,7 @@ export const FOCUS_DEPTHS = [1, 2, 3];
  */
 export function focusSet(view, start, depth) {
   if (!view.adjacency.has(start)) return new Set();
-  const seen = new Set([start]);
-  let frontier = [start];
-  for (let step = 0; step < depth; step++) {
-    const next = [];
-    for (const id of frontier) {
-      const links = view.adjacency.get(id);
-      for (const other of [...links.out, ...links.in]) {
-        if (seen.has(other)) continue;
-        seen.add(other);
-        next.push(other);
-      }
-    }
-    frontier = next;
-  }
-  return seen;
+  return new Set([start, ...related(view, start, depth)]);
 }
 
 // --- 並びの土台 ------------------------------------------------------------
@@ -255,6 +317,27 @@ export function matchesQuery(node, query) {
     node.id.toLowerCase().includes(needle) ||
     node.text.toLowerCase().includes(needle)
   );
+}
+
+/**
+ * 検索にヒットしたノードの id。並びは左サイドバーの一覧と同じ (正規化 JSON の順)。
+ * 検索語が空なら「ヒット無し」= 空配列 (全件ではない)。ハイライトもキーボード
+ * 選択も「絞り込んだ結果を送る」ためのものなので、空欄で全件を送っても意味が無い。
+ */
+export function searchHits(view, query) {
+  if (!(query || "").trim()) return [];
+  return view.nodes.filter((node) => matchesQuery(node, query)).map((node) => node.id);
+}
+
+/**
+ * ↑↓ で候補を送ったときの次の id。delta は +1 (下) か -1 (上)。
+ * 端では巻き戻す。候補が無ければ null、現在位置が候補に無ければ端から始める。
+ */
+export function stepHit(hits, current, delta) {
+  if (!hits.length) return null;
+  const at = hits.indexOf(current);
+  if (at < 0) return delta > 0 ? hits[0] : hits[hits.length - 1];
+  return hits[(at + delta + hits.length) % hits.length];
 }
 
 /**
@@ -370,6 +453,10 @@ export function defaultState(data) {
     query: "",
     //: 近傍の深さ。0 ならフォーカス無し (全体を描く)。
     focus: 0,
+    //: 影響範囲の探索の深さ。0 なら無制限 (`req explain` に --depth を渡さない)。
+    depth: 0,
+    //: 影響範囲をエッジの向きを無視して辿るか (`req explain --undirected`)。
+    undirected: false,
     sort: { ...DEFAULT_SORT },
   };
   for (const filter of SET_FILTERS) state[filter.key] = new Set(filter.all(data));
@@ -397,6 +484,8 @@ export function encodeHash(state, data) {
   if (state.direction === "LR") put("dir", "LR");
   if (state.mode === "table") put("view", "table");
   if (FOCUS_DEPTHS.includes(state.focus)) put("focus", String(state.focus));
+  if (IMPACT_DEPTHS.includes(state.depth)) put("depth", String(state.depth));
+  if (state.undirected) put("undir", "1");
   if (query) put("q", encodeURIComponent(query));
   if (sort.key !== DEFAULT_SORT.key || sort.asc !== DEFAULT_SORT.asc) {
     put("sort", `${sort.key}:${sort.asc ? "asc" : "desc"}`);
@@ -427,6 +516,9 @@ export function decodeHash(hash, data) {
   if (params.get("view") === "table") state.mode = "table";
   const focus = Number(params.get("focus"));
   if (FOCUS_DEPTHS.includes(focus)) state.focus = focus;
+  const depth = Number(params.get("depth"));
+  if (IMPACT_DEPTHS.includes(depth)) state.depth = depth;
+  if (params.get("undir") === "1") state.undirected = true;
   if (params.has("q")) state.query = params.get("q");
   const sort = parseSort(params.get("sort"));
   if (sort) state.sort = sort;
@@ -504,21 +596,45 @@ export function allEdgeNames(data) {
 }
 
 /**
- * 「影響部分グラフをコピー」の本文。`req explain ID` の出力と一致する
- * (エッジ種別を絞っていれば `req explain ID --edges ...` と一致する)。
+ * コピー本文と同じ内容を出す `req explain` のコマンド行。詳細ペインの案内に使う。
+ * 画面の設定 (エッジ種別・深さ・向き) がそのまま引数になる。
  */
-export function nodeContext(view, id) {
+export function explainCommand(view, id, scope = null) {
+  const { depth, undirected } = scope || impactScope(view.state);
   const edgeFilter = activeEdgeNames(view);
-  const upstream = reach(view, id, false);
-  const downstream = reach(view, id, true);
-  const whole = new Set([id, ...upstream, ...downstream]);
+  const parts = [`req explain ${id}`];
+  if (edgeFilter) parts.push(`--edges ${edgeFilter.join(",")}`);
+  if (depth !== null) parts.push(`--depth ${depth}`);
+  if (undirected) parts.push("--undirected");
+  return parts.join(" ");
+}
+
+/**
+ * 「影響部分グラフをコピー」の本文。`explainCommand()` が出すコマンドの
+ * 出力と一致する (絞り込み無し・深さ無制限・有向なら `req explain ID` と同じ)。
+ *
+ * scope を省略すると view の state から取るので、画面の色分けと同じ範囲になる。
+ */
+export function nodeContext(view, id, scope = null) {
+  const settings = scope || impactScope(view.state);
+  const edgeFilter = activeEdgeNames(view);
+  const { upstream, downstream, whole, undirected } = impactSets(view, id, settings);
 
   const lines = [`# 影響部分グラフ: ${id}`, ""];
-  lines.push(
-    `対象 1 件 / 上流 ${upstream.size} 件 / 下流 ${downstream.size} 件 / ` +
-      `合計 ${whole.size} 件`,
-  );
+  if (undirected) {
+    lines.push(
+      `対象 ${whole.size - downstream.size} 件 / 関連 ${downstream.size} 件 / ` +
+        `合計 ${whole.size} 件`,
+    );
+    lines.push("探索方向: 無向 (エッジの向きを無視)");
+  } else {
+    lines.push(
+      `対象 1 件 / 上流 ${upstream.size} 件 / 下流 ${downstream.size} 件 / ` +
+        `合計 ${whole.size} 件`,
+    );
+  }
   if (edgeFilter) lines.push(`エッジ種別フィルタ: ${edgeFilter.join(", ")}`);
+  if (settings.depth !== null) lines.push(`探索深さ: ${settings.depth}`);
 
   const block = (title, ids) => {
     const sorted = [...ids].sort((a, b) => rankOf(view, a) - rankOf(view, b));
@@ -528,8 +644,12 @@ export function nodeContext(view, id) {
   };
 
   block("対象ノード", [id]);
-  block("上流 (この変更の理由・根拠になるノード)", upstream);
-  block("下流 (この変更の影響を受けるノード)", downstream);
+  if (undirected) {
+    block("関連ノード (向きを問わず繋がっているノード)", downstream);
+  } else {
+    block("上流 (この変更の理由・根拠になるノード)", upstream);
+    block("下流 (この変更の影響を受けるノード)", downstream);
+  }
 
   // 部分グラフのエッジは種別で絞らない (CLI の subgraph_edges と同じ)。
   const edges = view.data.edges.filter(
@@ -634,10 +754,14 @@ export function graphElements(data) {
  *   3. status … 線種 (border-style) と、その補強の太さ (border-width)
  *   4. 優先度 … 枠の外側の輪 (outline-*)
  *   5. 状態   … 影響範囲の色分けと見せ消し (border-color / border-width / opacity)
+ *   6. 検索   … ヒットの暈し (underlay-*)
  *
  * 影響範囲のハイライトが奪うのは border-color と border-width だけなので、
  * status の **線種** と高優先度の **輪** は強調中も残る。status を線種だけで
  * 区別できるようにしてあるのは、このためである (`_STATUS_BORDER` を参照)。
+ *
+ * 検索ヒットは枠線をまったく使わず、ノードの下に敷く暈し (underlay) で示す。
+ * 影響範囲と同時に点いても、どちらが何を言っているか読み分けられる。
  */
 export function graphStyle(meta, palette) {
   const impact = meta.impact_colors;
@@ -766,11 +890,37 @@ export function graphStyle(meta, palette) {
       selector: "node.down",
       style: { "border-width": 3, "border-color": impact.downstream },
     },
+    //: 無向で辿ったときは上流/下流の区別が付かない (CLI の --undirected と同じ)。
+    {
+      selector: "node.rel",
+      style: { "border-width": 3, "border-color": impact.related },
+    },
     {
       selector: "edge.on-path",
       style: { width: 2, "line-color": palette.fg, "target-arrow-color": palette.fg },
     },
   );
+
+  // 6. 検索
+  if (meta.search) {
+    style.push(
+      {
+        selector: "node.hit",
+        style: {
+          "underlay-color": meta.search.hit,
+          "underlay-opacity": 0.3,
+          "underlay-padding": 8,
+        },
+      },
+      //: ↑↓ で送っている最中の 1 件。他のヒットより強く出す。
+      {
+        selector: "node.hit-current",
+        style: { "underlay-opacity": 0.55, "underlay-padding": 12, "z-index": 9 },
+      },
+      //: 影響範囲の外にあるヒットも、暈しが読める程度には残す。
+      { selector: "node.dim.hit", style: { opacity: 0.65 } },
+    );
+  }
   return style;
 }
 

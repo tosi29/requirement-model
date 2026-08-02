@@ -135,6 +135,10 @@ export const META = {
     verified: { border_style: "double", border_width: 4 },
   },
   priority: { threshold: 2, outline: "#f9ab00" },
+  bands: [
+    { type: "Goal", label: "Goal (最上位)" },
+    { type: "Need", label: "Need (上位)" },
+  ],
   dashed_edges: ["conflicts", "has_source"],
   impact_colors: { selected: "#d93025", upstream: "#1a73e8", downstream: "#188038" },
 };

@@ -90,6 +90,13 @@ _STATUS_BORDER: dict[str, tuple[str, float]] = {
 #: 枠線は型 (色) と status (線種) で埋まっているので、その外側の outline を使う。
 _HIGH_PRIORITY_OUTLINE = "#f9ab00"
 
+#: 静的サイトで帯 (枠) にまとめて上に出す型。並びがそのまま上からの帯の順になる。
+#: Goal (最上位) → Need (上位) の階層が、エッジの向きに関わらず常に図の上に来る。
+_BANDS: tuple[tuple[type[Node], str], ...] = (
+    (Goal, "Goal (最上位)"),
+    (Need, "Need (上位)"),
+)
+
 _DOT_SHAPE: dict[type[Node], str] = {
     Goal: "hexagon",
     Need: "ellipse",
@@ -134,6 +141,10 @@ def render_meta() -> dict[str, Any]:
             "threshold": HIGH_PRIORITY_THRESHOLD,
             "outline": _HIGH_PRIORITY_OUTLINE,
         },
+        "bands": [
+            {"type": node_type.__name__, "label": label}
+            for node_type, label in _BANDS
+        ],
         "dashed_edges": [
             name for name, arrow in _EDGE_STYLE_MERMAID.items() if arrow == "-.->"
         ],

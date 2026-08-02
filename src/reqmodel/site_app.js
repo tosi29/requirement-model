@@ -7,10 +7,11 @@
  */
 
 import {
-  PRIORITY_BUCKETS,
   TABLE_COLUMNS,
   activeEdgeNames,
   createView,
+  decodeHash,
+  encodeHash,
   escapeHtml,
   graphElements,
   graphStyle,
@@ -31,21 +32,15 @@ import {
 const cytoscape = window.cytoscape;
 
 const DATA = JSON.parse(document.getElementById("model-data").textContent);
-const state = {
-  types: new Set(DATA.types),
-  edges: new Set(DATA.edge_names),
-  //: status と優先度区分の絞り込み。種別・エッジと同じく、影響範囲の計算にも効く。
-  statuses: new Set(Object.keys(DATA.meta.statuses)),
-  priorities: new Set(PRIORITY_BUCKETS.map((bucket) => bucket.key)),
-  selected: null,
-  direction: "TD",
-  //: 中央ペインに出しているもの。"graph" か "table"。
-  mode: "graph",
-  //: 検索語。左の一覧とテーブルの両方に効く。
-  query: "",
-  //: テーブルの並び順。
-  sort: { key: "id", asc: true },
-};
+
+/**
+ * 表示状態。持ち物は `defaultState()` を参照 (絞り込みの集合・選択ノード・
+ * グラフの向き・中央ペインのタブ・検索語・テーブルの並び順)。
+ *
+ * URL ハッシュが唯一の出典なので、初期値はハッシュから作り、以降も変更のたびに
+ * `writeHash()` で書き戻す (戻る/進むは `applyHash()` で戻す)。
+ */
+let state = decodeHash(location.hash, DATA);
 
 /** 絞り込みを反映した現在のグラフ。refresh() で作り直す。 */
 let view = createView(DATA, state);
@@ -300,26 +295,42 @@ function renderNodeList() {
   });
 }
 
-/** チェックボックス 1 群。`items` は `{ key, label, count }` の配列。 */
-function renderToggles(containerId, attribute, items) {
+/**
+ * チェックボックス 1 群。`items` は `{ key, label, count }` の配列。
+ * チェックの有無は state の集合から取る (ハッシュ付きの URL で開いたとき用)。
+ */
+function renderToggles(containerId, attribute, items, set) {
   document.getElementById(containerId).innerHTML = items
     .map(
-      (item) => `<label class="toggle"><input type="checkbox" data-${attribute}="${item.key}" checked>
+      (item) => `<label class="toggle"><input type="checkbox" data-${attribute}="${item.key}"${set.has(item.key) ? " checked" : ""}>
         ${escapeHtml(item.label)}<span class="count">${item.count}</span></label>`,
     )
     .join("");
 }
 
-/** チェックの付け外しを state の集合に写す。 */
-function bindToggles(attribute, set) {
+/**
+ * チェックの付け外しを state の集合に写す。集合は押されたときに引き直す
+ * (`applyHash()` が state ごと差し替えるので、ここで掴んでおくと古い集合が残る)。
+ */
+function bindToggles(attribute, key) {
   document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
-    const key = input.dataset[attribute];
+    const value = input.dataset[attribute];
     input.addEventListener("change", () => {
-      input.checked ? set.add(key) : set.delete(key);
+      input.checked ? state[key].add(value) : state[key].delete(value);
       refresh();
+      writeHash();
     });
   });
 }
+
+//: 絞り込み 1 群の [チェックボックスの属性名, state のキー]。置き場所は
+//: `<属性名>-filters`。描画・イベント・URL からの復元がこの並びを共有する。
+const FILTER_SETS = [
+  ["type", "types"],
+  ["status", "statuses"],
+  ["priority", "priorities"],
+  ["edge", "edges"],
+];
 
 function renderFilters() {
   const countBy = (keyOf) => {
@@ -329,31 +340,34 @@ function renderFilters() {
   };
 
   const typeCounts = countBy((node) => node.type);
-  renderToggles(
-    "type-filters",
-    "type",
-    DATA.types.map((type) => ({ key: type, label: type, count: typeCounts[type] || 0 })),
-  );
-
-  renderToggles("status-filters", "status", statusFilters(DATA));
-  renderToggles("priority-filters", "priority", priorityFilters(DATA));
-
   const edgeCounts = {};
   for (const edge of DATA.edges) edgeCounts[edge.name] = (edgeCounts[edge.name] || 0) + 1;
-  renderToggles(
-    "edge-filters",
-    "edge",
-    DATA.edge_names.map((name) => ({
+  const items = {
+    types: DATA.types.map((type) => ({ key: type, label: type, count: typeCounts[type] || 0 })),
+    statuses: statusFilters(DATA),
+    priorities: priorityFilters(DATA),
+    edges: DATA.edge_names.map((name) => ({
       key: name,
       label: name,
       count: edgeCounts[name] || 0,
     })),
-  );
+  };
 
-  bindToggles("type", state.types);
-  bindToggles("status", state.statuses);
-  bindToggles("priority", state.priorities);
-  bindToggles("edge", state.edges);
+  for (const [attribute, key] of FILTER_SETS) {
+    renderToggles(`${attribute}-filters`, attribute, items[key], state[key]);
+    bindToggles(attribute, key);
+  }
+}
+
+/** 入力欄・チェック・タブを state に合わせ直す。ハッシュから復元したとき用。 */
+function syncControls() {
+  document.getElementById("search").value = state.query;
+  document.getElementById("direction").value = state.direction;
+  for (const [attribute, key] of FILTER_SETS) {
+    document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
+      input.checked = state[key].has(input.dataset[attribute]);
+    });
+  }
 }
 
 function renderStats() {
@@ -454,6 +468,7 @@ function renderTable() {
     button.addEventListener("click", () => {
       state.sort = nextSort(state.sort, button.dataset.key);
       renderTable();
+      writeHash();
     });
   });
   table.querySelectorAll("tbody tr[data-id]").forEach((tr) => {
@@ -496,12 +511,54 @@ function setMode(mode) {
   revealSelected();
 }
 
+// --- URL ハッシュ ----------------------------------------------------------
+//
+// 表示状態と URL を両向きに繋ぐ。書くのは writeHash()、読むのは applyHash() だけ。
+
+/**
+ * いまの状態を URL に書き戻す。
+ *
+ * push=true なら履歴に積む (戻る/進むで辿れる)。検索語のように 1 打鍵ごとに
+ * 変わるものは push=false で最後のエントリを置き換え、履歴を埋めない。
+ */
+function writeHash(push = true) {
+  const hash = encodeHash(state, DATA);
+  if (hash === location.hash) return;
+  // ハッシュが空になるときは "#" 自体を落とす。
+  const url = hash || location.pathname + location.search;
+  try {
+    push ? history.pushState(null, "", url) : history.replaceState(null, "", url);
+  } catch {
+    // file:// で開いていると pushState が使えないことがある。履歴の粒度は
+    // 諦めて、URL だけは合わせる (この代入は hashchange を起こす)。
+    location.hash = hash;
+  }
+}
+
+/**
+ * URL のハッシュから表示状態を作り直す。戻る/進む (popstate) と、URL を手で
+ * 書き換えたとき (hashchange) の入口。既に一致していれば何もしない。
+ */
+function applyHash() {
+  if (location.hash === encodeHash(state, DATA)) return;
+  const next = decodeHash(location.hash, DATA);
+  const turned = next.direction !== state.direction;
+  state = next;
+  syncControls();
+  refresh();
+  setMode(state.mode);
+  if (turned) relayout();
+  // 手で書かれた URL はここで正しい形に直す。履歴は増やさない。
+  writeHash(false);
+}
+
 // --- 操作 ------------------------------------------------------------------
 
 function selectNode(id) {
   state.selected = state.selected === id ? null : id;
   refresh();
   revealSelected();
+  writeHash();
 }
 
 function refresh() {
@@ -513,20 +570,29 @@ function refresh() {
   applyHighlight();
 }
 
-document.getElementById("tab-graph").addEventListener("click", () => setMode("graph"));
-document.getElementById("tab-table").addEventListener("click", () => setMode("table"));
+document.getElementById("tab-graph").addEventListener("click", () => {
+  setMode("graph");
+  writeHash();
+});
+document.getElementById("tab-table").addEventListener("click", () => {
+  setMode("table");
+  writeHash();
+});
 document.getElementById("search").addEventListener("input", (event) => {
   state.query = event.target.value;
   renderNodeList();
   renderTable();
+  writeHash(false);
 });
 document.getElementById("clear").addEventListener("click", () => {
   state.selected = null;
   refresh();
+  writeHash();
 });
 document.getElementById("direction").addEventListener("change", (event) => {
   state.direction = event.target.value;
   relayout();
+  writeHash();
 });
 document.getElementById("relayout").addEventListener("click", relayout);
 document.getElementById("zoom-in").addEventListener("click", () => zoomBy(1.2));
@@ -539,7 +605,26 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
   if (cy) cy.style(graphStyle(DATA.meta, palette()));
 });
 
+const copyLink = document.getElementById("copy-link");
+copyLink.addEventListener("click", async () => {
+  //: URL は writeHash() が常に最新にしているので、そのまま渡せばよい。
+  try {
+    await navigator.clipboard.writeText(location.href);
+    copyLink.textContent = "コピーした";
+  } catch {
+    copyLink.textContent = "コピーできなかった";
+  }
+  setTimeout(() => (copyLink.textContent = "リンクをコピー"), 1600);
+});
+
+window.addEventListener("popstate", applyHash);
+window.addEventListener("hashchange", applyHash);
+
 initGraph();
 renderFilters();
+syncControls();
 renderStats();
 refresh();
+setMode(state.mode);
+// 解釈できない項目を落とした後の正しい URL に直す (履歴は増やさない)。
+writeHash(false);

@@ -9,6 +9,9 @@ import {
   activeEdgeNames,
   allEdgeNames,
   createView,
+  decodeHash,
+  defaultState,
+  encodeHash,
   escapeHtml,
   graphElements,
   graphStyle,
@@ -362,6 +365,119 @@ test("列の定義には issue の求める項目が揃っている", () => {
     TABLE_COLUMNS.map((column) => column.key),
     ["id", "type", "text", "status", "priority", "criteria", "findings"],
   );
+});
+
+// --- URL ハッシュ ----------------------------------------------------------
+
+const hashOf = (overrides) => {
+  const data = fixture();
+  return encodeHash({ ...defaultState(data), ...overrides }, data);
+};
+
+const stateOf = (hash) => decodeHash(hash, fixture());
+
+test("既定の表示状態では URL にハッシュを付けない", () => {
+  assert.equal(hashOf({}), "");
+  assert.equal(hashOf({ query: "   " }), "");
+});
+
+test("選択・種別の絞り込み・方向がハッシュに載る", () => {
+  assert.equal(
+    hashOf({ selected: "FR-1", types: new Set(["Need", "Goal"]), direction: "LR" }),
+    "#node=FR-1&types=Goal,Need&dir=LR",
+  );
+});
+
+test("status と優先度の絞り込みも載る", () => {
+  assert.equal(
+    hashOf({
+      statuses: new Set(["approved", "proposed"]),
+      priorities: new Set(["high"]),
+    }),
+    "#status=proposed,approved&priority=high",
+  );
+});
+
+test("エッジ絞り込み・表示中のタブ・検索語・並び順も載る", () => {
+  assert.equal(
+    hashOf({
+      edges: new Set(["satisfies"]),
+      mode: "table",
+      query: "領収書",
+      sort: { key: "findings", asc: false },
+    }),
+    `#edges=satisfies&view=table&q=${encodeURIComponent("領収書")}&sort=findings:desc`,
+  );
+});
+
+test("ハッシュが無ければ既定の状態", () => {
+  const data = fixture();
+  assert.deepEqual(decodeHash("", data), defaultState(data));
+  assert.deepEqual(decodeHash("#", data), defaultState(data));
+});
+
+test("状態 → ハッシュ → 状態で元に戻る", () => {
+  const data = fixture();
+  const state = {
+    types: new Set(["Goal", "FunctionalRequirement"]),
+    edges: new Set(["satisfies", "qualifies"]),
+    statuses: new Set(["approved"]),
+    priorities: new Set(["high", "none"]),
+    selected: "FR-1",
+    direction: "LR",
+    mode: "table",
+    query: "領収書 画像",
+    sort: { key: "priority", asc: false },
+  };
+
+  assert.deepEqual(decodeHash(encodeHash(state, data), data), state);
+});
+
+test("ハッシュ → 状態 → ハッシュでも元に戻る", () => {
+  const data = fixture();
+  const hash =
+    "#node=QR-1&types=Goal,QualityRequirement&edges=qualifies&status=proposed" +
+    `&priority=high,normal&dir=LR&view=table&q=${encodeURIComponent("3 秒")}&sort=criteria:desc`;
+
+  assert.equal(encodeHash(decodeHash(hash, data), data), hash);
+});
+
+test("絞り込みの軸を持たない state は、その軸を書かない", () => {
+  const data = fixture();
+  //: createView() が statuses / priorities 省略を「絞り込み無し」と見るのに合わせる。
+  const state = { ...defaultState(data), statuses: undefined, priorities: undefined };
+
+  assert.equal(encodeHash(state, data), "");
+});
+
+test("解釈できない値は捨てて既定に倒す", () => {
+  const state = stateOf("#node=NOPE&dir=YZ&view=nope&sort=bogus:asc&sort2&other=1");
+
+  assert.equal(state.selected, null);
+  assert.equal(state.direction, "TD");
+  assert.equal(state.mode, "graph");
+  assert.deepEqual(state.sort, { key: "id", asc: true });
+});
+
+test("知らない種別は落とし、知っているものだけを選ぶ", () => {
+  assert.deepEqual([...stateOf("#types=Goal,Nope").types], ["Goal"]);
+  assert.deepEqual([...stateOf("#edges=nope").edges], []);
+  assert.deepEqual([...stateOf("#status=approved,nope").statuses], ["approved"]);
+  assert.deepEqual([...stateOf("#priority=high,nope").priorities], ["high"]);
+});
+
+test("何も選んでいない絞り込みも URL に出せる", () => {
+  const data = fixture();
+
+  assert.equal(encodeHash({ ...defaultState(data), types: new Set() }, data), "#types=");
+  assert.equal(stateOf("#types=").types.size, 0);
+});
+
+test("壊れたエスケープはその組だけ捨てる", () => {
+  const state = stateOf("#q=%E3%81&node=FR-1");
+
+  assert.equal(state.query, "");
+  assert.equal(state.selected, "FR-1");
 });
 
 // --- コピー本文 ------------------------------------------------------------

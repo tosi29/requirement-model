@@ -178,6 +178,21 @@ def test_page_has_both_the_graph_and_the_table_view(tmp_path: Path):
     assert "function setMode(" in html
 
 
+def test_page_puts_the_view_state_in_the_url(tmp_path: Path):
+    """選択・絞り込みは URL に載る。URL を渡せば相手にも同じ画面が出る。"""
+    index = build_site(chain(), FindingList(), tmp_path)
+    html = index.read_text(encoding="utf-8")
+
+    # ロジック層が状態と `#...` を相互変換し、表示層が両向きに繋ぐ。
+    assert "function encodeHash(" in html
+    assert "function decodeHash(" in html
+    assert "function writeHash(" in html
+    # 戻る/進む (popstate) と、URL を手で書き換えたとき (hashchange) の両方から戻す。
+    assert '"popstate", applyHash' in html
+    assert '"hashchange", applyHash' in html
+    assert 'id="copy-link"' in html
+
+
 def test_definition_text_is_never_treated_as_a_placeholder(tmp_path: Path):
     """定義ファイル由来の文字列がテンプレートの穴として解釈されないこと。"""
     graph = build(fr("FR-1", text="__APP_JS__ と __SCRIPTS__ を出すこと"))

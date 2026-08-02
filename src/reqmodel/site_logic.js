@@ -107,10 +107,13 @@ const countBy = (nodes, keyOf) => {
   return counts;
 };
 
-/** status の選択肢。並びは成熟度 (`meta.statuses` の順 = `STATUS_RANK`)。 */
+/** status の一覧。並びは成熟度 (`meta.statuses` の順 = `STATUS_RANK`)。 */
+const statusNames = (data) => Object.keys((data.meta || {}).statuses || {});
+
+/** status の選択肢。 */
 export function statusFilters(data) {
   const counts = countBy(data.nodes, (node) => node.status);
-  return Object.keys((data.meta || {}).statuses || {}).map((status) => ({
+  return statusNames(data).map((status) => ({
     key: status,
     label: status,
     count: counts.get(status) || 0,
@@ -274,6 +277,124 @@ export function nextSort(sort, key) {
   if (!column) return sort;
   if (sort.key === key) return { key, asc: !sort.asc };
   return { key, asc: !column.numeric };
+}
+
+// --- URL ハッシュ ----------------------------------------------------------
+//
+// 表示状態を URL に載せ、「この FR を見て」と URL だけ渡せば相手にも同じ画面が
+// 出るようにする (`#node=FR-3&types=Goal,Need&dir=LR`)。
+//
+// 既定値は書かない。初期表示のままなら URL にハッシュは付かず、載っている項目が
+// そのまま「既定と違うところ」の一覧になる。読めるように、値の区切りには
+// パーセントエンコードしない `,` と `:` を使う。
+
+//: テーブルの既定の並び順。
+const DEFAULT_SORT = { key: "id", asc: true };
+
+/**
+ * 集合で持つ絞り込みの軸。ハッシュのキー・state のキー・取りうる値の全体を
+ * 1 か所で対応付ける。軸を足すときはここに 1 行足せば、既定値・URL への
+ * 書き出し・復元の 3 つが揃って増える。
+ */
+const SET_FILTERS = [
+  { param: "types", key: "types", all: (data) => data.types },
+  { param: "edges", key: "edges", all: (data) => data.edge_names },
+  { param: "status", key: "statuses", all: (data) => statusNames(data) },
+  { param: "priority", key: "priorities", all: () => PRIORITY_BUCKETS.map((b) => b.key) },
+];
+
+/** ハッシュが無いときの状態。ページの初期 state でもある。 */
+export function defaultState(data) {
+  const state = {
+    selected: null,
+    direction: "TD",
+    mode: "graph",
+    query: "",
+    sort: { ...DEFAULT_SORT },
+  };
+  for (const filter of SET_FILTERS) state[filter.key] = new Set(filter.all(data));
+  return state;
+}
+
+/** 状態を `#...` にする。既定のままなら空文字 (ハッシュ無し)。 */
+export function encodeHash(state, data) {
+  const params = [];
+  const put = (key, value) => params.push(`${key}=${value}`);
+  //: 選択の順ではなく定義順で並べる。同じ絞り込みなら常に同じ URL になる。
+  const list = (selected, all) =>
+    all.filter((name) => selected.has(name)).map(encodeURIComponent).join(",");
+  const sort = state.sort || DEFAULT_SORT;
+  const query = (state.query || "").trim();
+
+  if (state.selected) put("node", encodeURIComponent(state.selected));
+  for (const filter of SET_FILTERS) {
+    const selected = state[filter.key];
+    const all = filter.all(data);
+    // 持っていない軸は createView() と同じく「絞り込み無し」として扱う。
+    if (!selected || selected.size === all.length) continue;
+    put(filter.param, list(selected, all));
+  }
+  if (state.direction === "LR") put("dir", "LR");
+  if (state.mode === "table") put("view", "table");
+  if (query) put("q", encodeURIComponent(query));
+  if (sort.key !== DEFAULT_SORT.key || sort.asc !== DEFAULT_SORT.asc) {
+    put("sort", `${sort.key}:${sort.asc ? "asc" : "desc"}`);
+  }
+  return params.length ? `#${params.join("&")}` : "";
+}
+
+/**
+ * `#...` から状態を復元する。書かれていない項目は既定のまま。
+ *
+ * 手で書き換えられる場所なので、解釈できない値は黙って捨てる (知らないノード
+ * 種別・存在しないノード id・壊れたエスケープ)。ただし `types=` のように
+ * 「空を選んでいる」状態は URL に出せる以上そのまま復元する。
+ */
+export function decodeHash(hash, data) {
+  const state = defaultState(data);
+  const params = parseHash(hash);
+  const subset = (raw, all) =>
+    new Set(raw.split(",").map((name) => name.trim()).filter((name) => all.includes(name)));
+
+  const node = params.get("node");
+  if (node && data.nodes.some((item) => item.id === node)) state.selected = node;
+  for (const filter of SET_FILTERS) {
+    if (!params.has(filter.param)) continue;
+    state[filter.key] = subset(params.get(filter.param), filter.all(data));
+  }
+  if (params.get("dir") === "LR") state.direction = "LR";
+  if (params.get("view") === "table") state.mode = "table";
+  if (params.has("q")) state.query = params.get("q");
+  const sort = parseSort(params.get("sort"));
+  if (sort) state.sort = sort;
+  return state;
+}
+
+/** `#a=1&b=2` を Map にする。壊れている組はその組だけ捨てる。 */
+function parseHash(hash) {
+  const params = new Map();
+  for (const part of (hash || "").replace(/^#/, "").split("&")) {
+    if (!part) continue;
+    const at = part.indexOf("=");
+    try {
+      params.set(
+        decodeURIComponent(at < 0 ? part : part.slice(0, at)),
+        at < 0 ? "" : decodeURIComponent(part.slice(at + 1)),
+      );
+    } catch {
+      // 壊れたパーセントエンコード。
+    }
+  }
+  return params;
+}
+
+/** `findings:desc` を並び順にする。知らない列や向きは null (既定のまま)。 */
+function parseSort(raw) {
+  if (!raw) return null;
+  const [key, order] = raw.split(":");
+  if (!TABLE_COLUMNS.some((column) => column.key === key)) return null;
+  if (order !== "asc" && order !== "desc") return null;
+  return { key, asc: order === "asc" };
 }
 
 // --- LLM 用コンテキスト -----------------------------------------------------

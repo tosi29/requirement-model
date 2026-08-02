@@ -298,6 +298,38 @@ export function graphStyle(meta, palette) {
   return style;
 }
 
+/**
+ * ノードが表示範囲に収まっているか。extent (`cy.extent()`) も box
+ * (`node.boundingBox()`) も Cytoscape のモデル座標 `{x1, y1, x2, y2}`。
+ *
+ * margin は端に貼り付いた状態を「見えている」と扱わないための余白。
+ * ノードが視野より大きくて収めようが無いときは、中心が見えていれば十分とする
+ * (そうしないと選ぶたびに毎回パンすることになる)。
+ */
+export function isNodeVisible(extent, box, margin = 0) {
+  const inner = {
+    x1: extent.x1 + margin,
+    y1: extent.y1 + margin,
+    x2: extent.x2 - margin,
+    y2: extent.y2 - margin,
+  };
+  const fits =
+    box.x2 - box.x1 <= inner.x2 - inner.x1 && box.y2 - box.y1 <= inner.y2 - inner.y1;
+  if (fits) {
+    return (
+      box.x1 >= inner.x1 && box.x2 <= inner.x2 && box.y1 >= inner.y1 && box.y2 <= inner.y2
+    );
+  }
+  const centerX = (box.x1 + box.x2) / 2;
+  const centerY = (box.y1 + box.y2) / 2;
+  return (
+    centerX >= extent.x1 &&
+    centerX <= extent.x2 &&
+    centerY >= extent.y1 &&
+    centerY <= extent.y2
+  );
+}
+
 /** dagre のレイアウト設定。direction は "TD" か "LR"。 */
 export function layoutOptions(direction) {
   return {

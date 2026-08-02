@@ -19,7 +19,8 @@
     ├─ validate (層1: 構文 / 層2: 構造)
     ├─ plan     (git 前版との構造 diff + 影響範囲)
     ├─ graph    (Mermaid / DOT 出力)
-    └─ explain  (影響部分グラフ抽出 → LLM 用コンテキスト生成)
+    ├─ explain  (影響部分グラフ抽出 → LLM 用コンテキスト生成)
+    └─ doc      (仕様書 / トレーサビリティ表の生成)
 ```
 
 - Python クラス (Pydantic) = 書くためのインターフェース兼スキーマ。
@@ -42,6 +43,7 @@ $ req validate [PATH ...]                  # 層0〜層2 の全チェック
 $ req plan     [PATH ...] [--rev HEAD]     # git 前版との構造 diff → 影響範囲
 $ req graph    [PATH ...] [--format mermaid|dot] [-o FILE]
 $ req explain  ID [ID ...] [-f PATH]       # 影響部分グラフを LLM 用に整形
+$ req doc      [PATH ...] [--matrix] [-o FILE]  # 仕様書 / トレーサビリティ表の生成
 $ req export   [PATH ...] [-o FILE]        # 正規化 JSON の出力
 $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (GitHub Pages 用)
 ```
@@ -64,6 +66,9 @@ $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (
 | `--depth N` | explain | 探索の深さ上限 |
 | `--undirected` | explain | エッジの向きを無視して辿る |
 | `--highlight ID,ID` | graph | 指定ノードを強調する |
+| `--matrix` | doc | 仕様書ではなくトレーサビリティマトリクスを出す |
+| `--format md\|csv` | doc | 出力形式 (既定は `-o` の拡張子から判定。`csv` は `--matrix` 専用) |
+| `--title` | doc | 文書のタイトル |
 | `--title` / `--assets` | site | ページ題名 / 描画ライブラリの参照先 (`cdn` or `local`) |
 
 ## 定義ファイルの規約 (宣言のみ)
@@ -212,6 +217,104 @@ impact(n) = ancestors(n) ∪ descendants(n)   # --edges でエッジ型を絞れ
 ```console
 $ req explain FR-3 -f examples/sample.py --undirected --depth 2
 ```
+
+## 仕様書とトレーサビリティ表の生成
+
+モデルが唯一の真実である以上、レビュー会に配る仕様書も監査に出すトレース表も
+モデルから導出する。仕様書を手で書くとモデルとの二重管理になる。
+
+```console
+$ req doc examples/sample.py -o spec.md              # 階層構造の仕様書 (Markdown)
+$ req doc examples/sample.py --matrix -o trace.md    # トレーサビリティ表 (Markdown)
+$ req doc examples/sample.py --matrix -o trace.csv   # 同上 (CSV)
+```
+
+出力形式は `-o` の拡張子から決まる (`.csv` なら CSV)。`--format md|csv` で明示もできる。
+
+### 仕様書 (`req doc`)
+
+Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`status`・`priority`・
+受け入れ基準・トレースリンク・定義位置を出す。`examples/sample.py` からの抜粋:
+
+```markdown
+### G-2 申請 1 件あたりの入力の手間を減らす
+
+- 種別: Goal / 状態: approved
+- 上位ノード (これが詳細化する対象): G-1
+- 動機づけるニーズ: N-1, N-2
+- 源泉: SRC-CFO (経理部長)
+- 定義: examples/sample.py:86
+
+#### N-1 申請者は、領収書を撮影するだけで経費を申請したい
+
+- 種別: Need / 状態: approved / 優先度: 1
+- 源泉: SRC-EMP (申請者となる一般社員)
+- 動機づけているゴール: G-2
+- これを充足する機能要求: FR-1, FR-2
+- 定義: examples/sample.py:54
+
+##### FR-1 領収書画像から金額と日付を抽出し、申請フォームの初期値として表示すること
+
+- 種別: FunctionalRequirement / 状態: approved / 優先度: 1
+- 充足するニーズ: N-1
+- 源泉: SRC-EMP (申請者となる一般社員)
+- 付与されている品質要求: QR-1
+- 受けている制約: C-1
+- 受け入れ基準:
+    - 社内で収集した領収書画像 200 枚に対し、金額の抽出正解率が 95% 以上である
+    - 抽出に失敗した項目は空欄で表示され、申請者が手入力で上書きできる
+- 定義: examples/sample.py:105
+```
+
+節の構成は次の 7 つで固定する (該当が無ければ「該当なし。」と出る)。
+
+| 節 | 内容 |
+|---|---|
+| 1. 要求階層 | Goal → Need → FR → QR。Goal の詳細化は DFS の並び順で表す |
+| 2. システムに張られた品質要求 | `qualifies` の張り先が System の QR |
+| 3. 制約 | Constraint と、その制約対象 |
+| 4. 決定 | Decision と、それが解消した競合ペア |
+| 5. 競合 | conflict の一覧。解消済みなら Decision の id、未解消なら **未解消** |
+| 6. 源泉 | Source と、それを参照しているノード |
+| 7. 上記に現れなかったノード | どの節にも入らなかったもの (ゴール未接続の Need 等) |
+
+見出しの深さは Goal=h3 / Need=h4 / FR=h5 / QR=h6 に固定する。Goal の詳細化は
+何段でも書けるため、深さをそのまま見出しレベルに写すと h6 を超えてしまうため。
+同じノードが複数の親にぶら下がるとき (1 つの FR が 2 つの Need を満たす等) は、
+最初の 1 か所だけ本文を出し、以降は `- (前掲) FR-1 …` として参照だけを置く。
+**7 節があるので、どのノードも必ずどこかに現れる**。文書から要求が落ちない。
+
+### トレーサビリティ表 (`req doc --matrix`)
+
+エッジ型ごとに 1 枚、行を上流・列を下流に置いた表を出す。`✓` がトレースリンク。
+
+```markdown
+| Need × FR | FR-1 | FR-2 | FR-3 | FR-4 | FR-5 |
+|---|---|---|---|---|---|
+| N-1 申請者は、領収書を撮影するだけで経費を申請したい | ✓ | ✓ |  |  |  |
+| N-2 経理担当者は、規程に反する申請を差し戻す前に検知したい |  |  | ✓ |  |  |
+| N-3 承認者は、自分が承認すべき申請にその日のうちに気づきたい |  |  |  | ✓ | ✓ |
+
+- トレースの無い行: なし
+- トレースの無い列: なし
+```
+
+出る表は 5 枚 (`Goal × Need` / `Need × FR` / `FR/System × QR` / `Source × 要求` /
+`Constraint × 制約対象`)。表ごとに「トレースの無い行 / 列」を添えるので、
+どこが未カバーかがそのまま読める。表の定義は `src/reqmodel/doc.py` の `MATRICES`。
+
+CSV は「1 行 = 1 トレースリンク」の縦持ちにする。5 枚の格子を 1 ファイルに並べる
+わけにいかないためで、表計算ソフトのピボットで格子に戻せる。トレース先の無い行は
+列側を空欄にした 1 行として残るので、CSV だけを見ても未トレースが分かる。
+
+```csv
+matrix,edge,row_type,row_id,row_text,col_type,col_id,col_text
+Goal × Need,motivates,Goal,G-1,経費精算にかかる全社の工数を半減する,,,
+Goal × Need,motivates,Goal,G-2,申請 1 件あたりの入力の手間を減らす,Need,N-1,申請者は、領収書を撮影するだけで経費を申請したい
+```
+
+`req doc` は検証をしない。「未カバー」は表に出すが、指摘として数えるのは
+`req validate` の役目 (`structure.orphan_*`) であり、二重に判定しない。
 
 ## 可視化
 

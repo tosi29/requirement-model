@@ -4,6 +4,7 @@
     req plan               # git 上の前版との構造 diff → 影響範囲
     req graph [--format mermaid|dot]
     req explain <ID...>    # 影響部分グラフをテキスト化 (LLM コンテキスト用)
+    req doc                # 仕様書 / トレーサビリティ表の生成
     req export             # 正規化 JSON の出力
     req site               # 閲覧用の静的サイト生成 (GitHub Pages 用)
 """
@@ -16,6 +17,14 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from .doc import (
+    DEFAULT_MATRIX_TITLE,
+    DEFAULT_SPEC_TITLE,
+    DOC_FORMATS,
+    render_matrices_csv,
+    render_matrices_markdown,
+    render_spec,
+)
 from .explain import explain_text, impact_set
 from .findings import FindingList
 from .graph import RequirementGraph
@@ -110,6 +119,26 @@ def build_parser() -> argparse.ArgumentParser:
     explain_parser.add_argument(
         "--json", action="store_true", help="部分グラフを JSON で出力する"
     )
+
+    doc_parser = subparsers.add_parser(
+        "doc", help="仕様書 / トレーサビリティ表を生成する"
+    )
+    add_common(doc_parser)
+    doc_parser.add_argument("-o", "--output", help="出力先ファイル (既定: 標準出力)")
+    doc_parser.add_argument(
+        "--matrix",
+        action="store_true",
+        help="仕様書ではなくトレーサビリティマトリクスを出力する",
+    )
+    doc_parser.add_argument(
+        "--format",
+        choices=DOC_FORMATS,
+        help=(
+            "出力形式。既定は -o の拡張子から判定し (.csv なら csv)、"
+            "判定できなければ md。csv は --matrix 専用"
+        ),
+    )
+    doc_parser.add_argument("--title", help="文書のタイトル")
 
     export_parser = subparsers.add_parser(
         "export", help="正規化 JSON を出力する (真のソース・オブ・トゥルース)"
@@ -308,6 +337,42 @@ def cmd_explain(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _doc_format(args: argparse.Namespace) -> str:
+    """出力形式。明示が無ければ出力先の拡張子から決める。"""
+    if args.format:
+        return str(args.format)
+    if args.output and Path(args.output).suffix.lower() == ".csv":
+        return "csv"
+    return "md"
+
+
+def cmd_doc(args: argparse.Namespace) -> int:
+    result = _load(args)
+    _require_loadable(result)
+    sources = [str(p) for p in result.paths]
+    fmt = _doc_format(args)
+
+    if fmt == "csv" and not args.matrix:
+        print(
+            "csv で出せるのはトレーサビリティ表だけ。--matrix を付けること。",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    if args.matrix:
+        if fmt == "csv":
+            text = render_matrices_csv(result.graph)
+        else:
+            text = render_matrices_markdown(
+                result.graph, args.title or DEFAULT_MATRIX_TITLE, sources
+            )
+    else:
+        text = render_spec(result.graph, args.title or DEFAULT_SPEC_TITLE, sources)
+
+    _write(text, args.output)
+    return EXIT_OK
+
+
 def cmd_export(args: argparse.Namespace) -> int:
     result = _load(args)
     _require_loadable(result)
@@ -343,6 +408,7 @@ _COMMANDS = {
     "plan": cmd_plan,
     "graph": cmd_graph,
     "explain": cmd_explain,
+    "doc": cmd_doc,
     "export": cmd_export,
     "site": cmd_site,
 }

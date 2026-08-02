@@ -1,0 +1,55 @@
+name: CI
+
+# Python 側と、静的サイトの JS ロジックの両方を検査する。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # tests/test_site_js.py が node を呼ぶ (無ければ skip されてしまうので必ず入れる)。
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: インストール
+        run: pip install -e ".[dev]"
+
+      - name: テスト
+        run: pytest -q
+
+      - name: 型検査
+        run: mypy
+
+      - name: 定義ファイルを検証する
+        run: req validate examples/sample.py
+
+  site-js:
+    # 埋め込み前の JS を、単体で構文検査してユニットテストにかける。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: 構文検査
+        run: npm run lint
+
+      - name: ロジックのテスト
+        run: npm test

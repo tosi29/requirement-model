@@ -6,3 +6,5 @@ dist/
 .mypy_cache/
 .pytest_cache/
 .venv/
+node_modules/
+package-lock.json

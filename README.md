@@ -271,6 +271,34 @@ $ python -m http.server -d site
 描画の定義をブラウザ側に複製しないための出口であり、色を変えるなら `render.py`
 だけを触ればよい。
 
+### ページの JS
+
+出力は 1 枚の HTML だが、**ソースはテンプレートから分けてある**。
+
+| ファイル | 役割 |
+|---|---|
+| `site_logic.js` | ロジック層。DOM も Cytoscape.js も触らない純関数だけ |
+| `site_app.js` | 表示層。DOM と `cy` に触るのはここだけ |
+| `site_template.html` | 骨組みと CSS。JS は `__APP_JS__` の 1 か所に入る |
+
+`site.py` の `app_js()` が 2 つを連結して 1 つのモジュールにし、テンプレートへ
+インライン化する。連結にあたって落とすのはファイル間の `import` / `export` 行だけで、
+最小化もトランスパイルもしない。生成された HTML の中身は書いたままの JS である。
+
+分ける目的は**テストできるようにすること**。`site_logic.js` は素の ES モジュールなので、
+Node からそのまま読み込める。
+
+```console
+$ npm run lint    # node --check (依存パッケージは無い)
+$ npm test        # node --test tests/js/*.test.mjs
+```
+
+`nodeContext()` (「影響部分グラフをコピー」の本文) は `req explain` と同じ文字列を
+返さなければならない。ここが食い違うと、サイトから LLM に渡すコンテキストと CLI が
+出すコンテキストが別物になる。`tests/test_site_js.py` が `examples/sample.py` の全ノードに
+ついて Python の `explain_text()` と JS の `nodeContext()` を突き合わせ、一致を保証する
+(絞り込み中は `req explain --edges ...` に対応する)。
+
 ## GitHub Pages への公開
 
 `.github/workflows/pages.yml` が、`main` への push (と手動実行) をきっかけに
@@ -289,6 +317,16 @@ $ pip install -e ".[dev]"
 $ pytest
 $ mypy
 ```
+
+静的サイトの JS だけを回すなら Node (18 以上) で次を叩く。依存パッケージは無い。
+
+```console
+$ npm run lint
+$ npm test
+```
+
+`pytest` からも同じものが走る (`tests/test_site_js.py`)。node が入っていない環境では
+skip されるので、CI では `.github/workflows/ci.yml` が node を明示的に用意している。
 
 ## 指示書からの解釈
 

@@ -782,27 +782,44 @@ test("bandedLayout は Goal 帯 → Need 帯 → その他 の順に上から並
   const fr = positions.get("FR-1");
   assert.ok(goal.y < need.y, "Goal は Need より上");
   assert.ok(need.y < fr.y, "Need は FR より上");
-  // 副軸 (x) は dagre の並びを保つ。
-  assert.equal(goal.x, 0);
-  assert.equal(need.x, 50);
+  // 帯に入らない FR は副軸 (x) を動かさない。
   assert.equal(fr.x, 100);
 });
 
-test("bandedLayout は帯ごとに、ノードを余白付きで囲む枠を返す", () => {
+test("bandedLayout は帯の中の並び順を保ったまま中央へ寄せる", () => {
   const placed = [
     placedNode("G-1", "Goal", 0, 0),
-    placedNode("G-2", "Goal", 200, 0),
+    placedNode("G-2", "Goal", 100, 0),
+    placedNode("FR-1", "FunctionalRequirement", 400, 60),
+  ];
+  const { positions } = bandedLayout([BANDS[0]], placed, [], "TD");
+
+  const first = positions.get("G-1");
+  const second = positions.get("G-2");
+  assert.ok(first.x < second.x, "帯の中の左右の並びは変わらない");
+  assert.equal(second.x - first.x, 100, "帯の中の間隔も変わらない");
+  // 図の全幅 (-30 〜 430) の中心 200 に、2 件の中心 (50) が寄る。
+  assert.equal((first.x + second.x) / 2, 200);
+});
+
+test("bandedLayout の枠は図の全幅に揃い、等幅で縦に並ぶ", () => {
+  const placed = [
+    placedNode("G-1", "Goal", 0, 0),
     placedNode("N-1", "Need", 50, 80),
+    placedNode("FR-1", "FunctionalRequirement", 300, 160),
   ];
   const { positions, frames } = bandedLayout(BANDS, placed, [], "TD");
 
-  const frame = frames.get("Goal");
-  // 幅 = ノードの外接矩形 (60 + 200 = 260) + 余白 14 × 2。
-  assert.equal(frame.w, 288);
-  assert.equal(frame.h, 30 + 28);
-  assert.equal(frame.x, 100);
-  assert.equal(frame.y, positions.get("G-1").y);
-  assert.ok(frames.has("Need"));
+  const goal = frames.get("Goal");
+  const need = frames.get("Need");
+  // 全幅 = 外接矩形 (-30 〜 330 = 360) + 余白 14 × 2。
+  assert.equal(goal.w, 388);
+  assert.equal(need.w, goal.w, "2 つの枠は等幅");
+  assert.equal(need.x, goal.x, "左端も揃う");
+  assert.ok(goal.y < need.y, "縦に並ぶ");
+  // 高さは中身 1 行ぶん (30) + 余白。枠は中身の上下に掛かる。
+  assert.equal(goal.h, 30 + 28);
+  assert.equal(goal.y, positions.get("G-1").y);
 });
 
 test("bandedLayout は refines の親 Goal を子 Goal より上の行に置く", () => {

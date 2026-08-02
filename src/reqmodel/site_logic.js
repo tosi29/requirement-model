@@ -878,6 +878,10 @@ function bandRows(members, edges) {
  * 全ノードぶん返す (帯に入らないノードは形を保ったまま帯の下へ平行移動する)。
  * frames は型 → `{ x, y, w, h }` (枠の中心と大きさ) の Map。
  * 帯のノードが 1 つも無ければ両方とも空。
+ *
+ * **枠は図の全幅に揃える**。帯ごとに中身の外接矩形を掛けると幅も左端もばらばらに
+ * なり、「上に積んだ層」に見えない。等幅・同位置の枠が縦に並ぶ形にし、中身は
+ * その中央に寄せる (帯の中の相対位置は変えない)。
  */
 export function bandedLayout(bands, placed, edges, direction) {
   const positions = new Map();
@@ -897,12 +901,15 @@ export function bandedLayout(bands, placed, edges, direction) {
     vertical ? { x: secValue, y: priValue } : { x: priValue, y: secValue };
   const topOf = (nodes) => Math.min(...nodes.map((node) => pri(node) - priSize(node) / 2));
 
+  // 1. 帯ごとに行へ分けて積む。主軸方向の占有範囲 (spans) を控えておく。
   const banded = new Set();
+  const spans = new Map();
   let cursor = topOf(placed);
   for (let index = 0; index < bands.length; index++) {
     const members = membersOf[index];
     if (!members.length) continue;
     for (const node of members) banded.add(node.id);
+    const from = cursor;
     for (const row of bandRows(members, edges)) {
       const height = Math.max(...row.map(priSize));
       //: 副軸は dagre の並びを保ち、重なりだけを右 (下) に押して解消する。
@@ -916,34 +923,60 @@ export function bandedLayout(bands, placed, edges, direction) {
       }
       cursor += height + BAND_ROW_GAP;
     }
+    spans.set(index, { from, to: cursor - BAND_ROW_GAP });
     cursor += BAND_GAP - BAND_ROW_GAP;
-
-    //: 枠 = 帯に置いたノードの外接矩形 + 余白。
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const node of members) {
-      const center = positions.get(node.id);
-      minX = Math.min(minX, center.x - node.w / 2);
-      maxX = Math.max(maxX, center.x + node.w / 2);
-      minY = Math.min(minY, center.y - node.h / 2);
-      maxY = Math.max(maxY, center.y + node.h / 2);
-    }
-    frames.set(bands[index].type, {
-      x: (minX + maxX) / 2,
-      y: (minY + maxY) / 2,
-      w: maxX - minX + BAND_FRAME_PAD * 2,
-      h: maxY - minY + BAND_FRAME_PAD * 2,
-    });
   }
 
+  // 2. 帯に入らないノードは、形を保ったまま帯の下へ送る。
   const rest = placed.filter((node) => !banded.has(node.id));
   if (rest.length) {
     const shift = cursor - topOf(rest);
     for (const node of rest) {
       positions.set(node.id, at(sec(node), pri(node) + shift));
     }
+  }
+
+  // 3. 図の全幅 (副軸方向の範囲) を測る。枠の幅と、中身を寄せる中心になる。
+  const secCenter = (node) => {
+    const position = positions.get(node.id);
+    return vertical ? position.x : position.y;
+  };
+  let secMin = Infinity;
+  let secMax = -Infinity;
+  for (const node of placed) {
+    secMin = Math.min(secMin, secCenter(node) - secSize(node) / 2);
+    secMax = Math.max(secMax, secCenter(node) + secSize(node) / 2);
+  }
+  const secMiddle = (secMin + secMax) / 2;
+  const frameSecSize = secMax - secMin + BAND_FRAME_PAD * 2;
+
+  // 4. 帯の中身を中央へ寄せ、全幅の枠を掛ける。
+  for (let index = 0; index < bands.length; index++) {
+    const members = membersOf[index];
+    if (!members.length) continue;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const node of members) {
+      min = Math.min(min, secCenter(node) - secSize(node) / 2);
+      max = Math.max(max, secCenter(node) + secSize(node) / 2);
+    }
+    const shift = secMiddle - (min + max) / 2;
+    for (const node of members) {
+      const position = positions.get(node.id);
+      positions.set(
+        node.id,
+        vertical
+          ? { x: position.x + shift, y: position.y }
+          : { x: position.x, y: position.y + shift },
+      );
+    }
+    const span = spans.get(index);
+    const framePriSize = span.to - span.from + BAND_FRAME_PAD * 2;
+    frames.set(bands[index].type, {
+      ...at(secMiddle, (span.from + span.to) / 2),
+      w: vertical ? frameSecSize : framePriSize,
+      h: vertical ? framePriSize : frameSecSize,
+    });
   }
   return { positions, frames };
 }

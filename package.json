@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "lint": "node --check src/reqmodel/site_logic.js && node --check src/reqmodel/site_app.js",
-    "test": "node --test tests/js/*.test.mjs"
+    "test": "node --test tests/js/*.test.mjs",
+    "bench": "node tests/js/bench.mjs"
   }
 }

@@ -269,6 +269,8 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
           <option value="TD">縦 (TD)</option>
           <option value="LR">横 (LR)</option>
         </select>
+        <!-- 選択肢は site_app.js が FOCUS_DEPTHS から作る。 -->
+        <select id="focus" title="選択したノードの近傍だけを図に描く (一覧・表・コピー本文は全体のまま)"></select>
         <button id="relayout" title="表示中のノードだけで並べ直す">整列</button>
       </span>
       <button id="clear">選択解除</button>

@@ -93,7 +93,27 @@ export function createView(data, state) {
       state.edges.has(edge.name) && shown.has(edge.source) && shown.has(edge.target),
   );
   const order = new Map(data.nodes.map((node, index) => [node.id, index]));
-  return { data, state, byId, nodes, edges, order };
+  return { data, state, byId, nodes, edges, order, adjacency: buildAdjacency(nodes, edges) };
+}
+
+/**
+ * 見えているグラフの隣接マップ。id → `{ out: [id...], in: [id...] }`。
+ *
+ * 探索 (`reach()` / `focusSet()`) はこれだけを見る。探索のたびに全エッジを
+ * 走査すると 1 回が O(V×E) になり、深さ指定や近傍描画のように呼び出しが
+ * 増えるほど効いてくる。組み立ては view 1 つにつき 1 回で O(V+E)。
+ *
+ * `createView()` がエッジの両端が見えていることを保証しているので、
+ * ここでは端点の欠落を考えない。
+ */
+function buildAdjacency(nodes, edges) {
+  const adjacency = new Map();
+  for (const node of nodes) adjacency.set(node.id, { out: [], in: [] });
+  for (const edge of edges) {
+    adjacency.get(edge.source).out.push(edge.target);
+    adjacency.get(edge.target).in.push(edge.source);
+  }
+  return adjacency;
 }
 
 // --- 絞り込みの選択肢 ------------------------------------------------------
@@ -145,17 +165,55 @@ export function activeEdgeNames(view) {
  * 見えているエッジだけを使うので、絞り込みは影響範囲の計算にも効く。
  */
 export function reach(view, start, forward) {
+  const direction = forward ? "out" : "in";
   const seen = new Set();
+  //: 配列を先頭から削らず読み進める (shift() は要素数に比例する)。
   const queue = [start];
-  while (queue.length) {
-    const current = queue.shift();
-    for (const edge of view.edges) {
-      const from = forward ? edge.source : edge.target;
-      const to = forward ? edge.target : edge.source;
-      if (from !== current || to === start || seen.has(to)) continue;
-      seen.add(to);
-      queue.push(to);
+  for (let at = 0; at < queue.length; at++) {
+    const links = view.adjacency.get(queue[at]);
+    if (!links) continue;
+    for (const next of links[direction]) {
+      if (next === start || seen.has(next)) continue;
+      seen.add(next);
+      queue.push(next);
     }
+  }
+  return seen;
+}
+
+// --- フォーカス (近傍だけを描く) --------------------------------------------
+//
+// 要求グラフは同じ段に FR が何十個も並ぶため、全体を 1 枚に収めると横長になり
+// 文字が読めない (詳細は README「大きいグラフでの表示戦略」)。選んだノードの
+// 近傍だけを描けば、規模に関わらず読める倍率のまま中身を確認できる。
+
+/** 選べる近傍の深さ (ホップ数)。0 はフォーカス無し。 */
+export const FOCUS_DEPTHS = [1, 2, 3];
+
+/**
+ * start から depth ホップ以内のノード (start 自身を含む)。
+ *
+ * **エッジの向きは無視する**。フォーカスは「その要求の周りに何があるか」を
+ * 見るためのもので、上流 (Goal 側) と下流 (FR 側) のどちらが欠けても
+ * 文脈にならないため (`req explain --undirected` と同じ考え方)。
+ *
+ * 見えているグラフの隣接マップだけを見るので、絞り込みはそのまま効く。
+ */
+export function focusSet(view, start, depth) {
+  if (!view.adjacency.has(start)) return new Set();
+  const seen = new Set([start]);
+  let frontier = [start];
+  for (let step = 0; step < depth; step++) {
+    const next = [];
+    for (const id of frontier) {
+      const links = view.adjacency.get(id);
+      for (const other of [...links.out, ...links.in]) {
+        if (seen.has(other)) continue;
+        seen.add(other);
+        next.push(other);
+      }
+    }
+    frontier = next;
   }
   return seen;
 }
@@ -310,6 +368,8 @@ export function defaultState(data) {
     direction: "TD",
     mode: "graph",
     query: "",
+    //: 近傍の深さ。0 ならフォーカス無し (全体を描く)。
+    focus: 0,
     sort: { ...DEFAULT_SORT },
   };
   for (const filter of SET_FILTERS) state[filter.key] = new Set(filter.all(data));
@@ -336,6 +396,7 @@ export function encodeHash(state, data) {
   }
   if (state.direction === "LR") put("dir", "LR");
   if (state.mode === "table") put("view", "table");
+  if (FOCUS_DEPTHS.includes(state.focus)) put("focus", String(state.focus));
   if (query) put("q", encodeURIComponent(query));
   if (sort.key !== DEFAULT_SORT.key || sort.asc !== DEFAULT_SORT.asc) {
     put("sort", `${sort.key}:${sort.asc ? "asc" : "desc"}`);
@@ -364,6 +425,8 @@ export function decodeHash(hash, data) {
   }
   if (params.get("dir") === "LR") state.direction = "LR";
   if (params.get("view") === "table") state.mode = "table";
+  const focus = Number(params.get("focus"));
+  if (FOCUS_DEPTHS.includes(focus)) state.focus = focus;
   if (params.has("q")) state.query = params.get("q");
   const sort = parseSort(params.get("sort"));
   if (sort) state.sort = sort;

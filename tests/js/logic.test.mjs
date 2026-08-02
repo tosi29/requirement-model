@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  FOCUS_DEPTHS,
   PRIORITY_BUCKETS,
   TABLE_COLUMNS,
   activeEdgeNames,
@@ -16,6 +17,7 @@ import {
   defaultState,
   encodeHash,
   escapeHtml,
+  focusSet,
   graphElements,
   graphStyle,
   isNodeVisible,
@@ -33,7 +35,7 @@ import {
   truncate,
   wrapLabel,
 } from "../../src/reqmodel/site_logic.js";
-import { allOn, fixture } from "./fixture.mjs";
+import { allOn, fixture, largeFixture } from "./fixture.mjs";
 
 const viewOf = (state) => {
   const data = fixture();
@@ -170,6 +172,107 @@ test("閉路があっても止まる", () => {
 
   assert.ok(reach(view, "FR-1", true).has("N-1"));
   assert.ok(!reach(view, "FR-1", true).has("FR-1"));
+});
+
+test("知らない id からは何も辿れない", () => {
+  const view = viewOf();
+
+  assert.equal(reach(view, "NOPE", true).size, 0);
+  assert.equal(reach(view, "NOPE", false).size, 0);
+});
+
+/** 隣接マップを使わない素朴な実装 (書き換え前の reach())。突き合わせ用。 */
+function reachByScan(view, start, forward) {
+  const seen = new Set();
+  const queue = [start];
+  while (queue.length) {
+    const current = queue.shift();
+    for (const edge of view.edges) {
+      const from = forward ? edge.source : edge.target;
+      const to = forward ? edge.target : edge.source;
+      if (from !== current || to === start || seen.has(to)) continue;
+      seen.add(to);
+      queue.push(to);
+    }
+  }
+  return seen;
+}
+
+test("隣接マップの探索は、全エッジを走査する素朴な実装と同じ結果になる", () => {
+  const data = largeFixture();
+  const view = createView(data, allOn(data));
+
+  for (const node of view.nodes) {
+    for (const forward of [true, false]) {
+      assert.deepEqual(
+        [...reach(view, node.id, forward)].sort(),
+        [...reachByScan(view, node.id, forward)].sort(),
+        `${node.id} (forward=${forward})`,
+      );
+    }
+  }
+});
+
+// --- フォーカス ------------------------------------------------------------
+
+test("深さ 1 の近傍は、自分と直接繋がる相手 (向きは問わない)", () => {
+  const view = viewOf();
+
+  assert.deepEqual([...focusSet(view, "FR-1", 1)].sort(), ["FR-1", "N-1", "QR-1", "SRC-1"]);
+});
+
+test("深さを増やすと 1 ホップずつ広がる", () => {
+  const view = viewOf();
+
+  //: FR-1 の 1 ホップ先 N-1 の隣に G-1 がいる。
+  assert.ok(!focusSet(view, "FR-1", 1).has("G-1"));
+  assert.ok(focusSet(view, "FR-1", 2).has("G-1"));
+});
+
+test("近傍は始点自身を含む", () => {
+  assert.ok(focusSet(viewOf(), "N-1", 1).has("N-1"));
+});
+
+test("絞り込みで消えたノードは近傍にも出ない", () => {
+  const data = fixture();
+  const types = new Set(data.types);
+  types.delete("Source");
+  const view = createView(data, { ...allOn(data), types });
+
+  assert.deepEqual([...focusSet(view, "FR-1", 1)].sort(), ["FR-1", "N-1", "QR-1"]);
+});
+
+test("見えていないノードを始点にすると空になる", () => {
+  const view = viewOf();
+
+  assert.equal(focusSet(view, "NOPE", 3).size, 0);
+});
+
+test("大きいグラフでも 1 ホップの近傍は読める規模に収まる", () => {
+  const data = largeFixture();
+  const view = createView(data, allOn(data));
+
+  assert.ok(view.nodes.length > 250);
+  assert.ok(focusSet(view, "FR-40", 1).size < 10);
+});
+
+test("ハブ (Source) を経由すると近傍は一気に広がる", () => {
+  const data = largeFixture();
+  const view = createView(data, allOn(data));
+  //: 同じ源泉を参照する要求が全部 2 ホップ以内に入ってくる。
+  assert.ok(focusSet(view, "FR-40", 2).size > view.nodes.length / 4);
+
+  //: has_source を外せば要求どうしの繋がりだけが残り、深さを増やしても広がらない。
+  const edges = new Set(data.edge_names);
+  edges.delete("has_source");
+  const trimmed = createView(data, { ...allOn(data), edges });
+
+  assert.ok(focusSet(trimmed, "FR-40", 3).size < view.nodes.length / 4);
+});
+
+test("FOCUS_DEPTHS は 0 (フォーカス無し) を選択肢に含めない", () => {
+  assert.ok(!FOCUS_DEPTHS.includes(0));
+  assert.ok(FOCUS_DEPTHS.every((depth) => Number.isInteger(depth) && depth > 0));
 });
 
 // --- status / 優先度 --------------------------------------------------------
@@ -413,6 +516,11 @@ test("エッジ絞り込み・表示中のタブ・検索語・並び順も載�
   );
 });
 
+test("フォーカスの深さも載る (切のときは書かない)", () => {
+  assert.equal(hashOf({ selected: "FR-1", focus: 2 }), "#node=FR-1&focus=2");
+  assert.equal(hashOf({ focus: 0 }), "");
+});
+
 test("ハッシュが無ければ既定の状態", () => {
   const data = fixture();
   assert.deepEqual(decodeHash("", data), defaultState(data));
@@ -430,6 +538,7 @@ test("状態 → ハッシュ → 状態で元に戻る", () => {
     direction: "LR",
     mode: "table",
     query: "領収書 画像",
+    focus: 2,
     sort: { key: "priority", asc: false },
   };
 
@@ -440,7 +549,8 @@ test("ハッシュ → 状態 → ハッシュでも元に戻る", () => {
   const data = fixture();
   const hash =
     "#node=QR-1&types=Goal,QualityRequirement&edges=qualifies&status=proposed" +
-    `&priority=high,normal&dir=LR&view=table&q=${encodeURIComponent("3 秒")}&sort=criteria:desc`;
+    `&priority=high,normal&dir=LR&view=table&focus=1&q=${encodeURIComponent("3 秒")}` +
+    "&sort=criteria:desc";
 
   assert.equal(encodeHash(decodeHash(hash, data), data), hash);
 });
@@ -454,11 +564,12 @@ test("絞り込みの軸を持たない state は、その軸を書かない", (
 });
 
 test("解釈できない値は捨てて既定に倒す", () => {
-  const state = stateOf("#node=NOPE&dir=YZ&view=nope&sort=bogus:asc&sort2&other=1");
+  const state = stateOf("#node=NOPE&dir=YZ&view=nope&focus=9&sort=bogus:asc&sort2&other=1");
 
   assert.equal(state.selected, null);
   assert.equal(state.direction, "TD");
   assert.equal(state.mode, "graph");
+  assert.equal(state.focus, 0);
   assert.deepEqual(state.sort, { key: "id", asc: true });
 });
 

@@ -127,11 +127,24 @@ export const META = {
   types: Object.fromEntries(
     TYPES.map((type) => [type, { shape: "ellipse", fill: "#fff", stroke: "#000" }]),
   ),
+  //: 並びは成熟度 (STATUS_RANK) の順。線種だけで 4 つを区別できるようにしてある。
+  statuses: {
+    proposed: { border_style: "dotted", border_width: 1.5 },
+    approved: { border_style: "dashed", border_width: 1.5 },
+    implemented: { border_style: "solid", border_width: 2 },
+    verified: { border_style: "double", border_width: 4 },
+  },
+  priority: { threshold: 2, outline: "#f9ab00" },
   dashed_edges: ["conflicts", "has_source"],
   impact_colors: { selected: "#d93025", upstream: "#1a73e8", downstream: "#188038" },
 };
 
 /** 既定の state (すべて表示)。 */
 export function allOn(data) {
-  return { types: new Set(data.types), edges: new Set(data.edge_names) };
+  return {
+    types: new Set(data.types),
+    edges: new Set(data.edge_names),
+    statuses: new Set(Object.keys(data.meta.statuses)),
+    priorities: new Set(["high", "normal", "none"]),
+  };
 }

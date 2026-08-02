@@ -8,6 +8,8 @@ from typing import Any
 
 from .graph import RequirementGraph
 from .model import (
+    HIGH_PRIORITY_THRESHOLD,
+    STATUS_RANK,
     TYPE_ORDER,
     Constraint,
     Decision,
@@ -72,6 +74,22 @@ _IMPACT_COLORS = {
     "downstream": "#188038",
 }
 
+#: status → 枠線の (線種, 太さ)。成熟するほど「実線に近く・太く」なる。
+#:
+#: 4 つの status が **線種だけで区別できる** ようにしてあるのが要点。影響範囲の
+#: ハイライトは border-color と border-width を奪うので、太さに意味を持たせると
+#: 強調中に status が読めなくなる。太さは線種の補強に留める。
+_STATUS_BORDER: dict[str, tuple[str, float]] = {
+    "proposed": ("dotted", 1.5),
+    "approved": ("dashed", 1.5),
+    "implemented": ("solid", 2),
+    "verified": ("double", 4),
+}
+
+#: 高優先度 (priority <= HIGH_PRIORITY_THRESHOLD) を囲む輪の色。
+#: 枠線は型 (色) と status (線種) で埋まっているので、その外側の outline を使う。
+_HIGH_PRIORITY_OUTLINE = "#f9ab00"
+
 _DOT_SHAPE: dict[type[Node], str] = {
     Goal: "hexagon",
     Need: "ellipse",
@@ -90,9 +108,10 @@ _EDGE_STYLE_MERMAID = {
 
 
 def render_meta() -> dict[str, Any]:
-    """型ごとの描画情報。ブラウザ側 (Cytoscape.js) の初期化に使う。
+    """型・status・優先度ごとの描画情報。ブラウザ側 (Cytoscape.js) の初期化に使う。
 
-    形状・配色の定義をこのモジュールに一本化し、静的サイト側に複製しないための出口。
+    形状・配色・線種の定義をこのモジュールに一本化し、静的サイト側に複製しない
+    ための出口。凡例もここから作るので、定義を足せば凡例にも自動で並ぶ。
     """
     return {
         "types": {
@@ -102,6 +121,18 @@ def render_meta() -> dict[str, Any]:
                 "stroke": _PALETTE[node_type.__name__][1],
             }
             for node_type in TYPE_ORDER
+        },
+        # 並びは成熟度 (STATUS_RANK) を唯一の出典とする。凡例もこの順に出る。
+        "statuses": {
+            status: {
+                "border_style": _STATUS_BORDER[status][0],
+                "border_width": _STATUS_BORDER[status][1],
+            }
+            for status in sorted(STATUS_RANK, key=lambda name: STATUS_RANK[name])
+        },
+        "priority": {
+            "threshold": HIGH_PRIORITY_THRESHOLD,
+            "outline": _HIGH_PRIORITY_OUTLINE,
         },
         "dashed_edges": [
             name for name, arrow in _EDGE_STYLE_MERMAID.items() if arrow == "-.->"

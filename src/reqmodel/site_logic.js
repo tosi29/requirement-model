@@ -41,25 +41,94 @@ export function escapeHtml(text) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// --- 優先度 ----------------------------------------------------------------
+//
+// priority は「小さいほど高優先」の整数か null。絞り込みと凡例では、生の数値では
+// なく 3 つの区分に丸めて扱う。しきい値は Python 側 (`HIGH_PRIORITY_THRESHOLD`)
+// から meta 経由で渡ってくるので、ここには焼き込まない。
+
+/** 優先度の区分。並びがそのままチェックボックスの並びになる。 */
+export const PRIORITY_BUCKETS = [
+  { key: "high", label: "高優先" },
+  { key: "normal", label: "その他" },
+  { key: "none", label: "未設定" },
+];
+
+/** 高優先度とみなす境界 (この値以下が高優先)。 */
+export function priorityThreshold(data) {
+  const priority = (data.meta || {}).priority;
+  return priority ? priority.threshold : 0;
+}
+
+/** ノードの優先度区分。`PRIORITY_BUCKETS` の key を返す。 */
+export function priorityBucket(data, node) {
+  if (node.priority === null || node.priority === undefined) return "none";
+  return node.priority <= priorityThreshold(data) ? "high" : "normal";
+}
+
 // --- 表示対象 --------------------------------------------------------------
 
 /**
  * 絞り込みを適用した「いま見えているグラフ」。
  *
  * 1 回の再描画につき 1 つ作り、以降の計算はすべてこれを介して行う。
- * state は `{ types: Set<string>, edges: Set<string> }`。
+ * state は `{ types: Set<string>, edges: Set<string>, statuses?: Set<string>,
+ * priorities?: Set<string> }`。statuses / priorities は省略すると「絞り込み無し」。
+ *
+ * エッジは「見えているノード同士」を繋ぐものだけが残る。ノード側の条件が
+ * 何であれ (種別・status・優先度) 同じ扱いになるので、絞り込みはそのまま
+ * 影響範囲の計算 (`reach()`) にも効く。
  */
 export function createView(data, state) {
   const byId = new Map(data.nodes.map((node) => [node.id, node]));
-  const nodes = data.nodes.filter((node) => state.types.has(node.type));
+  const nodes = data.nodes.filter(
+    (node) =>
+      state.types.has(node.type) &&
+      (!state.statuses || state.statuses.has(node.status)) &&
+      (!state.priorities || state.priorities.has(priorityBucket(data, node))),
+  );
+  const shown = new Set(nodes.map((node) => node.id));
   const edges = data.edges.filter(
     (edge) =>
-      state.edges.has(edge.name) &&
-      state.types.has(byId.get(edge.source).type) &&
-      state.types.has(byId.get(edge.target).type),
+      state.edges.has(edge.name) && shown.has(edge.source) && shown.has(edge.target),
   );
   const order = new Map(data.nodes.map((node, index) => [node.id, index]));
   return { data, state, byId, nodes, edges, order };
+}
+
+// --- 絞り込みの選択肢 ------------------------------------------------------
+//
+// 左サイドバーのチェックボックス 1 群ぶん。件数は絞り込み前の全ノードで数える
+// (チェックを外しても数字が動かないほうが、何を外したか分かる)。
+
+const countBy = (nodes, keyOf) => {
+  const counts = new Map();
+  for (const node of nodes) counts.set(keyOf(node), (counts.get(keyOf(node)) || 0) + 1);
+  return counts;
+};
+
+/** status の一覧。並びは成熟度 (`meta.statuses` の順 = `STATUS_RANK`)。 */
+const statusNames = (data) => Object.keys((data.meta || {}).statuses || {});
+
+/** status の選択肢。 */
+export function statusFilters(data) {
+  const counts = countBy(data.nodes, (node) => node.status);
+  return statusNames(data).map((status) => ({
+    key: status,
+    label: status,
+    count: counts.get(status) || 0,
+  }));
+}
+
+/** 優先度の選択肢。高優先の表示名にはしきい値を添える。 */
+export function priorityFilters(data) {
+  const counts = countBy(data.nodes, (node) => priorityBucket(data, node));
+  const threshold = priorityThreshold(data);
+  return PRIORITY_BUCKETS.map(({ key, label }) => ({
+    key,
+    label: key === "high" ? `${label} (≤ ${threshold})` : label,
+    count: counts.get(key) || 0,
+  }));
 }
 
 /**
@@ -222,17 +291,29 @@ export function nextSort(sort, key) {
 //: テーブルの既定の並び順。
 const DEFAULT_SORT = { key: "id", asc: true };
 
+/**
+ * 集合で持つ絞り込みの軸。ハッシュのキー・state のキー・取りうる値の全体を
+ * 1 か所で対応付ける。軸を足すときはここに 1 行足せば、既定値・URL への
+ * 書き出し・復元の 3 つが揃って増える。
+ */
+const SET_FILTERS = [
+  { param: "types", key: "types", all: (data) => data.types },
+  { param: "edges", key: "edges", all: (data) => data.edge_names },
+  { param: "status", key: "statuses", all: (data) => statusNames(data) },
+  { param: "priority", key: "priorities", all: () => PRIORITY_BUCKETS.map((b) => b.key) },
+];
+
 /** ハッシュが無いときの状態。ページの初期 state でもある。 */
 export function defaultState(data) {
-  return {
-    types: new Set(data.types),
-    edges: new Set(data.edge_names),
+  const state = {
     selected: null,
     direction: "TD",
     mode: "graph",
     query: "",
     sort: { ...DEFAULT_SORT },
   };
+  for (const filter of SET_FILTERS) state[filter.key] = new Set(filter.all(data));
+  return state;
 }
 
 /** 状態を `#...` にする。既定のままなら空文字 (ハッシュ無し)。 */
@@ -246,9 +327,12 @@ export function encodeHash(state, data) {
   const query = (state.query || "").trim();
 
   if (state.selected) put("node", encodeURIComponent(state.selected));
-  if (state.types.size !== data.types.length) put("types", list(state.types, data.types));
-  if (state.edges.size !== data.edge_names.length) {
-    put("edges", list(state.edges, data.edge_names));
+  for (const filter of SET_FILTERS) {
+    const selected = state[filter.key];
+    const all = filter.all(data);
+    // 持っていない軸は createView() と同じく「絞り込み無し」として扱う。
+    if (!selected || selected.size === all.length) continue;
+    put(filter.param, list(selected, all));
   }
   if (state.direction === "LR") put("dir", "LR");
   if (state.mode === "table") put("view", "table");
@@ -274,8 +358,10 @@ export function decodeHash(hash, data) {
 
   const node = params.get("node");
   if (node && data.nodes.some((item) => item.id === node)) state.selected = node;
-  if (params.has("types")) state.types = subset(params.get("types"), data.types);
-  if (params.has("edges")) state.edges = subset(params.get("edges"), data.edge_names);
+  for (const filter of SET_FILTERS) {
+    if (!params.has(filter.param)) continue;
+    state[filter.key] = subset(params.get(filter.param), filter.all(data));
+  }
   if (params.get("dir") === "LR") state.direction = "LR";
   if (params.get("view") === "table") state.mode = "table";
   if (params.has("q")) state.query = params.get("q");
@@ -413,13 +499,21 @@ export function nodeContext(view, id) {
 //
 // 生成するのはただのオブジェクトなので、ライブラリを読み込まなくてもテストできる。
 
-/** 図の要素定義。ノードとエッジの全件を一度だけ作る。 */
+/**
+ * 図の要素定義。ノードとエッジの全件を一度だけ作る。
+ *
+ * status と優先度区分をデータに載せておくと、スタイル側は属性セレクタ
+ * (`node[status = "..."]`) で拾える。絞り込みで作り直す必要が無い。
+ */
 export function graphElements(data) {
   return [
     ...data.nodes.map((node) => ({
       data: {
         id: node.id,
         type: node.type,
+        status: node.status,
+        //: 生の priority ではなく `PRIORITY_BUCKETS` の key。
+        priorityClass: priorityBucket(data, node),
         label: `${node.id}\n${wrapLabel(truncate(node.text, 30))}`,
       },
     })),
@@ -436,11 +530,26 @@ export function graphElements(data) {
 }
 
 /**
- * スタイル定義。形状・配色は `render_meta()` から来た meta が唯一の出典で、
+ * スタイル定義。形状・配色・線種は `render_meta()` から来た meta が唯一の出典で、
  * テーマ依存の色 (fg / bg / border / muted) だけ palette で受け取る。
+ *
+ * Cytoscape のスタイルは **並び順で解決される** (後に置いた規則が勝つ) ので、
+ * 4 段に重ねる。この順序が「どの表現がどれを上書きするか」の決定そのもの:
+ *
+ *   1. 基本   … ノード / エッジ共通
+ *   2. 型     … 形 (shape) と 色 (background-color / border-color)
+ *   3. status … 線種 (border-style) と、その補強の太さ (border-width)
+ *   4. 優先度 … 枠の外側の輪 (outline-*)
+ *   5. 状態   … 影響範囲の色分けと見せ消し (border-color / border-width / opacity)
+ *
+ * 影響範囲のハイライトが奪うのは border-color と border-width だけなので、
+ * status の **線種** と高優先度の **輪** は強調中も残る。status を線種だけで
+ * 区別できるようにしてあるのは、このためである (`_STATUS_BORDER` を参照)。
  */
 export function graphStyle(meta, palette) {
   const impact = meta.impact_colors;
+
+  // 1. 基本
   const style = [
     {
       selector: "node",
@@ -477,6 +586,48 @@ export function graphStyle(meta, palette) {
         "curve-style": "bezier",
       },
     },
+  ];
+
+  // 2. 型
+  for (const [type, typeMeta] of Object.entries(meta.types)) {
+    style.push({
+      selector: `node[type = "${type}"]`,
+      style: {
+        shape: typeMeta.shape,
+        "background-color": typeMeta.fill,
+        "border-color": typeMeta.stroke,
+      },
+    });
+  }
+
+  // 3. status
+  for (const [status, statusMeta] of Object.entries(meta.statuses || {})) {
+    style.push({
+      selector: `node[status = "${status}"]`,
+      style: {
+        "border-style": statusMeta.border_style,
+        "border-width": statusMeta.border_width,
+      },
+    });
+  }
+
+  // 4. 優先度
+  if (meta.priority) {
+    style.push({
+      selector: 'node[priorityClass = "high"]',
+      //: 枠線から離して描く。verified の太い二重線と地続きに見えないようにするため。
+      style: {
+        "outline-width": 3,
+        "outline-style": "solid",
+        "outline-color": meta.priority.outline,
+        "outline-offset": 3,
+        "outline-opacity": 0.9,
+      },
+    });
+  }
+
+  // 5. 状態
+  style.push(
     { selector: "edge.dashed", style: { "line-style": "dashed" } },
     { selector: ".hidden", style: { display: "none" } },
     { selector: ".dim", style: { opacity: 0.28 } },
@@ -496,18 +647,71 @@ export function graphStyle(meta, palette) {
       selector: "edge.on-path",
       style: { width: 2, "line-color": palette.fg, "target-arrow-color": palette.fg },
     },
+  );
+  return style;
+}
+
+// --- 凡例 ------------------------------------------------------------------
+
+//: 凡例の見本は小さいので、太い枠 (verified の double 等) はここで頭打ちにする。
+const LEGEND_MAX_BORDER = 3;
+
+/**
+ * 凡例に出す項目。図に効いているスタイルと同じ meta から作るので、
+ * `render_meta()` に定義を足せば凡例にもそのまま並ぶ。
+ *
+ * 各 swatch は CSS の border 指定にそのまま写せる形にしてある
+ * (`borderColor` が null ならテーマの文字色を使う、の意味)。
+ */
+export function legendGroups(meta) {
+  const groups = [
+    {
+      title: "種別",
+      items: Object.entries(meta.types).map(([type, typeMeta]) => ({
+        label: type,
+        swatch: {
+          background: typeMeta.fill,
+          borderColor: typeMeta.stroke,
+          borderStyle: "solid",
+          borderWidth: 1,
+        },
+      })),
+    },
   ];
-  for (const [type, typeMeta] of Object.entries(meta.types)) {
-    style.push({
-      selector: `node[type = "${type}"]`,
-      style: {
-        shape: typeMeta.shape,
-        "background-color": typeMeta.fill,
-        "border-color": typeMeta.stroke,
-      },
+
+  const statuses = Object.entries(meta.statuses || {});
+  if (statuses.length) {
+    groups.push({
+      title: "status",
+      items: statuses.map(([status, statusMeta]) => ({
+        label: status,
+        swatch: {
+          background: "transparent",
+          borderColor: null,
+          borderStyle: statusMeta.border_style,
+          borderWidth: Math.min(statusMeta.border_width, LEGEND_MAX_BORDER),
+        },
+      })),
     });
   }
-  return style;
+
+  if (meta.priority) {
+    groups.push({
+      title: "優先度",
+      items: [
+        {
+          label: `高優先 (≤ ${meta.priority.threshold})`,
+          swatch: {
+            background: "transparent",
+            borderColor: meta.priority.outline,
+            borderStyle: "solid",
+            borderWidth: 2,
+          },
+        },
+      ],
+    });
+  }
+  return groups;
 }
 
 /**

@@ -17,11 +17,14 @@ import {
   graphStyle,
   isNodeVisible,
   layoutOptions,
+  legendGroups,
   matchesQuery,
   nextSort,
   nodeContext,
+  priorityFilters,
   reach,
   sortRows,
+  statusFilters,
   tableRows,
   truncate,
 } from "./site_logic.js";
@@ -31,10 +34,11 @@ const cytoscape = window.cytoscape;
 const DATA = JSON.parse(document.getElementById("model-data").textContent);
 
 /**
- * 表示状態。中身は `defaultState()` を参照。
+ * 表示状態。持ち物は `defaultState()` を参照 (絞り込みの集合・選択ノード・
+ * グラフの向き・中央ペインのタブ・検索語・テーブルの並び順)。
  *
- * URL ハッシュが唯一の出典なので、初期値はハッシュから作り、以降も
- * 変更のたびに `writeHash()` で書き戻す (戻る/進むは `applyHash()` で戻す)。
+ * URL ハッシュが唯一の出典なので、初期値はハッシュから作り、以降も変更のたびに
+ * `writeHash()` で書き戻す (戻る/進むは `applyHash()` で戻す)。
  */
 let state = decodeHash(location.hash, DATA);
 
@@ -291,53 +295,79 @@ function renderNodeList() {
   });
 }
 
-function renderFilters() {
-  const typeCounts = {};
-  for (const node of DATA.nodes) typeCounts[node.type] = (typeCounts[node.type] || 0) + 1;
-  //: チェックの初期値は state から取る (ハッシュ付きの URL で開いたとき用)。
-  const checked = (on) => (on ? " checked" : "");
-  document.getElementById("type-filters").innerHTML = DATA.types
+/**
+ * チェックボックス 1 群。`items` は `{ key, label, count }` の配列。
+ * チェックの有無は state の集合から取る (ハッシュ付きの URL で開いたとき用)。
+ */
+function renderToggles(containerId, attribute, items, set) {
+  document.getElementById(containerId).innerHTML = items
     .map(
-      (type) => `<label class="toggle"><input type="checkbox" data-type="${type}"${checked(state.types.has(type))}>
-        ${type}<span class="count">${typeCounts[type] || 0}</span></label>`,
+      (item) => `<label class="toggle"><input type="checkbox" data-${attribute}="${item.key}"${set.has(item.key) ? " checked" : ""}>
+        ${escapeHtml(item.label)}<span class="count">${item.count}</span></label>`,
     )
     .join("");
+}
 
-  const edgeCounts = {};
-  for (const edge of DATA.edges) edgeCounts[edge.name] = (edgeCounts[edge.name] || 0) + 1;
-  document.getElementById("edge-filters").innerHTML = DATA.edge_names
-    .map(
-      (name) => `<label class="toggle"><input type="checkbox" data-edge="${name}"${checked(state.edges.has(name))}>
-        ${name}<span class="count">${edgeCounts[name] || 0}</span></label>`,
-    )
-    .join("");
-
-  document.querySelectorAll("input[data-type]").forEach((input) => {
+/**
+ * チェックの付け外しを state の集合に写す。集合は押されたときに引き直す
+ * (`applyHash()` が state ごと差し替えるので、ここで掴んでおくと古い集合が残る)。
+ */
+function bindToggles(attribute, key) {
+  document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
+    const value = input.dataset[attribute];
     input.addEventListener("change", () => {
-      input.checked ? state.types.add(input.dataset.type) : state.types.delete(input.dataset.type);
-      refresh();
-      writeHash();
-    });
-  });
-  document.querySelectorAll("input[data-edge]").forEach((input) => {
-    input.addEventListener("change", () => {
-      input.checked ? state.edges.add(input.dataset.edge) : state.edges.delete(input.dataset.edge);
+      input.checked ? state[key].add(value) : state[key].delete(value);
       refresh();
       writeHash();
     });
   });
 }
 
+//: 絞り込み 1 群の [チェックボックスの属性名, state のキー]。置き場所は
+//: `<属性名>-filters`。描画・イベント・URL からの復元がこの並びを共有する。
+const FILTER_SETS = [
+  ["type", "types"],
+  ["status", "statuses"],
+  ["priority", "priorities"],
+  ["edge", "edges"],
+];
+
+function renderFilters() {
+  const countBy = (keyOf) => {
+    const counts = {};
+    for (const node of DATA.nodes) counts[keyOf(node)] = (counts[keyOf(node)] || 0) + 1;
+    return counts;
+  };
+
+  const typeCounts = countBy((node) => node.type);
+  const edgeCounts = {};
+  for (const edge of DATA.edges) edgeCounts[edge.name] = (edgeCounts[edge.name] || 0) + 1;
+  const items = {
+    types: DATA.types.map((type) => ({ key: type, label: type, count: typeCounts[type] || 0 })),
+    statuses: statusFilters(DATA),
+    priorities: priorityFilters(DATA),
+    edges: DATA.edge_names.map((name) => ({
+      key: name,
+      label: name,
+      count: edgeCounts[name] || 0,
+    })),
+  };
+
+  for (const [attribute, key] of FILTER_SETS) {
+    renderToggles(`${attribute}-filters`, attribute, items[key], state[key]);
+    bindToggles(attribute, key);
+  }
+}
+
 /** 入力欄・チェック・タブを state に合わせ直す。ハッシュから復元したとき用。 */
 function syncControls() {
   document.getElementById("search").value = state.query;
   document.getElementById("direction").value = state.direction;
-  document.querySelectorAll("input[data-type]").forEach((input) => {
-    input.checked = state.types.has(input.dataset.type);
-  });
-  document.querySelectorAll("input[data-edge]").forEach((input) => {
-    input.checked = state.edges.has(input.dataset.edge);
-  });
+  for (const [attribute, key] of FILTER_SETS) {
+    document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
+      input.checked = state[key].has(input.dataset[attribute]);
+    });
+  }
 }
 
 function renderStats() {
@@ -355,10 +385,20 @@ function renderStats() {
   if (DATA.stats.suppressed) chips.push(`<span class="chip">抑制 ${DATA.stats.suppressed} 件</span>`);
   document.getElementById("stats").innerHTML = chips.join("");
   document.getElementById("sources").textContent = DATA.generated_from.join(", ");
-  document.getElementById("legend").innerHTML = DATA.types
-    .map((type) => {
-      const meta = DATA.meta.types[type];
-      return `<span><i class="swatch" style="background:${meta.fill};border-color:${meta.stroke}"></i>${type}</span>`;
+  document.getElementById("legend").innerHTML = legendGroups(DATA.meta)
+    .map((group) => {
+      const items = group.items
+        .map(({ label, swatch }) => {
+          const style = [
+            `background:${swatch.background}`,
+            `border-color:${swatch.borderColor || "currentColor"}`,
+            `border-style:${swatch.borderStyle}`,
+            `border-width:${swatch.borderWidth}px`,
+          ].join(";");
+          return `<span><i class="swatch" style="${style}"></i>${escapeHtml(label)}</span>`;
+        })
+        .join("");
+      return `<span class="legend-group"><b>${escapeHtml(group.title)}</b>${items}</span>`;
     })
     .join("");
 
@@ -508,6 +548,8 @@ function applyHash() {
   refresh();
   setMode(state.mode);
   if (turned) relayout();
+  // 手で書かれた URL はここで正しい形に直す。履歴は増やさない。
+  writeHash(false);
 }
 
 // --- 操作 ------------------------------------------------------------------

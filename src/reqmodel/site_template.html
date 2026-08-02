@@ -216,9 +216,12 @@ ul.plain li { padding: 3px 0; }
 .detail dd { margin: 0; }
 .detail .edge { font-family: ui-monospace, monospace; font-size: 12px; }
 .empty { color: var(--muted); font-size: 13px; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
-.legend .swatch { width: 9px; height: 9px; border: 1px solid; border-radius: 2px; }
+.legend .legend-group { gap: 4px 8px; flex-wrap: wrap; }
+.legend .legend-group b { font-weight: 600; color: var(--fg); }
+/* 見本の border-* は JS が凡例データから直接書き込む (種別=配色 / status=線種)。 */
+.legend .swatch { width: 12px; height: 12px; border: 1px solid; border-radius: 2px; flex: none; }
 footer { padding: 10px 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
 code { font-family: ui-monospace, monospace; background: var(--panel); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
@@ -240,9 +243,15 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
     <h2>ノード種別</h2>
     <div id="type-filters"></div>
 
+    <h2>status</h2>
+    <div id="status-filters"></div>
+
+    <h2>優先度</h2>
+    <div id="priority-filters"></div>
+
     <h2>エッジ種別</h2>
     <div id="edge-filters"></div>
-    <p class="hint">エッジを絞ると、影響範囲の計算もその種別だけで行われる。</p>
+    <p class="hint">絞り込みは影響範囲の計算にも効く。外したノード・エッジは経路として辿らない。</p>
   </aside>
 
   <section class="graph-pane">

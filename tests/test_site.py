@@ -9,6 +9,8 @@ from pathlib import Path
 from conftest import build, fr, goal, need, qr, source
 from reqmodel.cli import main
 from reqmodel.findings import FindingList
+from reqmodel.model import HIGH_PRIORITY_THRESHOLD, STATUS_RANK
+from reqmodel.render import render_meta
 from reqmodel.site import (
     SITE_ASSETS,
     SITE_SCRIPTS,
@@ -63,6 +65,60 @@ def test_site_data_contains_graph_findings_and_render_meta():
     # ページ側が「このグラフに現れうるエッジ」を CLI と同じ手順で数えるための材料。
     assert data["edge_names_by_type"]["Goal"] == ["has_source", "refines", "motivates"]
     assert data["edge_names_by_type"]["Source"] == []
+
+
+def test_render_meta_maps_status_to_a_line_style():
+    """status は線種だけで区別できること。太さは影響範囲のハイライトに奪われる。"""
+    statuses = render_meta()["statuses"]
+
+    # 並びは辞書順ではなく成熟度 (STATUS_RANK)。凡例もこの順に出る。
+    assert list(statuses) == ["proposed", "approved", "implemented", "verified"]
+    assert set(statuses) == set(STATUS_RANK)
+
+    lines = [entry["border_style"] for entry in statuses.values()]
+    assert len(set(lines)) == len(lines)
+    # 成熟するほど太くなる (線種の補強)。
+    widths = [entry["border_width"] for entry in statuses.values()]
+    assert widths == sorted(widths)
+
+
+def test_render_meta_carries_the_high_priority_threshold():
+    """しきい値はページ側に焼き込まず、validate と同じ定数を渡す。"""
+    priority = render_meta()["priority"]
+
+    assert priority["threshold"] == HIGH_PRIORITY_THRESHOLD
+    assert priority["outline"].startswith("#")
+
+
+def test_site_data_carries_status_and_priority_of_every_node():
+    """status / priority フィルタの材料はノードにそのまま入っている。"""
+    graph = build(
+        source("S-1"),
+        need("N-1", status="approved", has_source=[source("S-1")]),
+        fr("FR-1", status="verified", priority=1, has_source=[source("S-1")]),
+    )
+    data = site_data(graph, FindingList(), "題名", ["a.py"])
+    by_id = {node["id"]: node for node in data["nodes"]}
+
+    assert by_id["N-1"]["status"] == "approved"
+    assert by_id["FR-1"]["status"] == "verified"
+    assert by_id["FR-1"]["priority"] == 1
+    assert by_id["S-1"]["priority"] is None
+    assert data["meta"]["statuses"]["verified"]["border_style"] == "double"
+    assert data["meta"]["priority"]["threshold"] == HIGH_PRIORITY_THRESHOLD
+
+
+def test_page_has_status_and_priority_filters(tmp_path: Path):
+    """status / priority の絞り込みは、既存の種別・エッジと同じ左サイドバーに並ぶ。"""
+    index = build_site(chain(), FindingList(), tmp_path)
+    html = index.read_text(encoding="utf-8")
+
+    for element_id in ("type-filters", "status-filters", "priority-filters", "edge-filters"):
+        assert f'id="{element_id}"' in html
+    # 表示層が状態を持ち、ロジック層が選択肢を作る。
+    assert "statusFilters(DATA)" in html
+    assert "priorityFilters(DATA)" in html
+    assert "function legendGroups(" in html
 
 
 def test_build_site_writes_page_and_raw_outputs(tmp_path: Path):

@@ -236,6 +236,52 @@ def test_doc_rejects_csv_without_matrix(capsys):
     assert "--matrix を付けること" in capsys.readouterr().err
 
 
+def test_stats_command(capsys):
+    assert main(["stats", SAMPLE]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("# モデル統計\n")
+    assert "- 規模: 20 ノード / 34 エッジ" in out
+    assert "| FunctionalRequirement | 1 | 4 | 0 | 0 | 5 |" in out
+    assert "- Need の充足率 (satisfies されている): 100.0% (3/3)" in out
+
+
+def test_stats_json_output(capsys):
+    assert main(["stats", "-f", SAMPLE, "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["files"] == [SAMPLE]
+    assert payload["totals"]["nodes"] == 20
+    assert payload["nodes"]["by_status"] == {
+        "proposed": 1,
+        "approved": 19,
+        "implemented": 0,
+        "verified": 0,
+    }
+    assert payload["ambiguity"]["findings"] == 0
+
+
+def test_stats_no_lexicon_option(capsys):
+    assert main(["stats", SAMPLE, "--no-lexicon", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["ambiguity"] is None
+
+
+def test_stats_writes_to_file(tmp_path: Path):
+    output = tmp_path / "stats.md"
+    assert main(["stats", SAMPLE, "-o", str(output)]) == 0
+    assert output.read_text(encoding="utf-8").startswith("# モデル統計\n")
+
+
+def test_stats_does_not_fail_on_an_unhealthy_model(tmp_path: Path, capsys):
+    """stats は判定をしない。指摘だらけのモデルでも終了コードは 0。"""
+    definition = tmp_path / "requirements.py"
+    definition.write_text(
+        HEADER + 'n = Need(id="N-1", text="適切に精算したい")\n', encoding="utf-8"
+    )
+    assert main(["stats", str(definition)]) == 0
+    out = capsys.readouterr().out
+    assert "- Need の充足率 (satisfies されている): 0.0% (0/1) 未達: N-1" in out
+    assert "- 指摘 1 件 / 1 ノード = 1.00 件/ノード" in out
+
+
 def test_export_command(capsys):
     assert main(["export", SAMPLE]) == 0
     payload = json.loads(capsys.readouterr().out)

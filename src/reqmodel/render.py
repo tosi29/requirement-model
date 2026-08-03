@@ -157,6 +157,14 @@ def _fit_of(shape: str) -> dict[str, float]:
     return {"wmul": wmul, "wpad": wpad, "hmul": hmul, "hpad": hpad}
 
 
+def _mermaid_shape_of_type(node_type: type[Node]) -> tuple[str, str]:
+    """型 (クラス) の Mermaid 形状。サブクラスは親の形状を継ぐ。"""
+    for base, shape in _MERMAID_SHAPE.items():
+        if issubclass(node_type, base):
+            return shape
+    raise KeyError(node_type.__name__)  # pragma: no cover
+
+
 def render_meta() -> dict[str, Any]:
     """型・status・優先度ごとの描画情報。ブラウザ側 (Cytoscape.js) の初期化に使う。
 
@@ -171,6 +179,11 @@ def render_meta() -> dict[str, Any]:
                 "stroke": _PALETTE[node_type.__name__][1],
                 # ラベルが図形の内側に収まる外形の決め方 (_SHAPE_FIT を参照)。
                 "fit": _fit_of(_CYTOSCAPE_SHAPE[node_type]),
+                # 画面から Mermaid を書き出す (絞り込み後の図) ときの形状。
+                # 書式そのものは render_mermaid() と揃える。
+                "mermaid": dict(
+                    zip(("open", "close"), _mermaid_shape_of_type(node_type))
+                ),
             }
             for node_type in TYPE_ORDER
         },

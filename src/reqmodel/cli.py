@@ -33,7 +33,14 @@ from .loader import LoadResult, discover_paths, load_paths
 from .model import EDGE_NAMES
 from .plan import diff_graphs, format_plan, load_revision
 from .render import FORMATS, render
-from .site import DEFAULT_TITLE, SITE_ASSETS, asset_srcs, build_site
+from .site import (
+    DEFAULT_REF,
+    DEFAULT_TITLE,
+    SITE_ASSETS,
+    RepoLink,
+    asset_srcs,
+    build_site,
+)
 from .stats import collect_stats, render_stats
 from .validate import validate_semantics_lexical, validate_structure
 from .waivers import WaiverResult, apply_waivers
@@ -183,6 +190,19 @@ def build_parser() -> argparse.ArgumentParser:
             f"{' / '.join(asset.file for asset in SITE_ASSETS)} を置けば、"
             "外部通信の無い自己完結サイトになる (既定: cdn)"
         ),
+    )
+    site_parser.add_argument(
+        "--repo-url",
+        help=(
+            "定義ファイルを置いているリポジトリの URL "
+            "(例: https://github.com/owner/repo)。"
+            "渡すと、ノードの出所から定義ファイルへのリンクがページに出る"
+        ),
+    )
+    site_parser.add_argument(
+        "--repo-ref",
+        default=DEFAULT_REF,
+        help=f"リンク先のブランチ / コミット SHA (既定: {DEFAULT_REF})",
     )
     site_parser.add_argument(
         "--no-lexicon", action="store_true", help="曖昧語チェックを行わない"
@@ -445,6 +465,7 @@ def cmd_site(args: argparse.Namespace) -> int:
         sources=[str(p) for p in result.paths],
         scripts=asset_srcs(local=args.assets == "local"),
         suppressed=waived.count,
+        repo=RepoLink(args.repo_url, args.repo_ref) if args.repo_url else None,
     )
     print(
         f"生成した: {index} ({len(result.graph)} ノード / {waived.summary()})",

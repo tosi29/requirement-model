@@ -118,7 +118,9 @@ export function fixture(overrides = {}) {
     edges,
     findings: [],
     stats: { nodes: nodes.length, edges: edges.length, findings: {} },
-    meta: META,
+    //: 呼ぶたびに複製する。META をそのまま渡すと、書き換えるテストの影響が
+    //: 後続のテストに漏れる (実行順で結果が変わる)。
+    meta: structuredClone(META),
     ...overrides,
   };
 }
@@ -214,7 +216,7 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
     edges,
     findings: [],
     stats: { nodes: nodes.length, edges: edges.length, findings: {} },
-    meta: META,
+    meta: structuredClone(META),
   };
 }
 
@@ -222,7 +224,14 @@ export const META = {
   types: Object.fromEntries(
     TYPES.map((type) => [
       type,
-      { shape: "ellipse", fill: "#fff", stroke: "#000", fit: ELLIPSE_FIT },
+      {
+        shape: "ellipse",
+        fill: "#fff",
+        stroke: "#000",
+        fit: ELLIPSE_FIT,
+        //: Mermaid の形状。ここも全型を楕円 "( )" で代表させる。
+        mermaid: { open: "(", close: ")" },
+      },
     ]),
   ),
   //: 並びは成熟度 (STATUS_RANK) の順。線種だけで 4 つを区別できるようにしてある。

@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from .doc import (
+from .application.doc import (
     DEFAULT_MATRIX_TITLE,
     DEFAULT_SPEC_TITLE,
     DOC_FORMATS,
@@ -26,12 +26,12 @@ from .doc import (
     render_matrices_markdown,
     render_spec,
 )
-from .explain import explain_text, impact_set
+from .application.explain import explain_text, impact_set
 from .findings import FindingList
 from .core.graph import RequirementGraph
-from .loader import LoadResult, discover_paths, load_paths
+from .application.loader import LoadResult, discover_paths, load_paths
 from .core.metamodel import EDGE_NAMES
-from .plan import diff_graphs, format_plan, load_revision
+from .application.plan import diff_graphs, format_plan, load_revision
 from .render import FORMATS, render
 from .site import (
     DEFAULT_REF,
@@ -41,9 +41,9 @@ from .site import (
     asset_srcs,
     build_site,
 )
-from .stats import collect_stats, render_stats
-from .validate import validate_semantics_lexical, validate_structure
-from .waivers import WaiverResult, apply_waivers
+from .application.stats import collect_stats, render_stats
+from .application.validate import validate_semantics_lexical, validate_structure
+from .application.waivers import WaiverResult, apply_waivers
 
 __all__ = ["main", "build_parser"]
 

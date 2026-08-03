@@ -823,10 +823,14 @@ skip されるので、CI では `.github/workflows/ci.yml` が node を明示�
 
 - `reqmodel.definition`: 定義ファイルの利用者が使うノード型・補助型
 - `reqmodel.core`: メタモデル、正規化グラフ、既定の投影ポリシー
+- `reqmodel.application`: 読み込み、検証、変更分析、説明・文書・統計生成のユースケース
 - `reqmodel.presentation`: Mermaid / DOT、描画スタイル、静的サイト
 
-依存方向は `presentation → core → definition` とし、従来の `reqmodel.model`、
-`reqmodel.graph`、`reqmodel.render`、`reqmodel.site` は互換 import のために残している。
+CLI は引数解析と入出力を担当し、`application → core → definition` の向きでユースケースを
+Python API として再利用できる。`presentation` も `core` を利用する。従来の `reqmodel.model`、
+`reqmodel.graph`、`reqmodel.render`、`reqmodel.site` に加え、`reqmodel.loader`、
+`reqmodel.validate`、`reqmodel.waivers`、`reqmodel.explain`、`reqmodel.plan`、
+`reqmodel.doc`、`reqmodel.stats` は互換 import のために残している。
 ルートからの `from reqmodel import Goal, Need, FR, QR` も引き続き利用できる。
 
 ## 設計判断の記録

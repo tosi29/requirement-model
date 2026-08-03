@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from .findings import Finding, FindingList, Severity
 from .graph import Edge, RequirementGraph
-from .loader import LoadResult, load_paths, load_sources
+from .application.loader import LoadResult, load_paths, load_sources
 from .model import (
     FR,
     QR,
@@ -32,9 +32,9 @@ from .model import (
     System,
     Waiver,
 )
-from .stats import Ambiguity, Ratio, Stats, collect_stats
-from .validate import validate_semantics_lexical, validate_structure
-from .waivers import WaiverResult, apply_waivers
+from .application.stats import Ambiguity, Ratio, Stats, collect_stats
+from .application.validate import validate_semantics_lexical, validate_structure
+from .application.waivers import WaiverResult, apply_waivers
 
 __version__ = "0.1.0"
 

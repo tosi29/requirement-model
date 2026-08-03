@@ -276,22 +276,6 @@ Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`statu
 受け入れ基準・トレースリンク・定義位置を出す。`examples/sample.py` からの抜粋:
 
 ```markdown
-### G-2 申請 1 件あたりの入力の手間を減らす
-
-- 種別: Goal / 状態: approved
-- 上位ノード (これが詳細化する対象): G-1
-- 動機づけるニーズ: N-1, N-2
-- 源泉: SRC-CFO (経理部長)
-- 定義: examples/sample.py:86
-
-#### N-1 申請者は、領収書を撮影するだけで経費を申請したい
-
-- 種別: Need / 状態: approved / 優先度: 1
-- 源泉: SRC-EMP (申請者となる一般社員)
-- 動機づけているゴール: G-2
-- これを充足する機能要求: FR-1, FR-2
-- 定義: examples/sample.py:54
-
 ##### FR-1 領収書画像から金額と日付を抽出し、申請フォームの初期値として表示すること
 
 - 種別: FunctionalRequirement / 状態: approved / 優先度: 1
@@ -304,6 +288,10 @@ Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`statu
     - 抽出に失敗した項目は空欄で表示され、申請者が手入力で上書きできる
 - 定義: examples/sample.py:105
 ```
+
+上位の Goal / Need も同じ形式で、トレースリンクの項目名だけが型ごとに変わる
+(`動機づけるニーズ`、`これを充足する機能要求` など)。全文は
+`req doc examples/sample.py` を叩けば出る。
 
 節の構成は次の 7 つで固定する (該当が無ければ「該当なし。」と出る)。
 
@@ -364,42 +352,16 @@ Goal × Need,motivates,Goal,G-2,申請 1 件あたりの入力の手間を減ら
 $ req stats examples/sample.py
 ```
 
+4 つの節が出る。**1.** ノード数 (型 × 状態の表)、**2.** エッジ数 (種別ごと)、
+**3.** 充足率・保有率、**4.** 曖昧語密度。3 の抜粋:
+
 ```markdown
-# モデル統計
-
-- 対象: examples/sample.py
-- 規模: 20 ノード / 34 エッジ
-- 判定はしない。閾値を置かず、数と割合だけを出す。
-
-## 1. ノード数 (型 × 状態)
-
-| 型 | proposed | approved | implemented | verified | 計 |
-|---|---|---|---|---|---|
-| Goal | 0 | 3 | 0 | 0 | 3 |
-| Need | 0 | 3 | 0 | 0 | 3 |
-| FunctionalRequirement | 1 | 4 | 0 | 0 | 5 |
-| QualityRequirement | 0 | 2 | 0 | 0 | 2 |
-| Constraint | 0 | 1 | 0 | 0 | 1 |
-| Decision | 0 | 1 | 0 | 0 | 1 |
-| System | 0 | 1 | 0 | 0 | 1 |
-| Source | 0 | 4 | 0 | 0 | 4 |
-| 計 | 1 | 19 | 0 | 0 | 20 |
-
-## 2. エッジ数 (種別)
-
-- has_source 16 / refines 3 / motivates 3 / satisfies 5 / conflicts 1 / qualifies 2 / constrains 2 / resolves 2
-
 ## 3. 充足率・保有率
 
 - Need の充足率 (satisfies されている): 100.0% (3/3)
 - FR の受け入れ基準保有率: 100.0% (5/5)
 - QR の受け入れ基準保有率: 100.0% (2/2)
 - 源泉トレース率 (has_source を持つ要求): 100.0% (14/14)
-
-## 4. 曖昧語密度
-
-- 指摘 0 件 / 20 ノード = 0.00 件/ノード
-- 指摘の出たノード: 0 件
 ```
 
 率が 100% に満たないときは、その行に未達のノード id が並ぶ
@@ -419,33 +381,12 @@ $ req stats examples/sample.py
 $ req stats examples/sample.py --json
 ```
 
+最上位のキーは `files` / `totals` / `nodes` / `edges` / `ratios` / `ambiguity` の 6 つ。
+`ratios` は 1 つの率が 1 要素になる。
+
 ```json
-{
-  "files": ["examples/sample.py"],
-  "totals": {"nodes": 20, "edges": 34},
-  "nodes": {
-    "by_type": {"Goal": 3, "Need": 3, "FunctionalRequirement": 5, "...": 0},
-    "by_status": {"proposed": 1, "approved": 19, "implemented": 0, "verified": 0},
-    "by_type_status": {"Goal": {"proposed": 0, "approved": 3, "...": 0}}
-  },
-  "edges": {"by_name": {"has_source": 16, "refines": 3, "...": 0}},
-  "ratios": [
-    {
-      "key": "need_satisfied",
-      "label": "Need の充足率 (satisfies されている)",
-      "covered": 3,
-      "total": 3,
-      "rate": 1.0,
-      "missing": []
-    }
-  ],
-  "ambiguity": {
-    "findings": 0,
-    "nodes_with_findings": 0,
-    "total_nodes": 20,
-    "density": 0.0
-  }
-}
+{"key": "need_satisfied", "label": "Need の充足率 (satisfies されている)",
+ "covered": 3, "total": 3, "rate": 1.0, "missing": []}
 ```
 
 `rate` は母数が 0 なら `null`、`ambiguity` は `--no-lexicon` を付けたとき

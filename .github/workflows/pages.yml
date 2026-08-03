@@ -43,11 +43,15 @@ jobs:
         run: req validate examples/sample.py
 
       - name: 静的サイトを生成する
+        # --repo-url / --repo-ref を渡すと、ノードの出所 (file:line) が
+        # 定義ファイルへのリンクになる。参照は公開したコミットそのものにする。
         run: |
           req site examples/sample.py \
             --output site \
             --title "要求グラフ (examples/sample.py)" \
-            --assets local
+            --assets local \
+            --repo-url "${{ github.server_url }}/${{ github.repository }}" \
+            --repo-ref "${{ github.sha }}"
 
       - name: 描画ライブラリを同梱する
         # 公開ページから外部への通信を無くすため、描画ライブラリを一緒に置く。

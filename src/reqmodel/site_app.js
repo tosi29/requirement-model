@@ -7,33 +7,48 @@
  */
 
 import {
+  ALL_SEVERITIES,
   FOCUS_DEPTHS,
   IMPACT_DEPTHS,
   LABEL_FONT,
   TABLE_COLUMNS,
+  THEME_LABELS,
+  THEME_STORAGE_KEY,
+  VIEW_STORAGE_KEY,
   bandDefs,
   bandId,
   bandedLayout,
   createView,
   decodeHash,
+  edgeItems,
   encodeHash,
+  escapeAttr,
   escapeHtml,
   explainCommand,
   focusSet,
   graphElements,
   graphStyle,
+  graphSvg,
+  groupFindings,
   impactSets,
+  initialHash,
   isNodeVisible,
   layoutOptions,
   legendGroups,
   matchesQuery,
+  mermaidText,
   nextSort,
+  nextTheme,
   nodeContext,
+  normalizeTheme,
   priorityFilters,
   searchHits,
+  severityTabs,
   sortRows,
+  sourceUrl,
   statusFilters,
   stepHit,
+  storableHash,
   tableRows,
   truncate,
 } from "./site_logic.js";
@@ -42,14 +57,37 @@ const cytoscape = window.cytoscape;
 
 const DATA = JSON.parse(document.getElementById("model-data").textContent);
 
+// --- 保存 (localStorage) ----------------------------------------------------
+//
+// 使えない環境 (file:// で開いた・プライベートモード・容量超過) では黙って
+// 諦める。保存はどれも「次に開いたときの利便」でしかなく、無くても表示は成立する。
+
+function readStore(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStore(key, value) {
+  try {
+    if (value) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
+  } catch {
+    // 保存できない環境。
+  }
+}
+
 /**
  * 表示状態。持ち物は `defaultState()` を参照 (絞り込みの集合・選択ノード・
  * グラフの向き・中央ペインのタブ・検索語・テーブルの並び順)。
  *
  * URL ハッシュが唯一の出典なので、初期値はハッシュから作り、以降も変更のたびに
- * `writeHash()` で書き戻す (戻る/進むは `applyHash()` で戻す)。
+ * `writeHash()` で書き戻す (戻る/進むは `applyHash()` で戻す)。ハッシュの無い
+ * URL で開いたときだけ、前回の絞り込み (localStorage) を初期値に使う。
  */
-let state = decodeHash(location.hash, DATA);
+let state = decodeHash(initialHash(location.hash, readStore(VIEW_STORAGE_KEY)), DATA);
 
 /** 絞り込みを反映した現在のグラフ。refresh() で作り直す。 */
 let view = createView(DATA, state);
@@ -374,8 +412,6 @@ function renderDetail() {
   }
   const node = view.byId.get(state.selected);
   const impact = impactSets(view, node.id);
-  const outgoing = view.edges.filter((edge) => edge.source === node.id);
-  const incoming = view.edges.filter((edge) => edge.target === node.id);
 
   const rows = [];
   rows.push(`<h3>${node.id} <span class="node-btn type">[${node.type}]</span></h3>`);
@@ -385,7 +421,7 @@ function renderDetail() {
   if (node.priority !== null && node.priority !== undefined) rows.push(`<dt>priority</dt><dd>${node.priority}</dd>`);
   if (node.kind) rows.push(`<dt>kind</dt><dd>${node.kind}</dd>`);
   if (node.decomposition) rows.push(`<dt>分解</dt><dd>${node.decomposition}</dd>`);
-  if (node.location) rows.push(`<dt>出所</dt><dd class="loc">${escapeHtml(node.location)}</dd>`);
+  if (node.location) rows.push(`<dt>出所</dt><dd class="loc">${locationHtml(node.location)}</dd>`);
   //: 件数は影響範囲の設定 (深さ・向き) に従う。図の色分けと同じ範囲を数える。
   if (impact.undirected) {
     rows.push(`<dt>関連</dt><dd>${impact.downstream.size} 件</dd>`);
@@ -409,22 +445,26 @@ function renderDetail() {
     rows.push("</ul>");
   }
 
-  const edgeList = (edges, direction) =>
-    edges
-      .map((edge) => {
-        const other = direction === "out" ? edge.target : edge.source;
-        const arrow = direction === "out" ? `--${edge.name}-->` : `<--${edge.name}--`;
-        return `<li class="edge"><button class="node-btn" data-id="${other}">${arrow} ${other}</button></li>`;
-      })
+  //: 相手の id だけでなく本文も出す。飛ぶ前に「何に繋がっているか」が読める。
+  const edgeList = (items) =>
+    items
+      .map(
+        (item) => `<li class="edge"><button class="node-btn" data-goto="${escapeAttr(item.id)}">
+          <span class="arrow">${escapeHtml(item.arrow)}</span> <span class="id">${escapeHtml(item.id)}</span>
+          <span class="type">${escapeHtml(item.type)}</span>
+          <span class="text">${escapeHtml(truncate(item.text, 40))}</span></button></li>`,
+      )
       .join("");
 
-  if (outgoing.length) rows.push(`<h2>出るエッジ</h2><ul class="plain">${edgeList(outgoing, "out")}</ul>`);
-  if (incoming.length) rows.push(`<h2>入るエッジ</h2><ul class="plain">${edgeList(incoming, "in")}</ul>`);
+  const links = edgeItems(view, node.id);
+  if (links.out.length) rows.push(`<h2>出るエッジ</h2><ul class="plain">${edgeList(links.out)}</ul>`);
+  if (links.in.length) rows.push(`<h2>入るエッジ</h2><ul class="plain">${edgeList(links.in)}</ul>`);
 
   const nodeFindings = DATA.findings.filter((finding) => finding.node_id === node.id);
   if (nodeFindings.length) {
     rows.push('<h2 id="node-findings">このノードへの指摘</h2>');
-    for (const finding of nodeFindings) rows.push(findingHtml(finding));
+    //: 選択中のノード自身への指摘なので、飛び先が無い (button にしない)。
+    for (const finding of nodeFindings) rows.push(findingHtml(finding, false));
   }
 
   rows.push('<h2>LLM 連携</h2><button id="copy-context">影響部分グラフをコピー</button>');
@@ -434,8 +474,8 @@ function renderDetail() {
   );
   panel.innerHTML = rows.join("");
 
-  panel.querySelectorAll("button[data-id]").forEach((button) => {
-    button.addEventListener("click", () => selectNode(button.dataset.id));
+  panel.querySelectorAll("button[data-goto]").forEach((button) => {
+    button.addEventListener("click", () => selectNode(button.dataset.goto));
   });
   const copyButton = document.getElementById("copy-context");
   copyButton.addEventListener("click", async () => {
@@ -449,16 +489,36 @@ function renderDetail() {
   });
 }
 
-function findingHtml(finding) {
+/**
+ * 出所 (`examples/sample.py:42`)。`req site --repo-url` を渡して生成した
+ * ページでは、定義そのもの (blob URL + 行番号) へのリンクになる。
+ */
+function locationHtml(location) {
+  const url = sourceUrl(DATA, location);
+  if (!url) return escapeHtml(location);
+  return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener"
+    title="GitHub でこの定義を開く">${escapeHtml(location)} ↗</a>`;
+}
+
+/**
+ * 指摘 1 件。ノードに紐づくものは押すとそのノードへ飛ぶので button で出す
+ * (キーボードで辿れる)。
+ *
+ * 出所をリンクにできるのは button にしない側だけ。button の中にリンクを
+ * 入れると入れ子の操作子になり、キーボードでも読み上げでも辿れなくなる。
+ * 紐づくノードがあるなら、詳細ペインの「出所」からリンクを開ける。
+ */
+function findingHtml(finding, interactive = true) {
   const where = finding.node_id ? ` (${finding.node_id})` : "";
-  const at = finding.location
-    ? `<div class="loc">${escapeHtml(finding.location)}</div>`
-    : "";
-  return `<div class="finding ${finding.severity}" data-id="${finding.node_id || ""}">
-    <div class="code">${finding.severity.toUpperCase()} · L${finding.layer} · ${finding.code}${where}</div>
-    <div>${escapeHtml(finding.message)}</div>
-    ${at}
-  </div>`;
+  const head = `<div class="code">${finding.severity.toUpperCase()} · L${finding.layer} · ${escapeHtml(finding.code)}${escapeHtml(where)}</div>
+    <div>${escapeHtml(finding.message)}</div>`;
+  if (interactive && finding.node_id) {
+    const at = finding.location ? `<div class="loc">${escapeHtml(finding.location)}</div>` : "";
+    return `<button type="button" class="finding ${finding.severity}" data-id="${escapeAttr(finding.node_id)}">
+      ${head}${at}</button>`;
+  }
+  const at = finding.location ? `<div class="loc">${locationHtml(finding.location)}</div>` : "";
+  return `<div class="finding ${finding.severity}">${head}${at}</div>`;
 }
 
 // --- 左サイドバー ----------------------------------------------------------
@@ -619,13 +679,61 @@ function renderStats() {
     })
     .join("");
 
+  renderFindings();
+}
+
+// --- 検証結果 ---------------------------------------------------------------
+//
+// 指摘は数が増えるほど「重い順の 1 本の帯」では読めなくなる。重大度で絞り、
+// 残りをチェックコードごとにまとめる。同じ規則の違反はまとめて直す (あるいは
+// まとめて抑制する) ものなので、コードが片付ける単位になる。
+
+//: 指摘一覧で選んでいる重大度。URL には載せない (パーマリンクで渡すのは図の状態
+//: であって、右ペインの読み方ではない)。
+let findingSeverity = ALL_SEVERITIES;
+
+/** 重大度タブを選ぶ。押しても ←→ で移っても同じ。 */
+function showSeverity(tab) {
+  findingSeverity = tab.dataset.severity;
+  renderFindings();
+}
+
+function renderFindings() {
+  const tabs = severityTabs(DATA.findings);
+  //: 選んでいた重大度が消えている状態にはならないが、念のため戻す。
+  if (!tabs.some((tab) => tab.key === findingSeverity)) findingSeverity = ALL_SEVERITIES;
+
+  const tabBar = document.getElementById("finding-tabs");
+  //: 描き直すとフォーカスが飛ぶ。タブから操作していたなら選んだタブに戻す。
+  const refocus = tabBar.contains(document.activeElement);
+  tabBar.innerHTML = tabs
+    .map(
+      (tab) => `<button type="button" role="tab" aria-controls="findings" data-severity="${escapeAttr(tab.key)}"
+        class="${tab.key === findingSeverity ? "active" : ""}"
+        aria-selected="${tab.key === findingSeverity}"
+        tabindex="${tab.key === findingSeverity ? 0 : -1}"
+        >${escapeHtml(tab.label)}<span class="count">${tab.count}</span></button>`,
+    )
+    .join("");
+  tabBar.querySelectorAll("button[data-severity]").forEach((button) => {
+    button.addEventListener("click", () => showSeverity(button));
+  });
+  bindTabKeys(tabBar, showSeverity);
+  if (refocus) tabBar.querySelector("button.active")?.focus();
+
+  const groups = groupFindings(DATA.findings, findingSeverity);
   const panel = document.getElementById("findings");
-  panel.innerHTML = DATA.findings.length
-    ? DATA.findings.map(findingHtml).join("")
+  panel.innerHTML = groups.length
+    ? groups
+        .map(
+          (group) => `<div class="code-head"><span>${escapeHtml(group.code)}</span>
+            <span>${group.items.length} 件</span></div>
+            ${group.items.map((finding) => findingHtml(finding)).join("")}`,
+        )
+        .join("")
     : '<p class="empty">指摘は無い。</p>';
-  panel.querySelectorAll(".finding[data-id]").forEach((element) => {
-    if (!element.dataset.id) return;
-    element.addEventListener("click", () => selectNode(element.dataset.id));
+  panel.querySelectorAll("button.finding[data-id]").forEach((button) => {
+    button.addEventListener("click", () => selectNode(button.dataset.id));
   });
 }
 
@@ -666,10 +774,13 @@ function renderTable() {
     }
   };
 
+  //: 行はクリックでノードを選ぶ操作子なので、キーボードからも入れるようにする
+  //: (tabindex + Enter / Space)。tr は button にできないので手で持たせる。
   const body = rows.length
     ? rows
         .map(
-          (row) => `<tr data-id="${row.id}" class="${row.id === state.selected ? "sel" : ""}">
+          (row) => `<tr data-id="${escapeAttr(row.id)}" tabindex="0"
+            class="${row.id === state.selected ? "sel" : ""}">
             ${TABLE_COLUMNS.map((column) => cell(row, column.key)).join("")}</tr>`,
         )
         .join("")
@@ -679,7 +790,7 @@ function renderTable() {
   table.innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
   document.getElementById("table-note").textContent =
     `${rows.length} 件を表示中 (全 ${DATA.nodes.length} 件)。` +
-    " 行をクリックすると右ペインに詳細が出る。列見出しで並べ替える。";
+    " 行をクリック (キーボードなら Enter) すると右ペインに詳細が出る。列見出しで並べ替える。";
 
   table.querySelectorAll("thead button[data-key]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -690,6 +801,11 @@ function renderTable() {
   });
   table.querySelectorAll("tbody tr[data-id]").forEach((tr) => {
     tr.addEventListener("click", () => selectNode(tr.dataset.id));
+    tr.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      selectNode(tr.dataset.id);
+    });
   });
   table.querySelectorAll("button[data-findings]").forEach((button) => {
     button.addEventListener("click", (event) => {
@@ -706,6 +822,38 @@ function showFindings(id) {
   if (heading) heading.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
+// --- タブ (中央ペイン / 指摘の重大度) ---------------------------------------
+
+/**
+ * タブ群のキーボード操作 (WAI-ARIA の tablist と同じ約束)。
+ *
+ * ←→ で隣のタブへ、Home / End で端へ移り、移った先がそのまま選ばれる。
+ * tab キーで飛ぶ先は選択中の 1 つだけ (roving tabindex) なので、タブが増えても
+ * キーボードでの移動距離が伸びない。
+ */
+function bindTabKeys(container, activate) {
+  const keys = { ArrowLeft: -1, ArrowRight: 1 };
+  container.addEventListener("keydown", (event) => {
+    const buttons = [...container.querySelectorAll('[role="tab"]')];
+    const at = buttons.indexOf(event.target);
+    if (at < 0) return;
+    let next = null;
+    if (event.key in keys) next = buttons[(at + keys[event.key] + buttons.length) % buttons.length];
+    else if (event.key === "Home") next = buttons[0];
+    else if (event.key === "End") next = buttons[buttons.length - 1];
+    if (!next) return;
+    event.preventDefault();
+    next.focus();
+    activate(next);
+  });
+}
+
+//: 中央ペインのタブ [ボタンの id, 表示]。
+const VIEW_TABS = [
+  ["tab-graph", "graph"],
+  ["tab-table", "table"],
+];
+
 /** 中央ペインの表示切り替え。グラフは消さず、隠すだけ。 */
 function setMode(mode) {
   state.mode = mode;
@@ -714,10 +862,12 @@ function setMode(mode) {
   for (const element of document.querySelectorAll(".graph-only")) {
     element.hidden = mode !== "graph";
   }
-  for (const [id, name] of [["tab-graph", "graph"], ["tab-table", "table"]]) {
+  for (const [id, name] of VIEW_TABS) {
     const tab = document.getElementById(id);
     tab.classList.toggle("active", mode === name);
     tab.setAttribute("aria-selected", String(mode === name));
+    //: tab キーで入る先は選択中のタブだけにする。
+    tab.tabIndex = mode === name ? 0 : -1;
   }
   if (mode === "table") {
     renderTable();
@@ -740,6 +890,8 @@ function setMode(mode) {
  */
 function writeHash(push = true) {
   const hash = encodeHash(state, DATA);
+  //: 次に (ハッシュ無しの URL で) 開いたときに戻すぶん。選択と検索語は持ち越さない。
+  writeStore(VIEW_STORAGE_KEY, storableHash(state, DATA));
   if (hash === location.hash) return;
   // ハッシュが空になるときは "#" 自体を落とす。
   const url = hash || location.pathname + location.search;
@@ -801,22 +953,30 @@ function refresh() {
   syncFocusLayout();
 }
 
-document.getElementById("tab-graph").addEventListener("click", () => {
-  setMode("graph");
-  writeHash();
-});
-document.getElementById("tab-table").addEventListener("click", () => {
-  setMode("table");
-  writeHash();
-});
-document.getElementById("search").addEventListener("input", (event) => {
-  state.query = event.target.value;
+/** 検索語を差し替える。入力欄からも、キーボードの Esc からも通る。 */
+function applyQuery(value) {
+  state.query = value;
+  document.getElementById("search").value = value;
   //: 語が変われば候補も変わる。位置は先頭から数え直す。
   cursor = null;
   renderNodeList();
   renderTable();
   applySearchHits();
   writeHash(false);
+}
+
+for (const [id, name] of VIEW_TABS) {
+  document.getElementById(id).addEventListener("click", () => {
+    setMode(name);
+    writeHash();
+  });
+}
+bindTabKeys(document.querySelector(".tabs"), (tab) => {
+  setMode(VIEW_TABS.find(([id]) => id === tab.id)[1]);
+  writeHash();
+});
+document.getElementById("search").addEventListener("input", (event) => {
+  applyQuery(event.target.value);
 });
 //: ↑↓ で候補を送り、Enter で決める。入力欄から手を離さずに図を辿れるようにする。
 document.getElementById("search").addEventListener("keydown", (event) => {
@@ -866,8 +1026,147 @@ document.getElementById("zoom-reset").addEventListener("click", () => {
   if (cy) cy.zoom(1);
 });
 document.getElementById("zoom-fit").addEventListener("click", fitToView);
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+
+// --- テーマ ------------------------------------------------------------------
+//
+// 既定は OS 設定への追従。明るい部屋やプロジェクタでは追従されると困るので、
+// ヘッダのボタンで固定できる。固定した選択は次回にも残す。
+
+let theme = normalizeTheme(readStore(THEME_STORAGE_KEY));
+const themeButton = document.getElementById("theme");
+
+/** テーマを反映する。図の配色も CSS 変数から引き直す。 */
+function applyTheme() {
+  //: 自動のときは属性を外し、CSS 側の OS 追従に任せる。
+  if (theme === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.dataset.theme = theme;
+  themeButton.textContent = THEME_LABELS[theme];
+  restyleGraph();
+}
+
+/** テーマ依存の色を Cytoscape に入れ直す。 */
+function restyleGraph() {
   if (cy) cy.style(graphStyle(DATA.meta, palette()));
+}
+
+themeButton.addEventListener("click", () => {
+  theme = nextTheme(theme);
+  writeStore(THEME_STORAGE_KEY, theme === "auto" ? null : theme);
+  applyTheme();
+});
+//: 自動のときだけ効く (固定中は data-theme が勝つので、引き直しても色は動かない)。
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", restyleGraph);
+
+// --- 書き出し ----------------------------------------------------------------
+//
+// 出力先の graph.mmd / graph.dot は全体のグラフなので、絞り込んだ図はここで組む。
+// SVG は「いま図に描かれているもの」(フォーカス中なら近傍だけ) を写す。
+
+/** 文字列をファイルとして保存させる。 */
+function download(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * SVG に写すための実測値。位置・大きさ・折り返し済みのラベルは Cytoscape が
+ * 持っているので、ここで集めて `graphSvg()` に渡す (組み立てはロジック層)。
+ */
+function currentScene() {
+  if (!cy) return null;
+  const nodes = [];
+  const bands = [];
+  shownElements().nodes().forEach((element) => {
+    const position = element.position();
+    const box = {
+      x: position.x,
+      y: position.y,
+      w: element.outerWidth(),
+      h: element.outerHeight(),
+    };
+    if (element.hasClass("band")) {
+      bands.push({ ...box, type: element.data("bandType"), label: element.data("label") });
+    } else {
+      nodes.push({
+        ...box,
+        id: element.id(),
+        type: element.data("type"),
+        status: element.data("status"),
+        priorityClass: element.data("priorityClass"),
+        label: element.data("label"),
+      });
+    }
+  });
+  const dashed = new Set(DATA.meta.dashed_edges);
+  const edges = shownElements()
+    .edges()
+    .map((element) => {
+      //: 端点はノードの縁の座標 (Cytoscape が矢印を描いている位置)。
+      const from = element.sourceEndpoint();
+      const to = element.targetEndpoint();
+      return {
+        name: element.data("name"),
+        dashed: dashed.has(element.data("name")),
+        x1: from.x,
+        y1: from.y,
+        x2: to.x,
+        y2: to.y,
+      };
+    });
+  return { nodes, edges, bands, meta: DATA.meta, palette: palette(), title: DATA.title };
+}
+
+const exportSvg = document.getElementById("export-svg");
+exportSvg.addEventListener("click", () => {
+  const scene = currentScene();
+  if (!scene) return;
+  download("graph.svg", graphSvg(scene), "image/svg+xml;charset=utf-8");
+});
+document.getElementById("export-mmd").addEventListener("click", () => {
+  download("graph.mmd", mermaidText(view), "text/plain;charset=utf-8");
+});
+
+// --- キーボード --------------------------------------------------------------
+//
+// 図 (canvas) 以外はすべてキーボードで辿れる。よく使う 2 つだけ、どこからでも
+// 効く近道を置く。入力中の打鍵は奪わない。
+
+document.addEventListener("keydown", (event) => {
+  if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
+  const target = event.target;
+  //: 文字を打ち込める場所からは打鍵を奪わない。チェックボックスや範囲入力は
+  //: 文字を受け取らないので、ここでは「入力中」に数えない。
+  const typing =
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      ["SELECT", "TEXTAREA"].includes(target.tagName) ||
+      (target.tagName === "INPUT" &&
+        !["checkbox", "radio", "range", "button"].includes(target.type)));
+
+  if (event.key === "/" && !typing) {
+    event.preventDefault();
+    const search = document.getElementById("search");
+    search.focus();
+    search.select();
+    return;
+  }
+  if (event.key !== "Escape") return;
+  //: まず選択、無ければ検索語を解く。どちらも無ければ入力欄から手を離す。
+  if (state.selected) {
+    event.preventDefault();
+    state.selected = null;
+    refresh();
+    writeHash();
+  } else if (state.query) {
+    event.preventDefault();
+    applyQuery("");
+  } else if (typing) {
+    target.blur();
+  }
 });
 
 const copyLink = document.getElementById("copy-link");
@@ -885,7 +1184,11 @@ copyLink.addEventListener("click", async () => {
 window.addEventListener("popstate", applyHash);
 window.addEventListener("hashchange", applyHash);
 
+//: 図を組む前にテーマを確定させる (初期スタイルが CSS 変数を読むため)。
+applyTheme();
 initGraph();
+//: 描画ライブラリを読めなかったときは、写す図が無い。
+exportSvg.disabled = !cy;
 renderFilters();
 renderFocusOptions();
 renderImpactControls();

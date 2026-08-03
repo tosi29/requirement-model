@@ -12,8 +12,10 @@ from reqmodel.findings import FindingList
 from reqmodel.model import HIGH_PRIORITY_THRESHOLD, STATUS_RANK
 from reqmodel.render import render_meta
 from reqmodel.site import (
+    DEFAULT_REF,
     SITE_ASSETS,
     SITE_SCRIPTS,
+    RepoLink,
     app_js,
     asset_srcs,
     build_site,
@@ -396,3 +398,104 @@ def test_site_command_refuses_broken_definitions(tmp_path: Path):
     definition.write_text("from reqmodel import Need\nx = 1 + 1\n", encoding="utf-8")
     assert main(["site", str(definition), "-o", str(tmp_path / "site")]) == 1
     assert not (tmp_path / "site").exists()
+
+
+def test_render_meta_carries_the_mermaid_shape_of_every_type():
+    """画面から Mermaid を書き出すときの形状も Python 側が唯一の出典。"""
+    types = render_meta()["types"]
+
+    assert types["Goal"]["mermaid"] == {"open": "{{", "close": "}}"}
+    assert types["Source"]["mermaid"] == {"open": "[(", "close": ")]"}
+    assert all(entry["mermaid"]["open"] and entry["mermaid"]["close"] for entry in types.values())
+
+
+def test_site_data_has_no_repo_link_by_default():
+    """`--repo-url` を渡さなければ出所はただの文字列のまま。"""
+    assert site_data(chain(), FindingList(), "題名", ["a.py"])["repo"] is None
+
+
+def test_site_data_carries_the_repo_link():
+    """出所 (file:line) から定義ファイルへ飛ぶための情報を渡す。"""
+    repo = RepoLink("https://github.com/owner/repo/", ref="abc123")
+    data = site_data(chain(), FindingList(), "題名", ["a.py"], repo=repo)
+
+    # URL の末尾の / は落とす (組み立てはページ側の sourceUrl())。
+    assert data["repo"] == {"url": "https://github.com/owner/repo", "ref": "abc123"}
+
+
+def test_site_command_takes_a_repo_url(tmp_path: Path):
+    output = tmp_path / "site"
+    assert (
+        main(
+            [
+                "site",
+                SAMPLE,
+                "-o",
+                str(output),
+                "--repo-url",
+                "https://github.com/owner/repo",
+                "--repo-ref",
+                "v1",
+            ]
+        )
+        == 0
+    )
+
+    data = embedded_data((output / "index.html").read_text(encoding="utf-8"))
+    assert data["repo"] == {"url": "https://github.com/owner/repo", "ref": "v1"}
+    # リンクの組み立てはページ側。出所そのものは今まで通り file:line のまま。
+    assert data["nodes"][0]["location"].startswith(SAMPLE + ":")
+
+
+def test_site_command_defaults_the_repo_ref(tmp_path: Path):
+    output = tmp_path / "site"
+    assert main(["site", SAMPLE, "-o", str(output), "--repo-url", "https://example.com/r"]) == 0
+
+    data = embedded_data((output / "index.html").read_text(encoding="utf-8"))
+    assert data["repo"] == {"url": "https://example.com/r", "ref": DEFAULT_REF}
+
+
+def test_page_can_download_the_filtered_graph(tmp_path: Path):
+    """絞り込んだ図は SVG / .mmd で持ち出せる (出力先の graph.mmd は全体)。"""
+    index = build_site(chain(), FindingList(), tmp_path)
+    html = index.read_text(encoding="utf-8")
+
+    for element_id in ("export-svg", "export-mmd"):
+        assert f'id="{element_id}"' in html
+    assert "function mermaidText(" in html
+    assert "function graphSvg(" in html
+
+
+def test_page_has_a_theme_toggle_and_restores_the_last_view(tmp_path: Path):
+    """テーマは手で固定でき、絞り込みは次回訪問時に戻る。"""
+    index = build_site(chain(), FindingList(), tmp_path)
+    html = index.read_text(encoding="utf-8")
+
+    assert 'id="theme"' in html
+    # OS 追従 (media query) と手動指定 (data-theme) の両方を CSS が持つ。
+    assert "@media (prefers-color-scheme: dark)" in html
+    assert ':root[data-theme="dark"]' in html
+    # 保存するのは絞り込みと表示だけ (選択と検索語は持ち越さない)。
+    assert "function storableHash(" in html
+    assert "function initialHash(" in html
+
+
+def test_page_groups_findings_by_severity_and_code(tmp_path: Path):
+    index = build_site(chain(), FindingList(), tmp_path)
+    html = index.read_text(encoding="utf-8")
+
+    assert 'id="finding-tabs"' in html
+    assert "function severityTabs(" in html
+    assert "function groupFindings(" in html
+
+
+def test_page_is_operable_from_the_keyboard(tmp_path: Path):
+    """図 (canvas) 以外はキーボードで辿れ、フォーカス位置が見える。"""
+    index = build_site(chain(), FindingList(), tmp_path)
+    html = index.read_text(encoding="utf-8")
+
+    assert ":focus-visible" in html
+    # タブ群は ←→ で移れる (WAI-ARIA の tablist と同じ約束)。
+    assert "function bindTabKeys(" in html
+    # 指摘は div ではなく button なので、キーボードから押せる。
+    assert "button.finding" in html

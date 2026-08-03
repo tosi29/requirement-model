@@ -27,9 +27,11 @@ __all__ = [
     "site_data",
     "app_js",
     "Asset",
+    "RepoLink",
     "SITE_ASSETS",
     "SITE_SCRIPTS",
     "asset_srcs",
+    "DEFAULT_REF",
     "DEFAULT_TITLE",
 ]
 
@@ -63,6 +65,25 @@ SITE_ASSETS: tuple[Asset, ...] = (
 
 DEFAULT_TITLE = "要求グラフ"
 
+#: `--repo-ref` の既定。ブランチ名でもコミット SHA でもよい。
+DEFAULT_REF = "main"
+
+
+@dataclass(frozen=True)
+class RepoLink:
+    """定義ファイルの置き場所 (ページから「GitHub で開く」を出すための情報)。
+
+    ノードの出所 (``examples/sample.py:42``) は**生成時の作業ディレクトリからの
+    相対パス**なので、リポジトリの URL と参照 (ブランチ / SHA) を足せば
+    blob URL になる。組み立てはページ側 (``site_logic.sourceUrl()``) で行う。
+    """
+
+    url: str
+    ref: str = DEFAULT_REF
+
+    def to_dict(self) -> dict[str, str]:
+        return {"url": self.url.rstrip("/"), "ref": self.ref}
+
 
 def asset_srcs(local: bool = False) -> list[str]:
     """`<script src>` に入れる参照先。local なら出力先の同名ファイルを相対参照する。"""
@@ -75,15 +96,21 @@ def site_data(
     title: str,
     sources: Sequence[str],
     suppressed: int = 0,
+    repo: RepoLink | None = None,
 ) -> dict[str, Any]:
     """ページに埋め込むデータ一式。
 
     findings は抑制 (waiver) 適用後の指摘。抑制した件数は消さずに
     ``stats.suppressed`` として残す。
+
+    repo を渡すと、ノードと指摘の出所から定義ファイルへのリンクがページに出る。
+    渡さなければ出所は今まで通りただの文字列として出る。
     """
     return {
         "title": title,
         "generated_from": list(sources),
+        # 出所 (file:line) から定義ファイルへ飛ぶためのリポジトリ情報。無ければ null。
+        "repo": repo.to_dict() if repo else None,
         "schema_version": graph.to_json_obj()["schema_version"],
         "types": [node_type.__name__ for node_type in TYPE_ORDER],
         "edge_names": list(EDGE_NAMES),
@@ -149,13 +176,14 @@ def build_site(
     sources: Sequence[str] = (),
     scripts: Sequence[str] | None = None,
     suppressed: int = 0,
+    repo: RepoLink | None = None,
 ) -> Path:
     """out_dir に index.html と生データを書き出し、index.html のパスを返す。
 
     scripts に相対パス (``asset_srcs(local=True)``) を渡し、同じディレクトリへ
     その UMD ビルドを置けば、外部への通信が無い自己完結のサイトになる。
     """
-    data = site_data(graph, findings, title, sources, suppressed)
+    data = site_data(graph, findings, title, sources, suppressed, repo)
     payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
     tags = "\n".join(
         f'<script src="{escape(src, quote=True)}"></script>'

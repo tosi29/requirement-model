@@ -1,13 +1,15 @@
 """静的サイトの JS ロジック。
 
-2 つのことを見る。
+3 つのことを見る。
 
 - `tests/js/` のユニットテストが通ること (Node の test runner をそのまま呼ぶ)
 - `nodeContext()` の出力が `req explain` と一致すること
+- `mermaidText()` の出力が `req graph --format mermaid` と一致すること
 
-後者はサイトの「影響部分グラフをコピー」が LLM に渡す本文そのものなので、
-CLI と食い違うと気付かないまま別物を配ることになる。Python 側の
-``explain_text()`` を真とし、JS 側の出力を突き合わせる。
+後の 2 つは、サイトが配るもの (LLM に渡すコンテキスト / 書き出した .mmd) が
+CLI の出力と食い違うと、気付かないまま別物を配ることになるためである。
+Python 側 (``explain_text()`` / ``render_mermaid()``) を真とし、JS 側の出力を
+突き合わせる。
 """
 
 from __future__ import annotations
@@ -23,11 +25,13 @@ from reqmodel.explain import explain_text
 from reqmodel.findings import FindingList
 from reqmodel.loader import load_paths
 from reqmodel.model import EDGE_NAMES
+from reqmodel.render import render_mermaid
 from reqmodel.site import site_data
 
 ROOT = Path(__file__).resolve().parents[1]
 JS_TESTS = ROOT / "tests" / "js"
 BRIDGE = JS_TESTS / "context_bridge.mjs"
+EXPORT_BRIDGE = JS_TESTS / "export_bridge.mjs"
 SAMPLE = ROOT / "examples" / "sample.py"
 
 NODE = shutil.which("node")
@@ -52,6 +56,14 @@ def node_contexts(data: dict, requests: list[dict]) -> list[str]:
     result = run_node([str(BRIDGE)], payload)
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
+
+
+def mermaid_export(data: dict, **selection) -> str:
+    """`mermaidText()` を Node 上で走らせる (絞り込みは selection で渡す)。"""
+    payload = json.dumps({"data": data, **selection}, ensure_ascii=False)
+    result = run_node([str(EXPORT_BRIDGE)], payload)
+    assert result.returncode == 0, result.stderr
+    return result.stdout
 
 
 def sample_graph():
@@ -133,3 +145,32 @@ def test_node_context_matches_req_explain_undirected(depth: int | None):
     for node_id, text in zip(node_ids, actual):
         expected = explain_text(graph, [node_id], depth=depth, undirected=True)
         assert text == expected, node_id
+
+
+def test_mermaid_export_matches_req_graph():
+    """絞り込み無しのとき、画面からの書き出しは `req graph --format mermaid` と同じ。
+
+    ページの「.mmd」ボタンは、出力先に置かれる graph.mmd と同じ書式でなければ
+    ならない (絞り込んだぶんだけが減る、という関係にする)。
+    """
+    graph = sample_graph()
+    data = site_data(graph, FindingList(), "題名", [str(SAMPLE)])
+
+    assert mermaid_export(data) == render_mermaid(graph)
+
+
+def test_mermaid_export_drops_filtered_out_nodes():
+    """種別を外すと、そのノードと端点を持つエッジが書き出しからも消える。"""
+    graph = sample_graph()
+    data = site_data(graph, FindingList(), "題名", [str(SAMPLE)])
+    types = [name for name in data["types"] if name != "Source"]
+
+    text = mermaid_export(data, types=types)
+    lines = text.splitlines()
+
+    assert not [line for line in lines if "[Source]" in line]
+    assert not [line for line in lines if line.startswith("    class n_") and line.endswith(" Source")]
+    assert "has_source" not in text
+    # ノードとエッジだけが減る。classDef は全型ぶん残す (絞り込みで並びが変わらない)。
+    assert "    classDef Source" in text
+    assert "    classDef Source" in render_mermaid(graph)

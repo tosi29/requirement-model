@@ -1566,12 +1566,15 @@ function collapse(text, limit) {
   return collapsed;
 }
 
-/** `render.py` の `_safe_id()`。Mermaid の識別子として使える形に直す。 */
-function safeId(nodeId) {
-  const body = [...String(nodeId)]
-    .map((char) => (/[\p{L}\p{N}_]/u.test(char) ? char : "_"))
-    .join("");
-  return `n_${body}`;
+/**
+ * `render.py` の `_ids()`。ノード id → Mermaid の識別子 (`n1`, `n2`, …)。
+ *
+ * 元の id から作ると、記号を潰した結果が衝突する (`FR-1` と `FR_1` が同じ
+ * 識別子になり、図の上で 1 ノードに融合する)。描く順の索引で連番を振れば
+ * 衝突は起こり得ず、元の id はラベルに出るので情報も失われない。
+ */
+function exportIds(nodes) {
+  return new Map(nodes.map((node, index) => [node.id, `n${index + 1}`]));
 }
 
 /** `render.py` の `_mermaid_escape()`。 */
@@ -1595,6 +1598,7 @@ export function mermaidText(view, maxLabel = EXPORT_LABEL_LIMIT) {
   const meta = view.data.meta || {};
   const types = meta.types || {};
   const dashed = new Set(meta.dashed_edges || []);
+  const ids = exportIds(view.nodes);
   const lines = ["flowchart TD"];
 
   for (const node of view.nodes) {
@@ -1603,20 +1607,21 @@ export function mermaidText(view, maxLabel = EXPORT_LABEL_LIMIT) {
       `<b>${node.id}</b> [${node.type}]`,
       mermaidEscape(collapse(node.text, maxLabel)),
     ].join("<br/>");
-    lines.push(`    ${safeId(node.id)}${shape.open}"${label}"${shape.close}`);
+    lines.push(`    ${ids.get(node.id)}${shape.open}"${label}"${shape.close}`);
   }
 
   lines.push("");
   for (const edge of view.edges) {
+    if (!ids.has(edge.source) || !ids.has(edge.target)) continue;
     const arrow = dashed.has(edge.name) ? "-.->" : "-->";
-    lines.push(`    ${safeId(edge.source)} ${arrow}|${edge.name}| ${safeId(edge.target)}`);
+    lines.push(`    ${ids.get(edge.source)} ${arrow}|${edge.name}| ${ids.get(edge.target)}`);
   }
 
   lines.push("");
   for (const [type, typeMeta] of Object.entries(types)) {
     lines.push(`    classDef ${type} fill:${typeMeta.fill},stroke:${typeMeta.stroke}`);
   }
-  for (const node of view.nodes) lines.push(`    class ${safeId(node.id)} ${node.type}`);
+  for (const node of view.nodes) lines.push(`    class ${ids.get(node.id)} ${node.type}`);
 
   return lines.join("\n") + "\n";
 }

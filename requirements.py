@@ -509,11 +509,10 @@ fr_svg = FunctionalRequirement(
         "Graphviz が入っていない環境では、その旨を伝えて終了コード 2 で終わる",
     ],
 )
-# → issue #43
 fr_id_collision = FunctionalRequirement(
     id="FR-24",
     text="記号だけが異なる id を持つノードを、図の上でも別のノードとして描き分けること",
-    status="proposed",
+    status="implemented",
     priority=2,
     satisfies=[need_readable],
     has_source=[src_owner],

@@ -1526,14 +1526,15 @@ test("Mermaid は見えているノードとエッジだけを出す", () => {
   types.delete("Source");
   const text = mermaidText(createView(data, { ...allOn(data), types }));
 
+  //: 識別子は描く順の連番 (G-1, N-1, FR-1, QR-1 の 4 件)。
   assert.ok(text.startsWith("flowchart TD\n"));
-  assert.ok(text.includes('n_G_1("<b>G-1</b> [Goal]<br/>経費精算を速くする")'));
-  assert.ok(!text.includes("n_SRC_1("));
+  assert.ok(text.includes('n1("<b>G-1</b> [Goal]<br/>経費精算を速くする")'));
+  assert.ok(!text.includes("SRC-1"));
   assert.ok(!text.includes("has_source"));
-  assert.ok(text.includes("    n_G_1 -->|motivates| n_N_1"));
+  assert.ok(text.includes("    n1 -->|motivates| n2"));
   //: classDef は全型ぶん出す (絞り込みで並びが変わらない)。
   assert.ok(text.includes("    classDef Source fill:#fff,stroke:#000"));
-  assert.ok(!text.includes("    class n_SRC_1 Source"));
+  assert.ok(!/ {4}class n\d+ Source$/m.test(text));
 });
 
 test("Mermaid のラベルは空白を潰して切り詰め、記号を逃がす", () => {
@@ -1553,8 +1554,27 @@ test("破線にするエッジ種別は meta が決める", () => {
   const view = viewOf();
   const text = mermaidText(view);
 
-  assert.ok(text.includes("n_G_1 -.->|has_source| n_SRC_1"));
-  assert.ok(text.includes("n_FR_1 -->|satisfies| n_N_1"));
+  //: G-1 = n1, N-1 = n2, FR-1 = n3, QR-1 = n4, SRC-1 = n5。
+  assert.ok(text.includes("n1 -.->|has_source| n5"));
+  assert.ok(text.includes("n3 -->|satisfies| n2"));
+});
+
+test("記号だけが異なる id でもノードは融合しない", () => {
+  const data = fixture();
+  //: `FR-1` の記号違い。元の id から識別子を作ると両者が同じになる。
+  data.nodes.push({ ...data.nodes[2], id: "FR_1", text: "金額を表示すること" });
+  data.edges.push({ source: "FR_1", name: "satisfies", target: "N-1" });
+  const text = mermaidText(createView(data, allOn(data)));
+
+  const declared = [...text.matchAll(/^ {4}(\w+)\("<b>(.+?)<\/b>/gm)];
+  assert.equal(declared.length, 6);
+  assert.equal(new Set(declared.map(([, id]) => id)).size, 6);
+  //: 2 つの FR が別々の端点から N-1 を指す。
+  const [, dash] = declared.find(([, , nodeId]) => nodeId === "FR-1");
+  const [, under] = declared.find(([, , nodeId]) => nodeId === "FR_1");
+  assert.notEqual(dash, under);
+  assert.ok(text.includes(`    ${dash} -->|satisfies| `));
+  assert.ok(text.includes(`    ${under} -->|satisfies| `));
 });
 
 // --- 書き出し (SVG) ----------------------------------------------------------

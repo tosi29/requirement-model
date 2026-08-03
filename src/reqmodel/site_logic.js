@@ -226,42 +226,17 @@ export function nodeSize(label, fit, measure = estimateTextWidth) {
   };
 }
 
-// --- 優先度 ----------------------------------------------------------------
-//
-// priority は「小さいほど高優先」の整数か null。絞り込みと凡例では、生の数値では
-// なく 3 つの区分に丸めて扱う。しきい値は Python 側 (`HIGH_PRIORITY_THRESHOLD`)
-// から meta 経由で渡ってくるので、ここには焼き込まない。
-
-/** 優先度の区分。並びがそのままチェックボックスの並びになる。 */
-export const PRIORITY_BUCKETS = [
-  { key: "high", label: "高優先" },
-  { key: "normal", label: "その他" },
-  { key: "none", label: "未設定" },
-];
-
-/** 高優先度とみなす境界 (この値以下が高優先)。 */
-function priorityThreshold(data) {
-  const priority = (data.meta || {}).priority;
-  return priority ? priority.threshold : 0;
-}
-
-/** ノードの優先度区分。`PRIORITY_BUCKETS` の key を返す。 */
-export function priorityBucket(data, node) {
-  if (node.priority === null || node.priority === undefined) return "none";
-  return node.priority <= priorityThreshold(data) ? "high" : "normal";
-}
-
 // --- 表示対象 --------------------------------------------------------------
 
 /**
  * 絞り込みを適用した「いま見えているグラフ」。
  *
  * 1 回の再描画につき 1 つ作り、以降の計算はすべてこれを介して行う。
- * state は `{ types: Set<string>, edges: Set<string>, statuses?: Set<string>,
- * priorities?: Set<string> }`。statuses / priorities は省略すると「絞り込み無し」。
+ * state は `{ types: Set<string>, edges: Set<string>, statuses?: Set<string> }`。
+ * statuses は省略すると「絞り込み無し」。
  *
  * エッジは「見えているノード同士」を繋ぐものだけが残る。ノード側の条件が
- * 何であれ (種別・status・優先度) 同じ扱いになるので、絞り込みはそのまま
+ * 何であれ (種別・status) 同じ扱いになるので、絞り込みはそのまま
  * 影響範囲の計算 (`reach()`) にも効く。
  */
 export function createView(data, state) {
@@ -269,8 +244,7 @@ export function createView(data, state) {
   const nodes = data.nodes.filter(
     (node) =>
       state.types.has(node.type) &&
-      (!state.statuses || state.statuses.has(node.status)) &&
-      (!state.priorities || state.priorities.has(priorityBucket(data, node))),
+      (!state.statuses || state.statuses.has(node.status)),
   );
   const shown = new Set(nodes.map((node) => node.id));
   const edges = data.edges.filter(
@@ -322,17 +296,6 @@ export function statusFilters(data) {
     key: status,
     label: status,
     count: counts.get(status) || 0,
-  }));
-}
-
-/** 優先度の選択肢。高優先の表示名にはしきい値を添える。 */
-export function priorityFilters(data) {
-  const counts = countBy(data.nodes, (node) => priorityBucket(data, node));
-  const threshold = priorityThreshold(data);
-  return PRIORITY_BUCKETS.map(({ key, label }) => ({
-    key,
-    label: key === "high" ? `${label} (≤ ${threshold})` : label,
-    count: counts.get(key) || 0,
   }));
 }
 
@@ -517,7 +480,6 @@ export const TABLE_COLUMNS = [
   { key: "type", label: "type" },
   { key: "text", label: "本文" },
   { key: "status", label: "status" },
-  { key: "priority", label: "優先度", numeric: true },
   { key: "criteria", label: "受入基準", numeric: true },
   { key: "findings", label: "指摘", numeric: true },
 ];
@@ -579,14 +541,13 @@ export function tableRows(view, query = "") {
       type: node.type,
       text: node.text,
       status: node.status,
-      priority: node.priority ?? null,
       criteria: (node.acceptance_criteria || []).length,
       findings: counts.get(node.id) || 0,
       severity: worst.has(node.id) ? SEVERITY_ORDER[worst.get(node.id)] : null,
     }));
 }
 
-//: 値を持たない行 (priority 無し等) の並び。向きに関わらず末尾に置く。
+//: 値を持たない行 (status が meta に無い等) の並び。向きに関わらず末尾に置く。
 const MISSING_VALUE = Number.POSITIVE_INFINITY;
 
 /**
@@ -601,8 +562,6 @@ function sortValue(view, row, key) {
       const rank = (view.data.status_rank || {})[row.status];
       return rank === undefined ? MISSING_VALUE : rank;
     }
-    case "priority":
-      return row.priority === null ? MISSING_VALUE : row.priority;
     default:
       return row[key];
   }
@@ -779,7 +738,6 @@ const SET_FILTERS = [
     initial: (data) => initialSelection(data, data.edge_names, "edges"),
   },
   { param: "status", key: "statuses", all: (data) => statusNames(data) },
-  { param: "priority", key: "priorities", all: () => PRIORITY_BUCKETS.map((b) => b.key) },
 ];
 
 /** 軸の初期選択。`initial` を持たない軸は全選択。 */
@@ -1035,9 +993,6 @@ export function sourceItems(data, id) {
 function describe(view, id, inlineSources = true) {
   const node = view.byId.get(id);
   const attrs = [`status=${node.status}`];
-  if (node.priority !== null && node.priority !== undefined) {
-    attrs.push(`priority=${node.priority}`);
-  }
   if (node.type === "Source") attrs.push(`kind=${node.kind}`);
   // decomposition は「子から refines されている Goal」にだけ意味がある。
   // CLI 側と揃えるため、ここだけは絞り込み前の全エッジを見る。
@@ -1193,7 +1148,7 @@ export const bandId = (type) => `band:${type}`;
 /**
  * 図の要素定義。ノードとエッジの全件を一度だけ作る。
  *
- * status と優先度区分をデータに載せておくと、スタイル側は属性セレクタ
+ * status をデータに載せておくと、スタイル側は属性セレクタ
  * (`node[status = "..."]`) で拾える。絞り込みで作り直す必要が無い。
  *
  * meta.bands に挙がった型 (Goal / Need) には帯枠を 1 つずつ足す。compound node
@@ -1218,8 +1173,6 @@ export function graphElements(data, measure = estimateTextWidth) {
           id: node.id,
           type: node.type,
           status: node.status,
-          //: 生の priority ではなく `PRIORITY_BUCKETS` の key。
-          priorityClass: priorityBucket(data, node),
           label,
           w: size.w,
           h: size.h,
@@ -1257,18 +1210,17 @@ export function graphElements(data, measure = estimateTextWidth) {
  * テーマ依存の色 (fg / bg / border / muted) だけ palette で受け取る。
  *
  * Cytoscape のスタイルは **並び順で解決される** (後に置いた規則が勝つ) ので、
- * 4 段に重ねる。この順序が「どの表現がどれを上書きするか」の決定そのもの:
+ * 5 段に重ねる。この順序が「どの表現がどれを上書きするか」の決定そのもの:
  *
  *   1. 基本   … ノード / エッジ共通
  *   2. 型     … 形 (shape) と 色 (background-color / border-color)
  *   3. status … 線種 (border-style) と、その補強の太さ (border-width)
- *   4. 優先度 … 枠の外側の輪 (outline-*)
- *   5. 状態   … 影響範囲の色分けと見せ消し (border-color / border-width / opacity)
- *   6. 検索   … ヒットの暈し (underlay-*)
+ *   4. 状態   … 影響範囲の色分けと見せ消し (border-color / border-width / opacity)
+ *   5. 検索   … ヒットの暈し (underlay-*)
  *
  * 影響範囲のハイライトが奪うのは border-color と border-width だけなので、
- * status の **線種** と高優先度の **輪** は強調中も残る。status を線種だけで
- * 区別できるようにしてあるのは、このためである (`_STATUS_BORDER` を参照)。
+ * status の **線種** は強調中も残る。status を線種だけで区別できるように
+ * してあるのは、このためである (`_STATUS_BORDER` を参照)。
  *
  * 検索ヒットは枠線をまったく使わず、ノードの下に敷く暈し (underlay) で示す。
  * 影響範囲と同時に点いても、どちらが何を言っているか読み分けられる。
@@ -1332,7 +1284,7 @@ export function graphStyle(meta, palette) {
 
   // 2.5. 帯 (枠)。ノード・エッジの下に敷く背面ノードで、型の配色を薄く使う。
   //      events: "no" なのでクリックは素通りし、選択や影響範囲には関わらない。
-  //      status / priorityClass を持たないので 3. 以降の規則には掛からない。
+  //      status を持たないので 3. 以降の規則には掛からない。
   for (const band of meta.bands || []) {
     const typeMeta = meta.types[band.type] || {};
     style.push({
@@ -1371,22 +1323,7 @@ export function graphStyle(meta, palette) {
     });
   }
 
-  // 4. 優先度
-  if (meta.priority) {
-    style.push({
-      selector: 'node[priorityClass = "high"]',
-      //: 枠線から離して描く。verified の太い二重線と地続きに見えないようにするため。
-      style: {
-        "outline-width": 3,
-        "outline-style": "solid",
-        "outline-color": meta.priority.outline,
-        "outline-offset": 3,
-        "outline-opacity": 0.9,
-      },
-    });
-  }
-
-  // 5. 状態
+  // 4. 状態
   style.push(
     { selector: "edge.dashed", style: { "line-style": "dashed" } },
     { selector: ".hidden", style: { display: "none" } },
@@ -1414,7 +1351,7 @@ export function graphStyle(meta, palette) {
     },
   );
 
-  // 6. 検索
+  // 5. 検索
   if (meta.search) {
     style.push(
       {
@@ -1481,22 +1418,6 @@ export function legendGroups(meta) {
     });
   }
 
-  if (meta.priority) {
-    groups.push({
-      title: "優先度",
-      items: [
-        {
-          label: `高優先 (≤ ${meta.priority.threshold})`,
-          swatch: {
-            background: "transparent",
-            borderColor: meta.priority.outline,
-            borderStyle: "solid",
-            borderWidth: 2,
-          },
-        },
-      ],
-    });
-  }
   return groups;
 }
 
@@ -1814,8 +1735,6 @@ const SVG_CUT_RATIO = 0.16;
 //: 角の丸め (round-rectangle) と、樽の膨らみ (barrel) の代わりの丸め。
 const SVG_CORNER = 8;
 const SVG_BARREL_RATIO = 0.3;
-//: 高優先度の輪を、枠線からどれだけ外に出すか。
-const SVG_OUTLINE_GAP = 6;
 
 //: status の線種 → SVG の stroke-dasharray。二重線 (verified) は SVG に無いので
 //: 実線で近似する (太さは meta の border_width が残るので区別は付く)。
@@ -1896,7 +1815,7 @@ function labelElement(label, x, y, { size = LABEL_FONT.size, fill, weight } = {}
  *
  * scene は表示層 (`site_app.js`) が Cytoscape から集めた実測値:
  *
- * - `nodes`: `{ id, type, status, priorityClass, label, x, y, w, h }`
+ * - `nodes`: `{ id, type, status, label, x, y, w, h }`
  * - `edges`: `{ name, dashed, x1, y1, x2, y2 }` (端点はノードの縁の座標)
  * - `bands`: `{ type, label, x, y, w, h }` (Goal / Need の帯枠)
  * - `meta`: `render_meta()` の内容、`palette`: テーマ依存の色
@@ -1996,20 +1915,6 @@ export function graphSvg(scene) {
   for (const node of nodes) {
     const typeMeta = types[node.type] || {};
     const statusMeta = statuses[node.status] || {};
-    if (node.priorityClass === "high" && meta.priority) {
-      body.push(
-        shapeElement(
-          typeMeta.shape,
-          {
-            x: node.x,
-            y: node.y,
-            w: node.w + SVG_OUTLINE_GAP * 2,
-            h: node.h + SVG_OUTLINE_GAP * 2,
-          },
-          { fill: "none", stroke: meta.priority.outline, "stroke-width": 3 },
-        ),
-      );
-    }
     body.push(
       shapeElement(typeMeta.shape, node, {
         fill: typeMeta.fill || "#ffffff",

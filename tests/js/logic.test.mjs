@@ -7,7 +7,6 @@ import {
   FOCUS_DEPTHS,
   LABEL_FONT,
   LABEL_WRAP_WIDTH,
-  PRIORITY_BUCKETS,
   TABLE_COLUMNS,
   ALL_SEVERITIES,
   activeEdgeNames,
@@ -42,8 +41,6 @@ import {
   nodeContext,
   nodeSize,
   normalizeTheme,
-  priorityBucket,
-  priorityFilters,
   reach,
   related,
   searchHits,
@@ -102,31 +99,18 @@ test("status を外すと、そのノードとそこに繋がるエッジが消�
   );
 });
 
-test("優先度の区分を外すと、その区分のノードが消える", () => {
-  const data = fixture();
-  const priorities = new Set(["high"]); // priority <= 2 の G-1 / FR-1 だけ残る
-  const view = createView(data, { ...allOn(data), priorities });
-
-  assert.deepEqual(
-    view.nodes.map((n) => n.id),
-    ["G-1", "FR-1"],
-  );
-  // 端点が消えたので、両者を繋がないエッジは 1 本も残らない。
-  assert.equal(view.edges.length, 0);
-});
-
-test("status / 優先度の絞り込みは影響範囲の計算にも効く", () => {
+test("status の絞り込みは影響範囲の計算にも効く", () => {
   const data = fixture();
   const all = createView(data, allOn(data));
   assert.ok(reach(all, "QR-1", true).has("N-1")); // QR-1 → FR-1 → N-1
 
-  // 中継点の FR-1 (proposed かつ high) を落とすと、その先へは辿れなくなる。
+  // 中継点の FR-1 (proposed) を落とすと、その先へは辿れなくなる。
   const statuses = new Set(["approved", "verified", "implemented"]);
   const view = createView(data, { ...allOn(data), statuses });
   assert.equal(reach(view, "QR-1", true).size, 0);
 });
 
-test("statuses / priorities を渡さない state は絞り込み無し扱い", () => {
+test("statuses を渡さない state は絞り込み無し扱い", () => {
   const data = fixture();
   const view = createView(data, {
     types: new Set(data.types),
@@ -389,16 +373,7 @@ test("FOCUS_DEPTHS は 0 (フォーカス無し) を選択肢に含めない", (
   assert.ok(FOCUS_DEPTHS.every((depth) => Number.isInteger(depth) && depth > 0));
 });
 
-// --- status / 優先度 --------------------------------------------------------
-
-test("priorityBucket はしきい値で高優先とその他を分け、null は未設定にする", () => {
-  const data = fixture(); // meta.priority.threshold === 2
-  assert.equal(priorityBucket(data, { priority: 0 }), "high");
-  assert.equal(priorityBucket(data, { priority: 2 }), "high");
-  assert.equal(priorityBucket(data, { priority: 3 }), "normal");
-  assert.equal(priorityBucket(data, { priority: null }), "none");
-  assert.equal(priorityBucket(data, {}), "none");
-});
+// --- status ----------------------------------------------------------------
 
 test("statusFilters は成熟度の順に、絞り込み前の件数を添えて返す", () => {
   assert.deepEqual(statusFilters(fixture()), [
@@ -407,20 +382,6 @@ test("statusFilters は成熟度の順に、絞り込み前の件数を添えて
     { key: "implemented", label: "implemented", count: 0 },
     { key: "verified", label: "verified", count: 0 },
   ]);
-});
-
-test("priorityFilters は区分ごとの件数を返し、高優先にはしきい値を添える", () => {
-  assert.deepEqual(priorityFilters(fixture()), [
-    { key: "high", label: "高優先 (≤ 2)", count: 2 },
-    { key: "normal", label: "その他", count: 0 },
-    { key: "none", label: "未設定", count: 3 },
-  ]);
-});
-
-test("PRIORITY_BUCKETS は絞り込みの全区分を覆う", () => {
-  const data = fixture();
-  const keys = new Set(PRIORITY_BUCKETS.map((bucket) => bucket.key));
-  for (const node of data.nodes) assert.ok(keys.has(priorityBucket(data, node)));
 });
 
 // --- ラベル整形 ------------------------------------------------------------
@@ -537,7 +498,6 @@ test("tableRows は 1 ノード 1 行にし、受け入れ基準と指摘を数�
     type: "FunctionalRequirement",
     text: "領収書画像から金額を抽出すること",
     status: "proposed",
-    priority: 2,
     criteria: 1,
     findings: 1,
     severity: "info",
@@ -636,8 +596,16 @@ test("status は成熟度の順に並ぶ (辞書順ではない)", () => {
 });
 
 test("値の無い行は向きに関わらず末尾に置く", () => {
-  assert.deepEqual(idsSortedBy("priority", true), ["G-1", "FR-1", "N-1", "QR-1", "SRC-1"]);
-  assert.deepEqual(idsSortedBy("priority", false), ["FR-1", "G-1", "N-1", "QR-1", "SRC-1"]);
+  //: 成熟度 (status_rank) に無い status は「値が無い」扱い。
+  //: statuses を渡さない (絞り込み無しの) state でないと、その行自体が消える。
+  const data = fixture();
+  data.nodes.find((node) => node.id === "N-1").status = "unknown";
+  const view = createView(data, { ...allOn(data), statuses: null });
+  const sorted = (asc) =>
+    sortRows(view, tableRows(view), { key: "status", asc }).map((row) => row.id);
+
+  assert.deepEqual(sorted(true), ["FR-1", "QR-1", "SRC-1", "G-1", "N-1"]);
+  assert.deepEqual(sorted(false), ["G-1", "FR-1", "QR-1", "SRC-1", "N-1"]);
 });
 
 test("指摘の多い順に並べられる", () => {
@@ -682,7 +650,7 @@ test("知らない列を押しても並び順は変わらない", () => {
 test("列の定義には issue の求める項目が揃っている", () => {
   assert.deepEqual(
     TABLE_COLUMNS.map((column) => column.key),
-    ["id", "type", "text", "status", "priority", "criteria", "findings"],
+    ["id", "type", "text", "status", "criteria", "findings"],
   );
 });
 
@@ -707,13 +675,10 @@ test("選択・種別の絞り込み・方向がハッシュに載る", () => {
   );
 });
 
-test("status と優先度の絞り込みも載る", () => {
+test("status の絞り込みも載る", () => {
   assert.equal(
-    hashOf({
-      statuses: new Set(["approved", "proposed"]),
-      priorities: new Set(["high"]),
-    }),
-    "#status=proposed,approved&priority=high",
+    hashOf({ statuses: new Set(["approved", "proposed"]) }),
+    "#status=proposed,approved",
   );
 });
 
@@ -760,7 +725,6 @@ test("状態 → ハッシュ → 状態で元に戻る", () => {
     types: new Set(["Goal", "FunctionalRequirement"]),
     edges: new Set(["satisfies", "qualifies"]),
     statuses: new Set(["approved"]),
-    priorities: new Set(["high", "none"]),
     selected: "FR-1",
     direction: "LR",
     mode: "table",
@@ -768,7 +732,7 @@ test("状態 → ハッシュ → 状態で元に戻る", () => {
     focus: 2,
     depth: 3,
     undirected: true,
-    sort: { key: "priority", asc: false },
+    sort: { key: "criteria", asc: false },
   };
 
   assert.deepEqual(decodeHash(encodeHash(state, data), data), state);
@@ -778,7 +742,7 @@ test("ハッシュ → 状態 → ハッシュでも元に戻る", () => {
   const data = fixture();
   const hash =
     "#node=QR-1&types=Goal,QualityRequirement&edges=qualifies&status=proposed" +
-    "&priority=high,normal&dir=LR&view=table&focus=1&depth=2&undir=1" +
+    "&dir=LR&view=table&focus=1&depth=2&undir=1" +
     `&q=${encodeURIComponent("3 秒")}&sort=criteria:desc`;
 
   assert.equal(encodeHash(decodeHash(hash, data), data), hash);
@@ -786,8 +750,8 @@ test("ハッシュ → 状態 → ハッシュでも元に戻る", () => {
 
 test("絞り込みの軸を持たない state は、その軸を書かない", () => {
   const data = fixture();
-  //: createView() が statuses / priorities 省略を「絞り込み無し」と見るのに合わせる。
-  const state = { ...defaultState(data), statuses: undefined, priorities: undefined };
+  //: createView() が statuses 省略を「絞り込み無し」と見るのに合わせる。
+  const state = { ...defaultState(data), statuses: undefined };
 
   assert.equal(encodeHash(state, data), "");
 });
@@ -806,7 +770,6 @@ test("知らない種別は落とし、知っているものだけを選ぶ", ()
   assert.deepEqual([...stateOf("#types=Goal,Nope").types], ["Goal"]);
   assert.deepEqual([...stateOf("#edges=nope").edges], []);
   assert.deepEqual([...stateOf("#status=approved,nope").statuses], ["approved"]);
-  assert.deepEqual([...stateOf("#priority=high,nope").priorities], ["high"]);
 });
 
 test("何も選んでいない絞り込みも URL に出せる", () => {
@@ -862,10 +825,10 @@ test("nodeContext は対象・上流・下流・エッジを並べる", () => {
   assert.ok(text.endsWith("\n"));
 });
 
-test("nodeContext は priority / kind / decomposition を属性行に出す", () => {
+test("nodeContext は kind / decomposition を属性行に出す", () => {
   const text = nodeContext(viewOf(), "G-1");
 
-  assert.match(text, /- \[Goal\] G-1: .*\n {4}\(status=approved, priority=1\)/);
+  assert.match(text, /- \[Goal\] G-1: .*\n {4}\(status=approved\)/);
   assert.match(text, /- \[Source\] SRC-1: .*\n {4}\(status=proposed, kind=stakeholder\)/);
   // G-1 は誰からも refines されていないので decomposition は出ない。
   assert.ok(!text.includes("decomposition="));
@@ -878,7 +841,6 @@ test("子から refines されている Goal にだけ decomposition が付く",
     id: "G-2",
     text: "承認を速くする",
     status: "proposed",
-    priority: null,
     has_source: [],
     decomposition: "AND",
     refines: ["G-1"],
@@ -887,7 +849,7 @@ test("子から refines されている Goal にだけ decomposition が付く",
   data.edges.push({ source: "G-2", name: "refines", target: "G-1" });
   const view = createView(data, allOn(data));
 
-  assert.match(nodeContext(view, "G-2"), /G-1: .*\n {4}\(status=approved, priority=1, decomposition=AND\)/);
+  assert.match(nodeContext(view, "G-2"), /G-1: .*\n {4}\(status=approved, decomposition=AND\)/);
 });
 
 test("エッジを絞ると nodeContext にフィルタ行が出る", () => {
@@ -1053,9 +1015,9 @@ test("検索ヒットは枠線を使わず暈し (underlay) で示す", () => {
   const hit = style.find((rule) => rule.selector === "node.hit");
 
   assert.equal(hit.style["underlay-color"], meta.search.hit);
-  //: 影響範囲 (枠線) と優先度 (輪) のどちらとも property が衝突しない。
+  //: 影響範囲 (枠線) と property が衝突しない。
   for (const key of Object.keys(hit.style)) {
-    assert.ok(!key.startsWith("border-") && !key.startsWith("outline-"), key);
+    assert.ok(!key.startsWith("border-"), key);
   }
   //: 検索の規則は影響範囲より後ろ = 減光より後に置く (dim でも暈しが残る)。
   assert.ok(
@@ -1072,17 +1034,15 @@ test("無向で辿ったノードは関連の色で塗る", () => {
   assert.equal(rel.style["border-color"], meta.impact_colors.related);
 });
 
-test("graphElements は status と優先度区分をデータに載せる", () => {
+test("graphElements は status をデータに載せる", () => {
   const elements = graphElements(fixture());
 
   assert.equal(elements[0].data.status, "approved"); // G-1
-  assert.equal(elements[0].data.priorityClass, "high"); // priority = 1
   assert.equal(elements[1].data.status, "approved"); // N-1
-  assert.equal(elements[1].data.priorityClass, "none"); // priority 無し
-  assert.equal(elements[3].data.priorityClass, "none"); // QR-1
+  assert.equal(elements[2].data.status, "proposed"); // FR-1
 });
 
-test("graphStyle は status を線種に、高優先度を outline に写す", () => {
+test("graphStyle は status を線種に写す", () => {
   const style = graphStyle(fixture().meta, {
     fg: "#111",
     bg: "#fff",
@@ -1103,10 +1063,6 @@ test("graphStyle は status を線種に、高優先度を outline に写す", (
       ],
   );
   assert.equal(new Set(lines).size, lines.length);
-
-  const high = style.find((rule) => rule.selector === 'node[priorityClass = "high"]');
-  assert.equal(high.style["outline-color"], "#f9ab00");
-  assert.ok(high.style["outline-width"] > 0);
 });
 
 test("影響範囲の規則は型・status より後に置かれる (後勝ちなので上書きできる)", () => {
@@ -1120,23 +1076,21 @@ test("影響範囲の規則は型・status より後に置かれる (後勝ち�
 
   assert.ok(at('node[type = "Goal"]') < at('node[status = "proposed"]'));
   assert.ok(at('node[status = "proposed"]') < at("node.sel"));
-  assert.ok(at('node[priorityClass = "high"]') < at("node.sel"));
   assert.ok(at("node.sel") < at("node.up") && at("node.up") < at("node.down"));
 
-  // 影響範囲が奪うのは色と太さだけ。線種と outline は強調中も残る。
+  // 影響範囲が奪うのは色と太さだけ。線種は強調中も残る。
   for (const selector of ["node.sel", "node.up", "node.down"]) {
     const keys = Object.keys(style.find((rule) => rule.selector === selector).style);
     assert.ok(!keys.includes("border-style"));
-    assert.ok(!keys.some((key) => key.startsWith("outline-")));
   }
 });
 
-test("legendGroups は実際のスタイル (配色・線種・輪) から凡例を作る", () => {
+test("legendGroups は実際のスタイル (配色・線種) から凡例を作る", () => {
   const groups = legendGroups(fixture().meta);
 
   assert.deepEqual(
     groups.map((group) => group.title),
-    ["種別", "status", "優先度"],
+    ["種別", "status"],
   );
   assert.equal(groups[0].items.length, fixture().types.length);
 
@@ -1149,12 +1103,9 @@ test("legendGroups は実際のスタイル (配色・線種・輪) から凡例
   // 見本は小さいので、太い枠は頭打ちにする (double の 4px はそのままでは潰れる)。
   assert.equal(statuses.items[3].swatch.borderStyle, "double");
   assert.equal(statuses.items[3].swatch.borderWidth, 3);
-
-  assert.equal(groups[2].items[0].label, "高優先 (≤ 2)");
-  assert.equal(groups[2].items[0].swatch.borderColor, "#f9ab00");
 });
 
-test("status / 優先度の定義が無い meta でも凡例と描画は壊れない", () => {
+test("status の定義が無い meta でも凡例と描画は壊れない", () => {
   const meta = { types: fixture().meta.types, impact_colors: {} };
   const style = graphStyle(meta, { fg: "#111", bg: "#fff", border: "#ddd", muted: "#666" });
 
@@ -1444,13 +1395,12 @@ test("源泉を持たないノードでは空になる", () => {
 test("引用は part_of の鎖を親から順に持つ", () => {
   const data = fixture();
   data.nodes.push(
-    { type: "Source", id: "SRC-DOC", text: "経費精算規程", status: "approved", priority: null, kind: "document" },
+    { type: "Source", id: "SRC-DOC", text: "経費精算規程", status: "approved", kind: "document" },
     {
       type: "Source",
       id: "SRC-DOC-A12",
       text: "領収書の添付を要する",
       status: "approved",
-      priority: null,
       kind: "document",
       locator: "第12条第3項",
     },
@@ -1661,7 +1611,6 @@ const scene = (overrides = {}) => ({
       id: "G-1",
       type: "Goal",
       status: "approved",
-      priorityClass: "high",
       label: "G-1\n経費精算",
       x: 0,
       y: 0,
@@ -1672,7 +1621,6 @@ const scene = (overrides = {}) => ({
       id: "N-1",
       type: "Need",
       status: "proposed",
-      priorityClass: "none",
       label: "N-1\n撮影するだけ",
       x: 0,
       y: 120,
@@ -1705,9 +1653,6 @@ test("SVG にはノードのラベル・配色・エッジ名が入る", () => {
   //: 型の配色 (meta.types) と status の線種 (meta.statuses) が効く。
   assert.equal(svg.match(/fill="#fff"/g).length >= 2, true);
   assert.ok(svg.includes('stroke-dasharray="1 3"')); // proposed = 点線
-  //: 高優先度は輪 (もう 1 つ大きい同じ形) で示す。
-  assert.equal(svg.match(/<ellipse /g).length, 3);
-  assert.ok(svg.includes('stroke="#f9ab00"'));
 });
 
 test("ノードが 1 つも無くても SVG は壊れない", () => {

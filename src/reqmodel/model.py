@@ -48,7 +48,6 @@ __all__ = [
     "GRAPH_EDGE_NAMES",
     "edge_specs_for",
     "STATUS_RANK",
-    "HIGH_PRIORITY_THRESHOLD",
 ]
 
 
@@ -65,9 +64,6 @@ STATUS_RANK: dict[str, int] = {
     "implemented": 2,
     "verified": 3,
 }
-
-#: priority は「小さいほど高優先」。この値以下を高優先度として扱う。
-HIGH_PRIORITY_THRESHOLD = 2
 
 #: 指摘の抑制 1 件。(チェックコード, 理由)。理由は必須 (下の validator を参照)。
 Waiver = tuple[str, str]
@@ -112,7 +108,6 @@ class Node(BaseModel):
     id: str
     text: str
     status: Status = "proposed"
-    priority: int | None = None
     #: 既知・意図的な指摘を黙らせる waiver。``[("structure.missing_source", "理由")]``
     #: の形で、コードと理由の組を並べる。理由の無い抑制は書けない。
     suppress: list[Waiver] = []

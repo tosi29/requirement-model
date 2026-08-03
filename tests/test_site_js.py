@@ -24,9 +24,9 @@ import pytest
 from reqmodel.application.explain import explain_text
 from reqmodel.findings import FindingList
 from reqmodel.application.loader import load_paths
-from reqmodel.model import EDGE_NAMES
-from reqmodel.render import render_mermaid
-from reqmodel.site import site_data
+from reqmodel.core.metamodel import EDGE_NAMES
+from reqmodel.presentation.render import render_mermaid
+from reqmodel.presentation.site import site_data
 
 ROOT = Path(__file__).resolve().parents[1]
 JS_TESTS = ROOT / "tests" / "js"

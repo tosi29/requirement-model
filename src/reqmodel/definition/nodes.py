@@ -36,13 +36,7 @@ __all__ = [
     "QR",
     "Ref",
     "Status",
-    "EdgeSpec",
     "Waiver",
-    "NODE_TYPES",
-    "TYPE_ORDER",
-    "SOURCE_EDGES",
-    "GRAPH_EDGE_NAMES",
-    "edge_specs_for",
     "STATUS_RANK",
 ]
 

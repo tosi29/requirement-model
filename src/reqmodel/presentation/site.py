@@ -19,14 +19,10 @@ from typing import Any, Sequence
 
 from ..findings import FindingList
 from ..core.graph import RequirementGraph
-from ..model import (
-    EDGE_NAMES,
-    SOURCE_EDGES,
-    STATUS_RANK,
-    TYPE_ORDER,
-    Source,
-    edge_specs_for,
-)
+from ..core.metamodel import EDGE_NAMES, TYPE_ORDER, edge_specs_for
+from ..core.projection import SOURCE_EDGE_NAMES
+from ..definition import Source
+from ..definition.nodes import STATUS_RANK
 from .render import render_dot, render_meta, render_mermaid
 
 __all__ = [
@@ -125,7 +121,7 @@ def site_data(
         # CLI の既定 (req graph / req explain) と揃うように Python から渡す。
         "hidden_by_default": {
             "types": [Source.__name__],
-            "edges": sorted(SOURCE_EDGES),
+            "edges": sorted(SOURCE_EDGE_NAMES),
         },
         # status の成熟度。テーブルビューの status 列をこの順で並べる
         # (辞書順に並べても意味が無いので、順序は Python 側を唯一の出典とする)。

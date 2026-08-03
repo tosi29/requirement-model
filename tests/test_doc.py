@@ -17,7 +17,7 @@ from reqmodel.application.doc import (
     render_matrices_markdown,
     render_spec,
 )
-from reqmodel.model import FunctionalRequirement, Need, Source
+from reqmodel.definition import FunctionalRequirement, Need, Source
 
 
 def sample():

@@ -31,7 +31,7 @@ README の[可視化](../../README.md#可視化)が「何ができるか」を�
 自己完結のサイトになる (Pages のワークフローはこの方式で公開する)。
 同梱するのはこの 2 ファイル (計 480KB 程度) だけでよい。dagre は
 `cytoscape-dagre` に同梱されている。URL とファイル名は
-`reqmodel.site.SITE_ASSETS` を唯一の出典とする。
+`reqmodel.presentation.site.SITE_ASSETS` を唯一の出典とする。
 
 ## 大きいグラフでの表示戦略 (フォーカス)
 

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from reqmodel.cli import main
-from reqmodel.graph import SCHEMA_VERSION
+from reqmodel.core.graph import SCHEMA_VERSION
 
 SAMPLE = str(Path(__file__).resolve().parents[1] / "examples" / "sample.py")
 HEADER = "from reqmodel import Need\n"

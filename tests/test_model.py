@@ -6,7 +6,8 @@ import pytest
 from pydantic import ValidationError
 
 from conftest import fr, need, source
-from reqmodel.model import (
+from reqmodel.core.metamodel import edge_specs_for
+from reqmodel.definition import (
     Constraint,
     FunctionalRequirement,
     Goal,
@@ -14,7 +15,6 @@ from reqmodel.model import (
     QualityRequirement,
     Source,
     System,
-    edge_specs_for,
 )
 
 
@@ -113,11 +113,8 @@ def test_public_definition_package_has_no_internal_dependencies():
         ), path
 
 
-def test_new_package_api_and_legacy_root_api_are_identical():
+def test_definition_types_are_exposed_by_the_public_root_api():
     from reqmodel import Goal as RootGoal
     from reqmodel.definition import Goal as DefinitionGoal
-    from reqmodel.core.graph import RequirementGraph as CoreGraph
-    from reqmodel.graph import RequirementGraph as LegacyGraph
 
     assert RootGoal is DefinitionGoal
-    assert CoreGraph is LegacyGraph

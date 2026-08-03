@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from reqmodel.codes import CHECK_CODES, SUPPRESSIBLE_CODES
 from reqmodel.findings import Finding, FindingList
-from reqmodel.model import Need
+from reqmodel.definition import Need
 from reqmodel.application.validate import validate_semantics_lexical, validate_structure
 from reqmodel.application.waivers import apply_waivers
 

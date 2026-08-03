@@ -228,7 +228,7 @@ id 文字列に潰れる。エッジ属性の導入は `_analyze()`・グラフ�
 ## Source を図に描かない
 
 `Source` はノード型として残しつつ、**図には描かない**ことにした
-(`model.SOURCE_EDGES`)。`req graph` / `req explain` / 静的サイトの図のいずれも既定で
+(`core.projection.SOURCE_EDGE_NAMES`)。`req graph` / `req explain` / 静的サイトの図のいずれも既定で
 源泉を落とし、源泉は参照元ノードの属性として出す。`--with-sources` で従来の描画に
 戻せる。
 

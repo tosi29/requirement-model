@@ -442,7 +442,7 @@ function renderDetail() {
     rows.push("</ul>");
   }
 
-  //: 源泉は図に描かない (`model.SOURCE_EDGES`) ので、ここが唯一の出口になる。
+  //: 源泉は図に描かない (`core.projection.SOURCE_EDGE_NAMES`) ので、ここが唯一の出口になる。
   //: 絞り込みで Source を消していても読めるよう、view ではなく DATA から引く。
   //: 飛び先にはしない。図に居ないノードへ飛ばすと選択が外れるだけになる。
   const sources = sourceItems(DATA, node.id);

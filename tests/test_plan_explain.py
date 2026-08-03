@@ -10,7 +10,7 @@ from conftest import build, fr, goal, need, qr, source
 from reqmodel.application.explain import explain_text, impact_set, source_label
 from reqmodel.application.loader import load_paths
 from reqmodel.application.plan import diff_graphs, format_plan, load_revision
-from reqmodel.render import render_dot, render_mermaid
+from reqmodel.presentation.render import render_dot, render_mermaid
 
 HEADER = "from reqmodel import Goal, Need, FunctionalRequirement, Source\n"
 

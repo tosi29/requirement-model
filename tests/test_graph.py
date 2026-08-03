@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from conftest import build, fr, goal, need, qr, source, system
-from reqmodel.graph import RequirementGraph
+from reqmodel.core.graph import RequirementGraph
 
 
 def chain():

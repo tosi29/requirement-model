@@ -10,7 +10,7 @@ from typing import Iterable, Sequence
 
 from ..core.graph import RequirementGraph
 from ..core.metamodel import edge_specs_for
-from ..core.projection import GRAPH_EDGE_NAMES, SOURCE_EDGES
+from ..core.projection import DEFAULT_GRAPH_EDGE_NAMES, SOURCE_EDGE_NAMES
 from ..definition import Source
 
 __all__ = ["impact_set", "explain_text", "source_label", "subgraph_edges", "traversed_edges"]
@@ -22,13 +22,13 @@ def traversed_edges(
     """実際に辿るエッジ種別。``None`` は「全種別」。
 
     ``edge_names`` (``--edges``) は書き手の明示指定なのでそのまま通す。指定が
-    無いときだけ、源泉エッジを既定で外す (理由は ``model.SOURCE_EDGES``)。
+    無いときだけ、源泉エッジを既定で外す (理由は ``core.projection.SOURCE_EDGE_NAMES``)。
     源泉を辿らなければ Source ノードは要求から到達できなくなるので、
     ノード側を落とす処理は要らない。
     """
     if edge_names is not None:
         return list(edge_names)
-    return None if include_sources else list(GRAPH_EDGE_NAMES)
+    return None if include_sources else list(DEFAULT_GRAPH_EDGE_NAMES)
 
 
 def impact_set(
@@ -76,7 +76,7 @@ def subgraph_edges(graph: RequirementGraph, node_ids: set[str]) -> list:
 def source_label(graph: RequirementGraph, source_id: str) -> str:
     """源泉 1 件の表示。``SRC-A (本文) [位置] < 親の源泉`` の形。
 
-    源泉はノードとして図に出さないので (``model.SOURCE_EDGES``)、引用元を辿る
+    源泉はノードとして図に出さないので (``core.projection.SOURCE_EDGE_NAMES``)、引用元を辿る
     ``part_of`` の鎖もここで畳んで 1 行に収める。閉路があっても止まるように
     通過済みを持つ (``structure.part_of_cycle`` が別途エラーにする)。
     """
@@ -164,7 +164,7 @@ def explain_text(
         lines.append("エッジ種別フィルタ: " + ", ".join(edge_names))
     elif not include_sources:
         lines.append(
-            "源泉エッジ (" + ", ".join(sorted(SOURCE_EDGES)) + ") は辿っていない。"
+            "源泉エッジ (" + ", ".join(sorted(SOURCE_EDGE_NAMES)) + ") は辿っていない。"
             "源泉は各ノードの「源泉:」行に畳んである"
         )
     if depth is not None:
@@ -200,7 +200,7 @@ def explain_text(
     #: 既定で外した源泉エッジは「現れなかった」に混ぜない。除外は上で明記して
     #: あり、両方に出すと「モデルに無い」のか「辿っていない」のか読み分けられない。
     #: --edges で明示されたときは書き手の指定なので、この畳み込みはしない。
-    hidden = frozenset() if (include_sources or edge_names is not None) else SOURCE_EDGES
+    hidden = frozenset() if (include_sources or edge_names is not None) else SOURCE_EDGE_NAMES
     unused = [
         name
         for name in _all_edge_names(graph)

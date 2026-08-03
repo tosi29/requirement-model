@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Iterable
-
-from typing import Any
+from typing import Any, Iterable
 
 from ..core.graph import Edge, RequirementGraph
-from ..model import (
-    SOURCE_EDGES,
-    STATUS_RANK,
-    TYPE_ORDER,
+from ..core.metamodel import TYPE_ORDER
+from ..core.projection import SOURCE_EDGE_NAMES
+from ..definition import (
     Constraint,
     FunctionalRequirement,
     Goal,
@@ -20,6 +17,7 @@ from ..model import (
     Source,
     System,
 )
+from ..definition.nodes import STATUS_RANK
 
 __all__ = ["render_mermaid", "render_dot", "render_meta", "FORMATS"]
 
@@ -60,7 +58,7 @@ def _drawn(
 ) -> tuple[list[Node], list[Edge]]:
     """図に出すノードとエッジ。
 
-    既定では Source ノードと源泉エッジを落とす (理由は ``model.SOURCE_EDGES``)。
+    既定では Source ノードと源泉エッジを落とす (理由は ``core.projection.SOURCE_EDGE_NAMES``)。
     識別子はここで残ったノードに振るので、除外しても連番に穴は空かない。
     """
     nodes = graph.ordered_nodes()
@@ -68,7 +66,7 @@ def _drawn(
     if include_sources:
         return nodes, edges
     nodes = [node for node in nodes if not isinstance(node, Source)]
-    return nodes, [edge for edge in edges if edge.name not in SOURCE_EDGES]
+    return nodes, [edge for edge in edges if edge.name not in SOURCE_EDGE_NAMES]
 
 
 def _mermaid_shape(node: Node) -> tuple[str, str]:

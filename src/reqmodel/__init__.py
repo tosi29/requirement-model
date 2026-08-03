@@ -13,9 +13,9 @@
 from __future__ import annotations
 
 from .findings import Finding, FindingList, Severity
-from .graph import Edge, RequirementGraph
+from .core.graph import Edge, RequirementGraph
 from .application.loader import LoadResult, load_paths, load_sources
-from .model import (
+from .definition import (
     FR,
     QR,
     Constraint,

@@ -9,9 +9,9 @@ from pathlib import Path
 from conftest import build, fr, goal, need, qr, source
 from reqmodel.cli import main
 from reqmodel.findings import FindingList
-from reqmodel.model import STATUS_RANK
-from reqmodel.render import render_meta
-from reqmodel.site import (
+from reqmodel.definition.nodes import STATUS_RANK
+from reqmodel.presentation.render import render_meta
+from reqmodel.presentation.site import (
     DEFAULT_REF,
     SITE_ASSETS,
     SITE_SCRIPTS,

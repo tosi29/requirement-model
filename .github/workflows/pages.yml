@@ -64,7 +64,7 @@ jobs:
         # ファイル名と URL (バージョン込み) は reqmodel 側の定義を唯一の出典とする。
         # 参照は相対パスなので、ページを置いたディレクトリごとに要る。
         run: |
-          python -c "from reqmodel.site import SITE_ASSETS
+          python -c "from reqmodel.presentation.site import SITE_ASSETS
           print('\n'.join(f'{a.file} {a.url}' for a in SITE_ASSETS))" |
           while read -r file url; do
             curl -fsSL --retry 3 -o "site/$file" "$url"

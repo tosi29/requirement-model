@@ -827,11 +827,9 @@ skip されるので、CI では `.github/workflows/ci.yml` が node を明示�
 - `reqmodel.presentation`: Mermaid / DOT、描画スタイル、静的サイト
 
 CLI は引数解析と入出力を担当し、`application → core → definition` の向きでユースケースを
-Python API として再利用できる。`presentation` も `core` を利用する。従来の `reqmodel.model`、
-`reqmodel.graph`、`reqmodel.render`、`reqmodel.site` に加え、`reqmodel.loader`、
-`reqmodel.validate`、`reqmodel.waivers`、`reqmodel.explain`、`reqmodel.plan`、
-`reqmodel.doc`、`reqmodel.stats` は互換 import のために残している。
-ルートからの `from reqmodel import Goal, Need, FR, QR` も引き続き利用できる。
+Python API として再利用できる。`presentation` も `core` を利用する。各責務の API は
+これらの正規サブパッケージから import する。要求定義向けの
+`from reqmodel import Goal, Need, FR, QR` はトップレベルの公開 API である。
 
 ## 設計判断の記録
 

@@ -32,8 +32,8 @@ from .core.graph import RequirementGraph
 from .application.loader import LoadResult, discover_paths, load_paths
 from .core.metamodel import EDGE_NAMES
 from .application.plan import diff_graphs, format_plan, load_revision
-from .render import FORMATS, render
-from .site import (
+from .presentation.render import FORMATS, render
+from .presentation.site import (
     DEFAULT_REF,
     DEFAULT_TITLE,
     SITE_ASSETS,

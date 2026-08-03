@@ -19,7 +19,3 @@ SOURCE_EDGE_NAMES: frozenset[str] = frozenset({"has_source", "part_of"})
 DEFAULT_GRAPH_EDGE_NAMES: tuple[str, ...] = tuple(
     name for name in EDGE_NAMES if name not in SOURCE_EDGE_NAMES
 )
-
-# Backwards-compatible names.
-SOURCE_EDGES = SOURCE_EDGE_NAMES
-GRAPH_EDGE_NAMES = DEFAULT_GRAPH_EDGE_NAMES

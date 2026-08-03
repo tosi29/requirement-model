@@ -22,6 +22,7 @@
 ## GitHub でのコミュニケーション
 
 GitHub Issue や Pull Request の作成、およびそれらへのコメントは日本語で行う。
+GitHub Issue に対応する Pull Request を作成するときは、Issue との関連付けとマージ時の自動クローズのため、本文に `Closes #<Issue番号>` を記載する。
 
 ## アーキテクチャ境界
 

@@ -139,9 +139,12 @@ fr_ocr = FunctionalRequirement(
 fr_short_form = FunctionalRequirement(
     id="FR-2",
     text="申請フォームの必須入力項目を 3 項目以下とすること",
-    status="approved",
+    status="verified",
     satisfies=[need_photo_only],
     has_source=[src_employee],
+    evidence=[
+        "受入テスト第 3 回 (2026-02-18) で新規申請画面の必須項目を数え、3 項目だった",
+    ],
     acceptance_criteria=[
         "新規申請画面の必須項目数が 3 以下である",
     ],
@@ -198,9 +201,12 @@ fr_autofill = FunctionalRequirement(
 qr_ocr_latency = QualityRequirement(
     id="QR-1",
     text="領収書画像の送信から抽出結果の表示までを、95 パーセンタイルで 5 秒以内とすること",
-    status="approved",
+    status="verified",
     qualifies=[fr_ocr],
     has_source=[src_employee],
+    evidence=[
+        "本番同等環境で 100 回計測し (2026-02-20)、95 パーセンタイル値は 4.2 秒だった",
+    ],
     acceptance_criteria=[
         "本番同等環境で 100 回計測し、95 パーセンタイル値が 5.0 秒以下である",
     ],

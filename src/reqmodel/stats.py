@@ -196,8 +196,8 @@ def _ratio(
 
 
 def _ratios(graph: RequirementGraph) -> tuple[Ratio, ...]:
-    def has_criteria(node: Node) -> bool:
-        return bool(getattr(node, "acceptance_criteria", []))
+    def has_evidence(node: Node) -> bool:
+        return bool(getattr(node, "evidence", []))
 
     return (
         _ratio(
@@ -207,16 +207,16 @@ def _ratios(graph: RequirementGraph) -> tuple[Ratio, ...]:
             lambda node: bool(graph.in_edges(node.id, ("satisfies",))),
         ),
         _ratio(
-            "acceptance_criteria_fr",
-            "FR の受け入れ基準保有率",
+            "evidence_fr",
+            "FR の根拠保有率 (evidence を持つ)",
             graph.by_type(FunctionalRequirement),
-            has_criteria,
+            has_evidence,
         ),
         _ratio(
-            "acceptance_criteria_qr",
-            "QR の受け入れ基準保有率",
+            "evidence_qr",
+            "QR の根拠保有率 (evidence を持つ)",
             graph.by_type(QualityRequirement),
-            has_criteria,
+            has_evidence,
         ),
         _ratio(
             "source_traced",

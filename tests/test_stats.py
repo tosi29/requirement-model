@@ -57,17 +57,17 @@ def test_need_satisfaction_ratio_lists_the_uncovered():
     assert ratio.missing == ("N-2",)
 
 
-def test_acceptance_criteria_ratios_are_split_by_type():
+def test_evidence_ratios_are_split_by_type():
     stats = collect_stats(
         build(
-            fr("FR-1"),
-            fr("FR-2", acceptance_criteria=[]),
-            qr("QR-1", acceptance_criteria=[]),
+            fr("FR-1", evidence=["受入テストで確認した"]),
+            fr("FR-2"),
+            qr("QR-1"),
         )
     )
 
-    assert stats.ratio("acceptance_criteria_fr").missing == ("FR-2",)
-    assert stats.ratio("acceptance_criteria_qr").rate == 0.0
+    assert stats.ratio("evidence_fr").missing == ("FR-2",)
+    assert stats.ratio("evidence_qr").rate == 0.0
 
 
 def test_source_trace_ratio_covers_the_same_types_as_missing_source():

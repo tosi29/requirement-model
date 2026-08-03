@@ -480,7 +480,7 @@ export const TABLE_COLUMNS = [
   { key: "type", label: "type" },
   { key: "text", label: "本文" },
   { key: "status", label: "status" },
-  { key: "criteria", label: "受入基準", numeric: true },
+  { key: "evidence", label: "根拠", numeric: true },
   { key: "findings", label: "指摘", numeric: true },
 ];
 
@@ -541,7 +541,7 @@ export function tableRows(view, query = "") {
       type: node.type,
       text: node.text,
       status: node.status,
-      criteria: (node.acceptance_criteria || []).length,
+      evidence: (node.evidence || []).length,
       findings: counts.get(node.id) || 0,
       severity: worst.has(node.id) ? SEVERITY_ORDER[worst.get(node.id)] : null,
     }));
@@ -1004,6 +1004,9 @@ function describe(view, id, inlineSources = true) {
     attrs.push(`decomposition=${node.decomposition}`);
   }
   const lines = [`- [${node.type}] ${node.id}: ${node.text}`, `    (${attrs.join(", ")})`];
+  for (const item of node.evidence || []) {
+    lines.push(`    根拠: ${item}`);
+  }
   for (const criterion of node.acceptance_criteria || []) {
     lines.push(`    受け入れ基準: ${criterion}`);
   }

@@ -44,7 +44,7 @@ def validate_structure(graph: RequirementGraph) -> FindingList:
     _check_unused_sources(graph, findings)
     _check_goal_decomposition(graph, findings)
     _check_sources_present(graph, findings)
-    _check_acceptance_criteria(graph, findings)
+    _check_unverified_claims(graph, findings)
     _check_status_consistency(graph, findings)
     return attach_locations(graph, findings)
 
@@ -340,15 +340,23 @@ def _check_sources_present(graph: RequirementGraph, findings: FindingList) -> No
             )
 
 
-def _check_acceptance_criteria(graph: RequirementGraph, findings: FindingList) -> None:
+def _check_unverified_claims(graph: RequirementGraph, findings: FindingList) -> None:
+    """``verified`` という主張に根拠が付いているかを見る。
+
+    発火するのは主張の時点だけである。まだ誰も合意していない ``proposed`` の要求に
+    検証を求めても意味が無く、逆に「確かめた」と書いた以上は何で確かめたかが残って
+    いるべき、という非対称をそのまま検査にしている。
+    """
     for node in graph.by_type(FunctionalRequirement, QualityRequirement):
-        if not node.acceptance_criteria:
+        if node.status != "verified":
+            continue
+        if not node.evidence:
             findings.add(
                 Finding(
                     severity="warning",
-                    code="structure.missing_acceptance_criteria",
+                    code="structure.unverified_claim",
                     layer=2,
-                    message="受け入れ基準が無い (検証可能性)",
+                    message="verified なのに根拠 (evidence) が無い",
                     node_id=node.id,
                 )
             )
@@ -389,6 +397,9 @@ def validate_semantics_lexical(graph: RequirementGraph) -> FindingList:
     findings = FindingList()
     for node in graph.ordered_nodes():
         texts = [node.text]
+        #: 事前の基準と事後の根拠も本文と同じ辞書にかける。「十分高速だった」の類は
+        #: 根拠の側にこそ出るため、evidence を対象から外すと検査の穴になる。
+        texts.extend(getattr(node, "evidence", []) or [])
         texts.extend(getattr(node, "acceptance_criteria", []) or [])
         reported: set[str] = set()
         for text in texts:

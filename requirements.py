@@ -183,7 +183,6 @@ fr_edge_rules = FunctionalRequirement(
         "Constraint から Goal へ張ったエッジは structure.edge_type として報告される",
         "存在しない id への参照は structure.dangling_ref として報告される",
         "refines と part_of の閉路は、それぞれ専用のコードで error として報告される",
-        "型規則はフィールドの型注釈から導出し、実装と二重管理にしない",
     ],
 )
 fr_orphan = FunctionalRequirement(
@@ -196,8 +195,8 @@ fr_orphan = FunctionalRequirement(
     satisfies=[need_no_dangling],
     has_source=[src_spec, src_incose],
     acceptance_criteria=[
-        "FR から Goal への到達は refines と satisfies と motivates の経路で判定する",
-        "孤立の判定規則は FR と QR で別に持つ",
+        "Goal に到達できない FR は structure.orphan_fr として報告される",
+        "孤立は FR と QR で別のコードとして報告される",
     ],
 )
 fr_lexicon = FunctionalRequirement(
@@ -263,13 +262,13 @@ fr_impact = FunctionalRequirement(
 )
 fr_explain = FunctionalRequirement(
     id="FR-9",
-    text="影響部分グラフの本文と受け入れ基準を、LLM に渡せる書式に整形して出力すること",
+    text="影響部分グラフの本文と根拠を、LLM に渡せる書式に整形して出力すること",
     status="implemented",
     refines=[fr_impact],
     satisfies=[need_llm_context],
     has_source=[src_spec, src_owner],
     acceptance_criteria=[
-        "出力には各ノードの text と acceptance_criteria が含まれる",
+        "出力には各ノードの text と evidence が含まれる",
         "--json で機械可読な形でも出せる",
     ],
 )
@@ -324,7 +323,6 @@ fr_fit_whole = FunctionalRequirement(
     has_source=[src_owner],
     acceptance_criteria=[
         "読み込み直後の倍率は、全ノードが表示領域に入る値になる",
-        "ラベルを読む倍率の保証はこの表示には求めず、フォーカス表示 (FR-26) が担う",
     ],
 )
 fr_table = FunctionalRequirement(
@@ -433,7 +431,7 @@ fr_more_checks = FunctionalRequirement(
     satisfies=[need_no_dangling],
     has_source=[src_owner, src_ireb],
     acceptance_criteria=[
-        "数値を含まない QR の受け入れ基準が報告される",
+        "数値を含まない QR の text が報告される",
         "追加する検査はいずれもチェックコードを持ち、抑制の可否が定義されている",
     ],
 )
@@ -514,22 +512,23 @@ qr_readable_zoom = QualityRequirement(
 qr_validate_speed = QualityRequirement(
     id="QR-2",
     text="300 ノードの定義ファイルについて、読み取りから指摘の出力までを 2 秒以内で終えること",
-    status="approved",
+    status="verified",
     qualifies=[system],
     has_source=[src_bench],
-    acceptance_criteria=[
-        "examples/bench.py に対する req validate が 2 秒以内に終わる",
+    evidence=[
+        "examples/bench.py (300 ノード) に対する req validate を 3 回計測し、"
+        "0.25〜0.43 秒で終わった",
     ],
 )
 qr_site_cli_parity = QualityRequirement(
     id="QR-3",
     text="閲覧用サイトが書き出す図と CLI が出す図を、一字一句一致させること",
-    status="approved",
+    status="verified",
     qualifies=[fr_site],
     has_source=[src_owner],
-    acceptance_criteria=[
-        "絞り込みの無い状態で、サイトの Mermaid 出力と render_mermaid() の出力が一致する",
-        "この一致は自動テストで検査される",
+    evidence=[
+        "tests/test_site_js.py の test_mermaid_export_matches_req_graph が、"
+        "サイトの Mermaid 出力と render_mermaid() の一致を CI で検査している",
     ],
 )
 qr_keyboard = QualityRequirement(

@@ -407,7 +407,7 @@ function renderDetail() {
   const panel = document.getElementById("detail");
   if (!state.selected || !view.byId.has(state.selected)) {
     panel.innerHTML =
-      '<p class="empty">グラフのノードをクリックすると、本文・受け入れ基準・影響範囲を表示する。</p>';
+      '<p class="empty">グラフのノードをクリックすると、本文・根拠・影響範囲を表示する。</p>';
     return;
   }
   const node = view.byId.get(state.selected);
@@ -430,6 +430,12 @@ function renderDetail() {
   }
   rows.push("</dl>");
 
+  //: 根拠 (事後) を先、受け入れ基準 (事前) を後に置く。CLI の doc / explain と同じ順。
+  if ((node.evidence || []).length) {
+    rows.push("<h2>根拠</h2><ul>");
+    for (const item of node.evidence) rows.push(`<li>${escapeHtml(item)}</li>`);
+    rows.push("</ul>");
+  }
   if ((node.acceptance_criteria || []).length) {
     rows.push("<h2>受け入れ基準</h2><ul>");
     for (const criterion of node.acceptance_criteria) rows.push(`<li>${escapeHtml(criterion)}</li>`);
@@ -774,7 +780,7 @@ function renderTable() {
       <button data-key="${column.key}" title="この列で並べ替える">${column.label}<span class="arrow">${arrow}</span></button></th>`;
   }).join("");
 
-  //: 値が無いこと (受け入れ基準 0 件・指摘 0 件) を空欄と区別して見せる。
+  //: 値が無いこと (根拠 0 件・指摘 0 件) を空欄と区別して見せる。
   const DASH = '<td class="num dash">—</td>';
   const cell = (row, key) => {
     switch (key) {
@@ -784,8 +790,8 @@ function renderTable() {
         return row.findings
           ? `<td class="num"><button class="finding-count ${row.severity || ""}" data-findings="${row.id}" title="このノードへの指摘を見る">${row.findings}</button></td>`
           : DASH;
-      case "criteria":
-        return row.criteria ? `<td class="num">${row.criteria}</td>` : DASH;
+      case "evidence":
+        return row.evidence ? `<td class="num">${row.evidence}</td>` : DASH;
       default:
         return `<td class="${key}">${escapeHtml(row[key])}</td>`;
     }

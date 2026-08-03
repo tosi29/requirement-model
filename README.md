@@ -130,7 +130,7 @@ import 文は実行されないが、mypy と IDE 補完のために必ず書く
 |---|---|---|
 | `Goal` | 事業・ステークホルダーの意図 (なぜ) | `decomposition="AND"\|"OR"` を持つ |
 | `Need` | 何が満たされたいか | 語尾規則あり・主語 (役割) を書く |
-| `FunctionalRequirement` (FR) | システムが提供すべき機能 | 語尾規則・受け入れ基準 |
+| `FunctionalRequirement` (FR) | システムが提供すべき機能 | 語尾規則・根拠 / 受け入れ基準 |
 | `QualityRequirement` (QR) | 品質要求 (性能・可用性等) | 「非機能要求」の語は使わない |
 | `Constraint` | 解決策の自由度を制限する条件 | 要求ではない |
 | `Source` | 要求の源泉 (引用も含む) | `kind` で分類、`part_of` で引用を束ねる |
@@ -201,7 +201,17 @@ QR 6 / Constraint 6) すべてで守られているが、破っても `req valid
 
 `id` / `text` / `status` (`proposed` → `approved` → `implemented` → `verified`) /
 `suppress` ([指摘の抑制](#指摘の抑制-waiver))。
-FR / QR には `acceptance_criteria: list[str]` が加わる。
+FR / QR には検証に関わる 2 つの欄が加わる。
+
+| 属性 | 何を書くか | 検査 |
+|---|---|---|
+| `evidence: list[str]` | 何をもって満たしたと判断したか (事後の事実) | `verified` なら必須 |
+| `acceptance_criteria: list[str]` | text が測定可能に書けないときの操作化 (事前の基準) | 無し (任意) |
+
+**主は `evidence` である。** 要求文が測定可能に書けていれば「何をもって満たしたと
+するか」は text に入りきるので、事前の基準は任意とし、検査は「`verified` と主張した
+なら根拠を出せ」の側にだけ置いた
+([理由](docs/design/model.md#検証可能性を-evidence-側に置く))。
 優先度は属性として持たない (理由は
 [`docs/design/model.md`](docs/design/model.md#優先度を属性として持たない))。
 
@@ -256,7 +266,7 @@ FR / QR には `acceptance_criteria: list[str]` が加わる。
 | `structure.goal_decomposition` | warning | AND 分解で要求群に到達しない子がある / OR 分解でどの子も到達しない |
 | `structure.goal_leaf` | warning | 子 Goal も Need も持たない Goal |
 | `structure.missing_source` | warning | 源泉リンクの無い要求 |
-| `structure.missing_acceptance_criteria` | warning | 受け入れ基準の無い FR / QR |
+| `structure.unverified_claim` | warning | `verified` なのに `evidence` の無い FR / QR |
 | `structure.status_inconsistent` | warning | approved 以上のノードが proposed のノードを参照 (`constrains` を除く) |
 | `semantics.ambiguous_term` | warning | 曖昧語 (「高速に」「適切に」等) |
 | `waiver.stale` | warning | 陳腐化した抑制 (対象の指摘が出ていない) |
@@ -309,7 +319,7 @@ impact(n) = ancestors(n) ∪ descendants(n)   # --edges でエッジ型を絞れ
 比較単位は `graph.node_to_json_obj()` (出所を含まないノード表現) で、出所は
 `RequirementGraph.locations` に横持ちする。
 
-`req explain` は影響部分グラフの各ノードの `text` (自然言語) と受け入れ基準を含めて
+`req explain` は影響部分グラフの各ノードの `text` (自然言語) と根拠・受け入れ基準を含めて
 整形出力する。機械が網羅性を担保し、解釈は LLM に委ねるための入力を作る。
 源泉エッジは辿らず、各ノードの属性行に畳む ([源泉の扱い](#源泉の扱い))。
 
@@ -336,7 +346,7 @@ $ req doc examples/sample.py --matrix -o trace.csv   # 同上 (CSV)
 ### 仕様書 (`req doc`)
 
 Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`status`・
-受け入れ基準・トレースリンク・定義位置を出す。`examples/sample.py` からの抜粋:
+根拠・受け入れ基準・トレースリンク・定義位置を出す。`examples/sample.py` からの抜粋:
 
 ```markdown
 ##### FR-1 領収書画像から金額と日付を抽出し、申請フォームの初期値として表示すること
@@ -349,7 +359,20 @@ Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`statu
 - 受け入れ基準:
     - 社内で収集した領収書画像 200 枚に対し、金額の抽出正解率が 95% 以上である
     - 抽出に失敗した項目は空欄で表示され、申請者が手入力で上書きできる
-- 定義: examples/sample.py:105
+- 定義: examples/sample.py:128
+```
+
+`verified` の要求では、根拠が受け入れ基準より先に出る (事後の事実が主で、事前の
+基準が従):
+
+```markdown
+###### QR-1 領収書画像の送信から抽出結果の表示までを、95 パーセンタイルで 5 秒以内とすること
+
+- 種別: QualityRequirement / 状態: verified
+- 根拠:
+    - 本番同等環境で 100 回計測し (2026-02-20)、95 パーセンタイル値は 4.2 秒だった
+- 受け入れ基準:
+    - 本番同等環境で 100 回計測し、95 パーセンタイル値が 5.0 秒以下である
 ```
 
 上位の Goal / Need も同じ形式で、トレースリンクの項目名だけが型ごとに変わる
@@ -420,8 +443,8 @@ $ req stats examples/sample.py
 ## 3. 充足率・保有率
 
 - Need の充足率 (satisfies されている): 100.0% (3/3)
-- FR の受け入れ基準保有率: 100.0% (6/6)
-- QR の受け入れ基準保有率: 100.0% (2/2)
+- FR の根拠保有率 (evidence を持つ): 16.7% (1/6) 未達: FR-1, FR-3, FR-4, FR-5, FR-6
+- QR の根拠保有率 (evidence を持つ): 50.0% (1/2) 未達: QR-2
 - 源泉トレース率 (has_source を持つ要求): 100.0% (15/15)
 ```
 
@@ -522,7 +545,7 @@ Mermaid / DOT のノード識別子は `n1`, `n2`, … の連番で、`ordered_n
 - **status を枠線の線種で表示**する
 - ノード種別・status・エッジ種別の絞り込み。**絞り込みは影響範囲の計算にも効く**
   (`req explain --edges` と同じ考え方)
-- 本文・受け入れ基準・**源泉**・出所 (file:line)・出入りのエッジ・そのノードへの指摘を
+- 本文・根拠・受け入れ基準・**源泉**・出所 (file:line)・出入りのエッジ・そのノードへの指摘を
   右ペインに表示。**出入りのエッジには相手ノードの本文を併記**する (飛ぶ前に何に
   繋がっているか読める)。源泉は図に描かないぶんここに出る ([源泉の扱い](#源泉の扱い))
 - `--repo-url` を渡して生成すると、**出所が定義ファイルへのリンク**になる
@@ -605,12 +628,12 @@ CLI の `req explain` は `--depth` で探索を何ホップかで切り、`--un
 | 列 | 中身 |
 |---|---|
 | id / type / 本文 / status | ノードの属性そのまま |
-| 受入基準 | `acceptance_criteria` の件数 |
+| 根拠 | `evidence` の件数 |
 | 指摘 | そのノードに紐づく指摘の件数。最も重い severity の色が付く |
 
 - **列見出しをクリックすると並べ替える**。type は種別の定義順、status は成熟度
   (`STATUS_RANK`) で並ぶ。辞書順には並べない
-- 受入基準・指摘が 0 件の行は 0 として並び、表示だけ `—` にする。並び替えの値そのものを
+- 根拠・指摘が 0 件の行は 0 として並び、表示だけ `—` にする。並び替えの値そのものを
   持たない行 (成熟度表に無い status 等) は、昇順でも降順でも**末尾**に置く
 - 同値の行は正規化 JSON の並び (型順 → id 順) で決まるので、押すたびに順番が入れ替わることは無い
 - 数の列は 1 回目のクリックで**多い順**から始まる (指摘の多いものから潰す用)
@@ -725,7 +748,7 @@ $ req doc -o spec.md
 $ req site -o site && python -m http.server -d site
 ```
 
-自分に `--strict` を課すと、全 FR が受け入れ基準と源泉を持ち、全 Need が satisfy され、
+自分に `--strict` を課すと、`verified` と書いた要求がすべて根拠を持ち、全要求が源泉を持ち、全 Need が satisfy され、
 全 QR が張り先を持ち、全 Goal が要求群まで分解されている必要がある。**この制約を自分で
 食らうことがモデル化の目的**で、実際に次のことが分かった。
 

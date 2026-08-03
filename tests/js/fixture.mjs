@@ -73,6 +73,7 @@ export function fixture(overrides = {}) {
       text: "領収書画像から金額を抽出すること",
       status: "proposed",
       has_source: ["SRC-1"],
+      evidence: ["受入テスト第 1 回で正解率 96% だった"],
       acceptance_criteria: ["正解率が 95% 以上である"],
       satisfies: ["N-1"],
       refines: [],
@@ -83,6 +84,7 @@ export function fixture(overrides = {}) {
       text: "抽出は 3 秒以内に終わること",
       status: "proposed",
       has_source: [],
+      evidence: [],
       acceptance_criteria: [],
       qualifies: ["FR-1"],
     },
@@ -168,6 +170,7 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
       id,
       text: `機能 ${i} を提供すること`,
       status: i % 3 === 0 ? "implemented" : "approved",
+      evidence: [`機能 ${i} の受入テスト結果`],
       acceptance_criteria: [`機能 ${i} の受け入れ基準`],
     });
     link(id, "satisfies", `N-${pick(i, needs)}`);
@@ -183,6 +186,7 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
       id,
       text: `品質 ${i} を保つこと`,
       status: "proposed",
+      evidence: [`品質 ${i} の計測結果`],
       acceptance_criteria: [`品質 ${i} の受け入れ基準`],
     });
     link(id, "qualifies", `FR-${pick(i, frs)}`);

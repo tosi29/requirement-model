@@ -263,7 +263,7 @@ def test_stats_command(capsys):
     out = capsys.readouterr().out
     assert out.startswith("# モデル統計\n")
     assert "- 規模: 23 ノード / 38 エッジ" in out
-    assert "| FunctionalRequirement | 1 | 5 | 0 | 0 | 6 |" in out
+    assert "| FunctionalRequirement | 1 | 4 | 0 | 1 | 6 |" in out
     assert "- Need の充足率 (satisfies されている): 100.0% (3/3)" in out
 
 
@@ -274,9 +274,9 @@ def test_stats_json_output(capsys):
     assert payload["totals"]["nodes"] == 23
     assert payload["nodes"]["by_status"] == {
         "proposed": 1,
-        "approved": 22,
+        "approved": 20,
         "implemented": 0,
-        "verified": 0,
+        "verified": 2,
     }
     assert payload["ambiguity"]["findings"] == 0
 

@@ -194,6 +194,9 @@ ul.plain li { padding: 3px 0; }
 .node-btn .id { font-weight: 600; }
 .node-btn .type { color: var(--muted); font-size: 11px; }
 .node-btn.active { background: var(--panel); outline: 1px solid var(--accent); }
+/* ↑↓ で送っている最中の候補。選択 (active) とは別の印にする。 */
+.node-btn.cursor { background: var(--panel); box-shadow: inset 3px 0 0 var(--accent); }
+input[type="range"] { width: 100%; margin: 2px 0 6px; cursor: pointer; accent-color: var(--accent); }
 .finding {
   border-left: 3px solid var(--border);
   padding: 5px 9px;
@@ -238,7 +241,16 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
   <aside class="pane">
     <h2>ノード検索</h2>
     <input type="search" id="search" placeholder="id / 本文で絞り込む" autocomplete="off">
+    <p class="hint">ヒットは図の上でも暈しで示す。↑↓ で候補を送り、Enter で選ぶ。</p>
     <ul class="plain" id="node-list"></ul>
+
+    <h2>影響範囲</h2>
+    <label class="toggle" for="depth">探索の深さ<span class="count" id="depth-value"></span></label>
+    <!-- min / max は site_app.js が IMPACT_DEPTHS から入れる。 -->
+    <input type="range" id="depth" title="影響範囲を何ホップ先まで辿るか (req explain --depth)">
+    <label class="toggle"><input type="checkbox" id="undirected">向きを無視して辿る</label>
+    <p class="hint">この設定は色分け・上流/下流の件数・「影響部分グラフをコピー」の
+      すべてに効く (<code>req explain --depth / --undirected</code> と同じ)。</p>
 
     <h2>ノード種別</h2>
     <div id="type-filters"></div>
@@ -269,6 +281,8 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
           <option value="TD">縦 (TD)</option>
           <option value="LR">横 (LR)</option>
         </select>
+        <!-- 選択肢は site_app.js が FOCUS_DEPTHS から作る。 -->
+        <select id="focus" title="選択したノードの近傍だけを図に描く (一覧・表・コピー本文は全体のまま)"></select>
         <button id="relayout" title="表示中のノードだけで並べ直す">整列</button>
       </span>
       <button id="clear">選択解除</button>

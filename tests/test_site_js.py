@@ -98,3 +98,38 @@ def test_node_context_matches_req_explain_with_edge_filter():
 
     for node_id, text in zip(node_ids, actual):
         assert text == explain_text(graph, [node_id], edge_names=selected), node_id
+
+
+@pytest.mark.parametrize("depth", [1, 2, 3])
+def test_node_context_matches_req_explain_with_depth(depth: int):
+    """深さを絞ったときは `req explain ID --depth N` と同じになる。"""
+    graph = sample_graph()
+    data = site_data(graph, FindingList(), "題名", [str(SAMPLE)])
+    node_ids = [node["id"] for node in data["nodes"]]
+
+    actual = node_contexts(
+        data, [{"id": node_id, "depth": depth} for node_id in node_ids]
+    )
+
+    for node_id, text in zip(node_ids, actual):
+        assert text == explain_text(graph, [node_id], depth=depth), node_id
+
+
+@pytest.mark.parametrize("depth", [None, 2])
+def test_node_context_matches_req_explain_undirected(depth: int | None):
+    """向きを無視したときは `req explain ID --undirected` と同じになる。"""
+    graph = sample_graph()
+    data = site_data(graph, FindingList(), "題名", [str(SAMPLE)])
+    node_ids = [node["id"] for node in data["nodes"]]
+
+    actual = node_contexts(
+        data,
+        [
+            {"id": node_id, "depth": depth, "undirected": True}
+            for node_id in node_ids
+        ],
+    )
+
+    for node_id, text in zip(node_ids, actual):
+        expected = explain_text(graph, [node_id], depth=depth, undirected=True)
+        assert text == expected, node_id

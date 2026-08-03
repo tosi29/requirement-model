@@ -97,12 +97,20 @@ _SHAPE_FIT: dict[str, tuple[float, float, float, float]] = {
     "ellipse": (1.42, 14, 1.42, 10),  # b = 1/√2
 }
 
-#: 影響範囲の色分け (選択 / 上流 / 下流)。
+#: 影響範囲の色分け (選択 / 上流 / 下流 / 関連)。
+#: 関連は無向で辿ったとき (``req explain --undirected`` 相当) の色で、
+#: 上流と下流の区別が付かないことをそのまま 1 色で表す。
 _IMPACT_COLORS = {
     "selected": "#d93025",
     "upstream": "#1a73e8",
     "downstream": "#188038",
+    "related": "#8430ce",
 }
+
+#: 検索ヒットの暈し (halo) の色。枠線は型 (色) と status (線種)、その外側の輪は
+#: 優先度、枠線の色と太さは影響範囲で埋まっているので、検索はノードの下に敷く
+#: underlay を使う。他のどの表現とも property が衝突しない。
+_SEARCH_HIT = "#00b8d4"
 
 #: status → 枠線の (線種, 太さ)。成熟するほど「実線に近く・太く」なる。
 #:
@@ -186,6 +194,7 @@ def render_meta() -> dict[str, Any]:
             name for name, arrow in _EDGE_STYLE_MERMAID.items() if arrow == "-.->"
         ],
         "impact_colors": dict(_IMPACT_COLORS),
+        "search": {"hit": _SEARCH_HIT},
     }
 
 

@@ -53,7 +53,15 @@ def test_site_data_contains_graph_findings_and_render_meta():
     assert data["meta"]["types"]["Goal"]["shape"] == "hexagon"
     assert data["meta"]["types"]["Goal"]["fill"].startswith("#")
     assert "has_source" in data["meta"]["dashed_edges"]
-    assert set(data["meta"]["impact_colors"]) == {"selected", "upstream", "downstream"}
+    assert set(data["meta"]["impact_colors"]) == {
+        "selected",
+        "upstream",
+        "downstream",
+        # 無向で辿ったとき (--undirected 相当) の色。上流/下流の区別が付かない。
+        "related",
+    }
+    # 検索ヒットは枠線・輪と衝突しない暈しで示すので、その色も meta から渡す。
+    assert data["meta"]["search"]["hit"].startswith("#")
     assert "satisfies" in data["edge_names"]
     # テーブルビューの status 列は辞書順ではなく成熟度で並べる。
     assert data["status_rank"] == {
@@ -179,6 +187,32 @@ def test_page_has_status_and_priority_filters(tmp_path: Path):
     assert "statusFilters(DATA)" in html
     assert "priorityFilters(DATA)" in html
     assert "function legendGroups(" in html
+
+
+def test_page_has_impact_depth_and_undirected_controls(tmp_path: Path):
+    """影響範囲の深さ・向きは `req explain --depth / --undirected` と同じ操作。"""
+    index = build_site(chain(), FindingList(), tmp_path)
+    html = index.read_text(encoding="utf-8")
+
+    for element_id in ("depth", "depth-value", "undirected"):
+        assert f'id="{element_id}"' in html
+    # 色分けもコピー本文も同じ関数から範囲を貰う (片方だけが設定を見ない)。
+    assert "function impactSets(" in html
+    assert "impactSets(view, state.selected)" in html
+    assert "function explainCommand(" in html
+
+
+def test_page_links_the_search_box_to_the_graph(tmp_path: Path):
+    """検索ヒットは図の上でも見え、↑↓ と Enter で選べる。"""
+    index = build_site(chain(), FindingList(), tmp_path)
+    html = index.read_text(encoding="utf-8")
+
+    assert "function searchHits(" in html
+    assert "function applySearchHits(" in html
+    assert "function moveCursor(" in html
+    assert '"ArrowDown"' in html
+    # ヒットの印は枠線ではなく暈し (影響範囲の色分けと衝突させない)。
+    assert '"underlay-color"' in html
 
 
 def test_build_site_writes_page_and_raw_outputs(tmp_path: Path):

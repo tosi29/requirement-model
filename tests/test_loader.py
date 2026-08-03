@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from reqmodel.loader import discover_paths, load_paths, load_sources
+from reqmodel.application.loader import discover_paths, load_paths, load_sources
 
 HEADER = "from reqmodel import Goal, Need, FunctionalRequirement, Source\n"
 

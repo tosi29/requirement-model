@@ -21,9 +21,9 @@ from pathlib import Path
 
 import pytest
 
-from reqmodel.explain import explain_text
+from reqmodel.application.explain import explain_text
 from reqmodel.findings import FindingList
-from reqmodel.loader import load_paths
+from reqmodel.application.loader import load_paths
 from reqmodel.model import EDGE_NAMES
 from reqmodel.render import render_mermaid
 from reqmodel.site import site_data

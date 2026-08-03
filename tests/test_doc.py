@@ -8,7 +8,7 @@ import io
 import pytest
 from conftest import build, constraint, fr, goal, need, qr, source, system
 
-from reqmodel.doc import (
+from reqmodel.application.doc import (
     CSV_HEADER,
     MATRICES,
     MatrixSpec,

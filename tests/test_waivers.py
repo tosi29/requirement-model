@@ -12,8 +12,8 @@ from pydantic import ValidationError
 from reqmodel.codes import CHECK_CODES, SUPPRESSIBLE_CODES
 from reqmodel.findings import Finding, FindingList
 from reqmodel.model import Need
-from reqmodel.validate import validate_semantics_lexical, validate_structure
-from reqmodel.waivers import apply_waivers
+from reqmodel.application.validate import validate_semantics_lexical, validate_structure
+from reqmodel.application.waivers import apply_waivers
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "reqmodel"
 
@@ -194,7 +194,7 @@ def test_every_emitted_code_is_registered():
     登録漏れがあると、そのチェックは抑制できないまま `--strict` を壊す。
     """
     emitted: set[str] = set()
-    for path in SRC.glob("*.py"):
+    for path in SRC.rglob("*.py"):
         emitted.update(re.findall(r'code="([\w.]+)"', path.read_text(encoding="utf-8")))
 
     assert emitted, "コードを 1 つも見つけられていない (探索が壊れている)"
@@ -202,7 +202,7 @@ def test_every_emitted_code_is_registered():
 
 
 def test_registered_codes_are_emitted_somewhere():
-    sources = "".join(path.read_text(encoding="utf-8") for path in SRC.glob("*.py"))
+    sources = "".join(path.read_text(encoding="utf-8") for path in SRC.rglob("*.py"))
     for code in CHECK_CODES:
         assert f'"{code}"' in sources, f"{code} はどこからも出ていない"
 

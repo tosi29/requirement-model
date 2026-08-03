@@ -21,8 +21,8 @@ from reqmodel.site import (
     build_site,
     site_data,
 )
-from reqmodel.validate import validate_structure
-from reqmodel.waivers import apply_waivers
+from reqmodel.application.validate import validate_structure
+from reqmodel.application.waivers import apply_waivers
 
 SAMPLE = str(Path(__file__).resolve().parents[1] / "examples" / "sample.py")
 

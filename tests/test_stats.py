@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from conftest import build, constraint, fr, goal, need, qr, source, system
 
-from reqmodel.stats import collect_stats, render_stats
+from reqmodel.application.stats import collect_stats, render_stats
 
 
 def test_counts_nodes_by_type_and_status():

@@ -14,8 +14,8 @@ from conftest import (
     source,
     system,
 )
-from reqmodel.loader import load_sources
-from reqmodel.validate import validate_semantics_lexical, validate_structure
+from reqmodel.application.loader import load_sources
+from reqmodel.application.validate import validate_semantics_lexical, validate_structure
 
 
 def traced_chain():

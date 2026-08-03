@@ -35,9 +35,11 @@ jobs:
       - name: 型検査
         run: mypy
 
-      # 2 つは別のグラフなので 1 回にまとめない (id が衝突する)。
+      # それぞれ別のグラフなので 1 回にまとめない (id が衝突する)。
+      # requirements.py はこのリポジトリ自身の要求モデル (dogfooding)。
       - name: 定義ファイルを検証する
         run: |
+          req validate --strict requirements.py
           req validate --strict examples/sample.py
           req validate --strict examples/bench.py
 

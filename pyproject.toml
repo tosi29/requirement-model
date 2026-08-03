@@ -25,7 +25,7 @@ testpaths = ["tests"]
 [tool.mypy]
 python_version = "3.11"
 plugins = ["pydantic.mypy"]
-files = ["src", "examples"]
+files = ["src", "examples", "requirements.py"]
 
 [tool.setuptools.package-data]
 reqmodel = ["site_template.html", "site_logic.js", "site_app.js"]

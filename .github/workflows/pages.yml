@@ -40,15 +40,26 @@ jobs:
         run: pytest -q
 
       - name: 定義ファイルを検証する
-        run: req validate examples/sample.py
-
-      - name: 静的サイトを生成する
-        # --repo-url / --repo-ref を渡すと、ノードの出所 (file:line) が
-        # 定義ファイルへのリンクになる。参照は公開したコミットそのものにする。
         run: |
-          req site examples/sample.py \
+          req validate requirements.py
+          req validate examples/sample.py
+
+      # 2 つ公開する。ルートがこのリポジトリ自身の要求モデル、/sample/ が
+      # 経費精算システムの例。build_site は 1 回 1 ディレクトリなので 2 回叩く
+      # (別のグラフなので 1 回にまとめると id が衝突する)。
+      # --repo-url / --repo-ref を渡すと、ノードの出所 (file:line) が
+      # 定義ファイルへのリンクになる。参照は公開したコミットそのものにする。
+      - name: 静的サイトを生成する
+        run: |
+          req site requirements.py \
             --output site \
-            --title "要求グラフ (examples/sample.py)" \
+            --title "reqmodel 自身の要求グラフ (requirements.py)" \
+            --assets local \
+            --repo-url "${{ github.server_url }}/${{ github.repository }}" \
+            --repo-ref "${{ github.sha }}"
+          req site examples/sample.py \
+            --output site/sample \
+            --title "要求グラフの例 (examples/sample.py)" \
             --assets local \
             --repo-url "${{ github.server_url }}/${{ github.repository }}" \
             --repo-ref "${{ github.sha }}"
@@ -56,11 +67,13 @@ jobs:
       - name: 描画ライブラリを同梱する
         # 公開ページから外部への通信を無くすため、描画ライブラリを一緒に置く。
         # ファイル名と URL (バージョン込み) は reqmodel 側の定義を唯一の出典とする。
+        # 参照は相対パスなので、ページを置いたディレクトリごとに要る。
         run: |
           python -c "from reqmodel.site import SITE_ASSETS
           print('\n'.join(f'{a.file} {a.url}' for a in SITE_ASSETS))" |
           while read -r file url; do
             curl -fsSL --retry 3 -o "site/$file" "$url"
+            cp "site/$file" "site/sample/$file"
           done
 
       - uses: actions/upload-pages-artifact@v3

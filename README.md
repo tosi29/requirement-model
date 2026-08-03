@@ -196,9 +196,8 @@ Need は「〜たい」、FR は「〜こと」で終わる必要がある (層1
 **機械が検査しているのは語尾だけで、主語は検査していない。** 上の規約は
 `requirements.py` と `examples/sample.py` の該当 61 ノード (Goal 6 / Need 11 / FR 32 /
 QR 6 / Constraint 6) すべてで守られているが、破っても `req validate` は何も言わない。
-規約に反していた `Goal` は
-[Goal 層を Need の言い換えから作り直した](docs/design/model.md#goal-層を-need-の言い換えから作り直した)
-で書き直してある。
+規約に反していた `Goal` を書き直した経緯は
+[このリポジトリ自身の要求モデル](#このリポジトリ自身の要求モデル-dogfooding)にある。
 
 ### 共通属性
 
@@ -746,10 +745,11 @@ $ req site -o site && python -m http.server -d site
   「〜できる状態にする」に変えただけ) になり、旧 G-4 に至っては「**機械が**文脈を揃える」と
   システムを主語にしていた。中間 `Goal` 層を丸ごと消して 8 つの `Need` を旧 G-1 に
   直付けしても `--strict` は通り、この層は構造的な荷重を負っていなかった。
-  `Goal` 層は世界の側の記述に書き直して 1 層に畳んである
-  ([理由](docs/design/model.md#goal-層を-need-の言い換えから作り直した))。
-  **これを機械が検査できていない**点は変わっておらず、主語の規約は文書
-  ([どの型に書くか](#どの型に書くか-主語で決める)) にしか無い
+  型の選び方は[どの型に書くか](#どの型に書くか-主語で決める)に書き下し、`Goal` 層は
+  そこに従って**世界の側の変化**に書き直した。reqmodel が存在しなくても述べられる文を
+  条件にすると 8 つの `Need` は 3 つの束に落ち、`refines` の中間層は不要になった
+  (Goal 5 件 → 3 件)。**規則の非対称は残っている。** `Goal` の本文規則は文書にしか
+  無く、`Need` をコピーして語尾を変えた `Goal` は今も `req validate` を素通りする
 - **未着手の要求に張った制約が `structure.status_inconsistent` になっていた。**
   検査のほうを直し、`constrains` を対象外にした
   ([理由](docs/design/model.md#constrains-を-structurestatus_inconsistent-の対象から外した))。

@@ -206,7 +206,10 @@ fr_syntax = FunctionalRequirement(
 )
 fr_edge_rules = FunctionalRequirement(
     id="FR-3",
-    text="型規則に違反するエッジ・参照切れ・refines の閉路を error として報告すること",
+    text=(
+        "型規則に違反するエッジ・参照切れ・階層エッジ (refines / part_of) の閉路を"
+        "error として報告すること"
+    ),
     status="implemented",
     priority=1,
     satisfies=[need_no_dangling],
@@ -214,6 +217,7 @@ fr_edge_rules = FunctionalRequirement(
     acceptance_criteria=[
         "Constraint から Goal へ張ったエッジは structure.edge_type として報告される",
         "存在しない id への参照は structure.dangling_ref として報告される",
+        "refines と part_of の閉路は、それぞれ専用のコードで error として報告される",
         "型規則はフィールドの型注釈から導出し、実装と二重管理にしない",
     ],
 )

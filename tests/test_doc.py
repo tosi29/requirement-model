@@ -17,7 +17,7 @@ from reqmodel.doc import (
     render_matrices_markdown,
     render_spec,
 )
-from reqmodel.model import FunctionalRequirement, Need
+from reqmodel.model import FunctionalRequirement, Need, Source
 
 
 def sample():
@@ -218,3 +218,27 @@ def test_csv_is_one_row_per_link_and_keeps_uncovered_rows():
 def test_documents_end_with_a_single_newline(render):
     text = render(sample())
     assert text.endswith("\n") and not text.endswith("\n\n")
+
+
+def test_source_section_nests_quotes_under_their_origin():
+    """「この源泉のどこが、どの要求の根拠か」を 1 か所で読めること。"""
+    graph = build(
+        source("S-1"),
+        Source(
+            id="S-2",
+            text="領収書の添付を要する",
+            kind="document",
+            locator="第12条第3項",
+            part_of=["S-1"],
+        ),
+        need("N-1", has_source=["S-2"]),
+        fr("FR-1", satisfies=["N-1"], has_source=["S-2"]),
+    )
+    text = render_spec(graph)
+    assert "- **S-1** (stakeholder) 経理部長 — 引用のみ" in text
+    assert "  - **S-2** [第12条第3項] 領収書の添付を要する — N-1, FR-1" in text
+
+
+def test_source_section_keeps_sources_that_have_no_quotes():
+    text = render_spec(sample())
+    assert "- **S-1** (stakeholder) 経理部長 — G-1, N-1" in text

@@ -149,6 +149,7 @@ _DOT_SHAPE: dict[type[Node], str] = {
 _EDGE_STYLE_MERMAID = {
     "conflicts": "-.->",
     "has_source": "-.->",
+    "part_of": "-.->",
 }
 
 

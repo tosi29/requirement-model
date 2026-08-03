@@ -110,6 +110,7 @@ _OUT_LABELS: dict[str, str] = {
     "qualifies": "品質を付与する対象",
     "constrains": "制約する対象",
     "has_source": "源泉",
+    "part_of": "上位の源泉 (これが引用元)",
 }
 
 #: 入ってくるエッジの見出し語。
@@ -120,6 +121,7 @@ _IN_LABELS: dict[str, str] = {
     "qualifies": "付与されている品質要求",
     "constrains": "受けている制約",
     "has_source": "この源泉を参照しているノード",
+    "part_of": "この源泉から引用されている箇所",
 }
 
 
@@ -138,6 +140,8 @@ def _attr_line(graph: RequirementGraph, node: Node) -> str:
         parts.append(f"優先度: {node.priority}")
     if isinstance(node, Source):
         parts.append(f"分類: {node.kind}")
+        if node.locator is not None:
+            parts.append(f"出典: {_inline(node.locator)}")
     if isinstance(node, Goal) and graph.in_edges(node.id, ("refines",)):
         parts.append(f"分解: {node.decomposition}")
     return "- " + " / ".join(parts)
@@ -348,15 +352,56 @@ def _conflict_section(
     return lines
 
 
+def _source_line(graph: RequirementGraph, source: Source, depth: int) -> str:
+    """源泉 1 件の行。引用なら locator と、根拠にしている要求を並べる。"""
+    head = f"**{source.id}**"
+    if depth == 0:
+        head += f" ({source.kind})"
+    if source.locator is not None:
+        head += f" [{_inline(source.locator)}]"
+
+    users = _unique(e.source for e in graph.in_edges(source.id, ("has_source",)))
+    if users:
+        tail = ", ".join(users)
+    elif graph.in_edges(source.id, ("part_of",)):
+        tail = "引用のみ"
+    else:
+        tail = "参照なし"
+
+    return f"{'  ' * depth}- {head} {_inline(source.text)} — {tail}"
+
+
 def _source_section(graph: RequirementGraph, emitted: set[str]) -> list[str]:
-    lines: list[str] = []
+    """源泉の一覧。引用は親の下にぶら下げ、それぞれの引用元要求を添える。
+
+    「この源泉のどこが、どの要求の根拠になっているか」を 1 か所で読めるようにする
+    のが目的なので、part_of の階層をそのまま入れ子で出す。
+    """
+    children: dict[str, list[Source]] = {}
     for source in graph.by_type(Source):
+        for edge in graph.out_edges(source.id, ("part_of",)):
+            children.setdefault(edge.target, []).append(source)
+
+    lines: list[str] = []
+
+    def emit(source: Source, depth: int, seen: frozenset[str]) -> None:
         emitted.add(source.id)
-        users = _unique(e.source for e in graph.in_edges(source.id, ("has_source",)))
-        used = ", ".join(users) if users else "参照なし"
-        lines.append(
-            f"- **{source.id}** ({source.kind}) {_inline(source.text)} — {used}"
-        )
+        lines.append(_source_line(graph, source, depth))
+        # 閉路は structure.part_of_cycle が error として報告する。ここでは
+        # 文書生成が止まらないように、辿った枝を覚えて打ち切るだけにする。
+        for child in children.get(source.id, []):
+            if child.id not in seen:
+                emit(child, depth + 1, seen | {source.id})
+
+    for source in graph.by_type(Source):
+        if not source.part_of:
+            emit(source, 0, frozenset())
+
+    # part_of の閉路などで根から辿れなかった源泉も、文書から落とさない。
+    for source in graph.by_type(Source):
+        if source.id not in emitted:
+            emit(source, 0, frozenset())
+
     return lines
 
 

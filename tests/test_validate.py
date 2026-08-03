@@ -101,6 +101,34 @@ def test_unused_source_is_information():
     assert unused and unused[0].severity == "info"
 
 
+def test_part_of_cycle_is_an_error():
+    graph = build(
+        source("S-1", part_of=["S-2"]),
+        source("S-2", part_of=["S-1"]),
+    )
+    cycles = [f for f in validate_structure(graph) if f.code == "structure.part_of_cycle"]
+    assert cycles and cycles[0].severity == "error"
+
+
+def test_quoted_source_is_not_unused_when_its_quote_is_used():
+    """引用が使われていれば、その親の文書を「未参照」とは言わない。"""
+    parent = source("S-1")
+    quote = source("S-2", part_of=[parent], locator="第12条第3項")
+    n = need("N-1", has_source=[quote])
+    findings = validate_structure(build(parent, quote, n))
+    assert "structure.unused_source" not in codes(findings)
+
+
+def test_quote_nobody_relies_on_is_reported_as_a_quote():
+    """親は子の側で報告されるので二重に言わない。指摘は引用の側にだけ出る。"""
+    parent = source("S-1")
+    quote = source("S-2", part_of=[parent])
+    findings = validate_structure(build(parent, quote))
+    unused = [f for f in findings if f.code == "structure.unused_source"]
+    assert [f.node_id for f in unused] == ["S-2"]
+    assert "引用" in unused[0].message
+
+
 def test_and_decomposition_requires_every_child_to_reach_requirements():
     s, n, g, f = traced_chain()
     reaching = goal("G-2", refines=[g], motivates=[n], has_source=[s])

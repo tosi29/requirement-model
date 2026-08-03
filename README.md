@@ -52,6 +52,8 @@ $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (
 
 `PATH` を省略するとカレントの `requirements.py` または `requirements/` を探す。
 ディレクトリを指定すると配下の `*.py` をまとめて 1 つのグラフとして扱う。
+このリポジトリのルートにも `requirements.py` があり、引数を省略すると
+[このツール自身の要求モデル](#このリポジトリ自身の要求モデル-dogfooding) が読まれる。
 
 終了コードは、`validate` でエラーがあれば 1 (`--strict` を付けると警告でも 1)、
 定義ファイルが見つからない等の使い方の誤りは 2。CI にそのまま置ける。
@@ -858,6 +860,40 @@ $ npm test        # node --test tests/js/*.test.mjs
 | `nodeContext()` (「影響部分グラフをコピー」) | `explain_text()` | 全ノード。絞り込み中は `req explain --edges / --depth / --undirected` に対応 |
 | `mermaidText()` (「.mmd」で書き出す図) | `render_mermaid()` | 絞り込み無しのとき一字一句同じ |
 
+## このリポジトリ自身の要求モデル (dogfooding)
+
+要求管理ツールでありながら自分の要求だけが要求管理されていない、という状態を避けるため、
+**このツール自身の要求をルートの `requirements.py` に置いてある**。実装済みの機能と、
+開いている issue の両方が対象である (54 ノード / 116 エッジ)。
+
+`loader.DEFAULT_PATHS` がルートの `requirements.py` を見るので、リポジトリ内では
+引数なしでそのままこのモデルを読む。CI (`.github/workflows/ci.yml`) も
+`req validate --strict requirements.py` を回している。
+
+```console
+$ req validate --strict     # requirements.py が読まれる
+$ req doc -o spec.md
+$ req site -o site && python -m http.server -d site
+```
+
+自分に `--strict` を課すと、全 FR が受け入れ基準と源泉を持ち、全 Need が satisfy され、
+全 QR が張り先を持ち、全 Goal が要求群まで分解されている必要がある。**この制約を自分で
+食らうことがモデル化の目的**で、実際に次のことが分かった。
+
+- **外部の課題管理への参照を持つ場が無い。** 未着手の FR と GitHub issue を対応付けたいが、
+  メタモデルにそのフィールドが無く、issue ごとに `Source` を作るのは意味的に歪む。
+  現状は**ノード直前のコメント** (`# → issue #6`) に逃がしてある。コメントは AST に
+  現れないのでモデルには入らない = 機械が辿れない
+- **未着手の要求に張った制約が `structure.status_inconsistent` になる。** approved な
+  Constraint が proposed な FR を `constrains` すると成熟度の逆転として報告されるが、
+  着手前の要求に制約を張るのは普通のことで、制約側の status を下げるのは実態に反する
+- **曖昧語辞書が語の使用と言及を区別しない。** 「安定」(ソートの安定性)、
+  「高速」(曖昧語検査そのものの受け入れ基準に出てくる引用) が指摘される
+
+いずれも抑制 (waiver) で理由付きで残してあり、`req validate --show-suppressed` で読める。
+**`--strict` を通すために表現を歪めてはいない**。5 件の抑制はすべて理由が書かれ、
+対象の指摘が消えれば `waiver.stale` で気付ける。
+
 ## GitHub Pages への公開
 
 `.github/workflows/pages.yml` が、`main` への push (と手動実行) をきっかけに
@@ -866,7 +902,16 @@ $ npm test        # node --test tests/js/*.test.mjs
 **リポジトリ側の設定が 1 つだけ必要**: Settings → Pages → Build and deployment の
 Source を **GitHub Actions** にする。これは API やワークフローからは設定できない。
 
-公開されるのは `examples/sample.py` のグラフ。自分の定義ファイルを公開するときは
+公開されるのは 2 つ。`build_site` は 1 回 1 ディレクトリなので、ワークフローで 2 回叩く
+(別のグラフなので 1 回にまとめると id が衝突する)。
+
+| 場所 | 中身 |
+|---|---|
+| `/` | このリポジトリ自身の要求モデル (`requirements.py`) |
+| `/sample/` | 経費精算システムの例 (`examples/sample.py`)。使い方の見本 |
+
+描画ライブラリの参照は相対パスなので、`--assets local` で公開するときは
+**ページを置いたディレクトリごとに** ライブラリを置く。自分の定義ファイルを公開するときは
 ワークフロー中の `req validate` / `req site` の引数を差し替える。
 
 ## 開発

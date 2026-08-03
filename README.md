@@ -530,7 +530,7 @@ $ req explain FR-3 -f requirements.py --with-sources   # 源泉エッジも辿�
 だけである。
 
 Mermaid / DOT のノード識別子は `n1`, `n2`, … の連番で、`ordered_nodes()` (型順 → id 順)
-の索引から振る (`render.py` の `_ids()`)。元の id を識別子に流用すると、非英数字を
+の索引から振る (`presentation/render.py` の `_ids()`)。元の id を識別子に流用すると、非英数字を
 潰した結果が衝突して `FR-1` と `FR_1` が図の上で 1 ノードに融合してしまう
 (ラベルは後勝ち、エッジも合流する) ためで、連番なら衝突が構造的に起こり得ない。
 元の id はラベルに出るので、読む側の情報は失われない。
@@ -816,6 +816,18 @@ $ npm run bench   # 300 ノード級の合成グラフで探索の時間を測�
 
 `pytest` からも同じものが走る (`tests/test_site_js.py`)。node が入っていない環境では
 skip されるので、CI では `.github/workflows/ci.yml` が node を明示的に用意している。
+
+## パッケージ構成
+
+`reqmodel` は責務ごとに一方向の依存関係を持つサブパッケージへ分割している。
+
+- `reqmodel.definition`: 定義ファイルの利用者が使うノード型・補助型
+- `reqmodel.core`: メタモデル、正規化グラフ、既定の投影ポリシー
+- `reqmodel.presentation`: Mermaid / DOT、描画スタイル、静的サイト
+
+依存方向は `presentation → core → definition` とし、従来の `reqmodel.model`、
+`reqmodel.graph`、`reqmodel.render`、`reqmodel.site` は互換 import のために残している。
+ルートからの `from reqmodel import Goal, Need, FR, QR` も引き続き利用できる。
 
 ## 設計判断の記録
 

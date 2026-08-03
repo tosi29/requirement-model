@@ -19,7 +19,7 @@ import io
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
-from .graph import RequirementGraph
+from .core.graph import RequirementGraph
 from .model import (
     Constraint,
     FunctionalRequirement,

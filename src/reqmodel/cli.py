@@ -28,9 +28,9 @@ from .doc import (
 )
 from .explain import explain_text, impact_set
 from .findings import FindingList
-from .graph import RequirementGraph
+from .core.graph import RequirementGraph
 from .loader import LoadResult, discover_paths, load_paths
-from .model import EDGE_NAMES
+from .core.metamodel import EDGE_NAMES
 from .plan import diff_graphs, format_plan, load_revision
 from .render import FORMATS, render
 from .site import (

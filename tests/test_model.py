@@ -84,3 +84,40 @@ def test_source_is_a_single_type_classified_by_kind():
     assert Source(id="S", text="規程", kind="document").kind == "document"
     with pytest.raises(ValidationError):
         Source(id="S", text="規程", kind="unknown")
+
+
+def test_public_definition_package_has_no_internal_dependencies():
+    """Author-facing definitions must not depend on graph or presentation code."""
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).parents[1] / "src" / "reqmodel" / "definition"
+    forbidden = {"reqmodel.core", "reqmodel.presentation"}
+    for path in root.glob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        imports = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        imports.update(
+            node.module or ""
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.level == 0
+        )
+        assert not any(
+            name == blocked or name.startswith(blocked + ".")
+            for name in imports
+            for blocked in forbidden
+        ), path
+
+
+def test_new_package_api_and_legacy_root_api_are_identical():
+    from reqmodel import Goal as RootGoal
+    from reqmodel.definition import Goal as DefinitionGoal
+    from reqmodel.core.graph import RequirementGraph as CoreGraph
+    from reqmodel.graph import RequirementGraph as LegacyGraph
+
+    assert RootGoal is DefinitionGoal
+    assert CoreGraph is LegacyGraph

@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from .astcheck import ExtractResult, RawNode, extract_file, extract_source
 from .findings import Finding, FindingList
-from .graph import RequirementGraph
+from .core.graph import RequirementGraph
 from .model import NODE_TYPES, Node
 
 __all__ = ["LoadResult", "load_paths", "load_sources", "discover_paths", "DEFAULT_PATHS"]

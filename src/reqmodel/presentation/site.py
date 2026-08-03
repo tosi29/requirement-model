@@ -1,0 +1,222 @@
+"""静的サイトの生成 (GitHub Pages 用)。
+
+正規化グラフと検証結果を 1 枚の HTML に埋め込み、ブラウザ上で
+グラフ表示・絞り込み・影響範囲の可視化ができるようにする。
+
+描画の定義 (形状・配色) は render.py から `render_meta()` で受け取り、
+ブラウザ側に複製しない。
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass
+from html import escape
+from importlib import resources
+from pathlib import Path
+from typing import Any, Sequence
+
+from ..findings import FindingList
+from ..core.graph import RequirementGraph
+from ..model import (
+    EDGE_NAMES,
+    SOURCE_EDGES,
+    STATUS_RANK,
+    TYPE_ORDER,
+    Source,
+    edge_specs_for,
+)
+from .render import render_dot, render_meta, render_mermaid
+
+__all__ = [
+    "build_site",
+    "site_data",
+    "app_js",
+    "Asset",
+    "RepoLink",
+    "SITE_ASSETS",
+    "SITE_SCRIPTS",
+    "asset_srcs",
+    "DEFAULT_REF",
+    "DEFAULT_TITLE",
+]
+
+
+@dataclass(frozen=True)
+class Asset:
+    """ページが読み込む描画ライブラリ 1 つ。"""
+
+    file: str
+    url: str
+
+
+#: 図の描画に使うライブラリ。バージョンは固定する。
+#: どちらも単一ファイルの UMD ビルドなので、公開先に置いて相対パスを指す
+#: (自己完結) こともできる。cytoscape-dagre は dagre を同梱しているため、
+#: 別途 dagre を置く必要は無い。
+CYTOSCAPE_VERSION = "3.34.0"
+CYTOSCAPE_DAGRE_VERSION = "4.0.0"
+_CDN = "https://cdn.jsdelivr.net/npm"
+
+SITE_ASSETS: tuple[Asset, ...] = (
+    Asset(
+        "cytoscape.min.js",
+        f"{_CDN}/cytoscape@{CYTOSCAPE_VERSION}/dist/cytoscape.min.js",
+    ),
+    Asset(
+        "cytoscape-dagre.js",
+        f"{_CDN}/cytoscape-dagre@{CYTOSCAPE_DAGRE_VERSION}/dist/cytoscape-dagre.js",
+    ),
+)
+
+DEFAULT_TITLE = "要求グラフ"
+
+#: `--repo-ref` の既定。ブランチ名でもコミット SHA でもよい。
+DEFAULT_REF = "main"
+
+
+@dataclass(frozen=True)
+class RepoLink:
+    """定義ファイルの置き場所 (ページから「GitHub で開く」を出すための情報)。
+
+    ノードの出所 (``examples/sample.py:42``) は**生成時の作業ディレクトリからの
+    相対パス**なので、リポジトリの URL と参照 (ブランチ / SHA) を足せば
+    blob URL になる。組み立てはページ側 (``site_logic.sourceUrl()``) で行う。
+    """
+
+    url: str
+    ref: str = DEFAULT_REF
+
+    def to_dict(self) -> dict[str, str]:
+        return {"url": self.url.rstrip("/"), "ref": self.ref}
+
+
+def asset_srcs(local: bool = False) -> list[str]:
+    """`<script src>` に入れる参照先。local なら出力先の同名ファイルを相対参照する。"""
+    return [asset.file if local else asset.url for asset in SITE_ASSETS]
+
+
+def site_data(
+    graph: RequirementGraph,
+    findings: FindingList,
+    title: str,
+    sources: Sequence[str],
+    suppressed: int = 0,
+    repo: RepoLink | None = None,
+) -> dict[str, Any]:
+    """ページに埋め込むデータ一式。
+
+    findings は抑制 (waiver) 適用後の指摘。抑制した件数は消さずに
+    ``stats.suppressed`` として残す。
+
+    repo を渡すと、ノードと指摘の出所から定義ファイルへのリンクがページに出る。
+    渡さなければ出所は今まで通りただの文字列として出る。
+    """
+    return {
+        "title": title,
+        "generated_from": list(sources),
+        # 出所 (file:line) から定義ファイルへ飛ぶためのリポジトリ情報。無ければ null。
+        "repo": repo.to_dict() if repo else None,
+        "schema_version": graph.to_json_obj()["schema_version"],
+        "types": [node_type.__name__ for node_type in TYPE_ORDER],
+        "edge_names": list(EDGE_NAMES),
+        # 図に既定で描かないもの (Source と源泉エッジ)。初期表示の絞り込みが
+        # CLI の既定 (req graph / req explain) と揃うように Python から渡す。
+        "hidden_by_default": {
+            "types": [Source.__name__],
+            "edges": sorted(SOURCE_EDGES),
+        },
+        # status の成熟度。テーブルビューの status 列をこの順で並べる
+        # (辞書順に並べても意味が無いので、順序は Python 側を唯一の出典とする)。
+        "status_rank": dict(STATUS_RANK),
+        # ノード型ごとのエッジ種別。ページ側が「このグラフに現れうるエッジ」を
+        # CLI (explain._all_edge_names) と同じ手順で数えるために渡す。
+        "edge_names_by_type": {
+            node_type.__name__: list(edge_specs_for(node_type))
+            for node_type in TYPE_ORDER
+        },
+        "nodes": graph.to_json_obj()["nodes"],
+        "edges": [
+            {"source": edge.source, "name": edge.name, "target": edge.target}
+            for edge in graph.edges
+            if edge.target in graph.nodes
+        ],
+        "findings": [finding.to_dict() for finding in findings.sorted()],
+        "stats": {
+            "nodes": len(graph),
+            "edges": len(graph.edges),
+            "findings": {
+                severity: findings.count(severity)  # type: ignore[arg-type]
+                for severity in ("error", "severe", "warning", "info")
+            },
+            "suppressed": suppressed,
+        },
+        "meta": render_meta(),
+    }
+
+
+def _read(name: str) -> str:
+    return resources.files("reqmodel.presentation").joinpath(name).read_text(encoding="utf-8")
+
+
+#: ページに載せる自前の JS。依存する側を後に置く (この順で連結する)。
+SITE_SCRIPTS: tuple[str, ...] = ("site_logic.js", "site_app.js")
+
+#: 連結して 1 つのモジュールにするので、ファイル間の import / export は落とす。
+#: これは「単体で lint / テストできる ES モジュール」を単一ファイル配布に
+#: 載せるための最小の橋渡しであり、これ以上の変換 (最小化・トランスパイル) はしない。
+_JS_IMPORT = re.compile(r'^import\s[^;]*?from\s+"\./[\w.-]+\.js";?[ \t]*\n', re.M)
+_JS_EXPORT = re.compile(r"^export\s+(?=(?:async\s+)?(?:function|const|let|var|class)\b)", re.M)
+
+
+def app_js() -> str:
+    """`SITE_SCRIPTS` を 1 つのモジュールに連結したもの。"""
+    parts = []
+    for name in SITE_SCRIPTS:
+        source = _JS_EXPORT.sub("", _JS_IMPORT.sub("", _read(name)))
+        if "</script" in source:
+            raise ValueError(f"{name} に </script> が含まれている")
+        parts.append(f"// --- {name} " + "-" * (60 - len(name)) + f"\n\n{source.strip()}\n")
+    return "\n".join(parts)
+
+
+def build_site(
+    graph: RequirementGraph,
+    findings: FindingList,
+    out_dir: Path,
+    title: str = DEFAULT_TITLE,
+    sources: Sequence[str] = (),
+    scripts: Sequence[str] | None = None,
+    suppressed: int = 0,
+    repo: RepoLink | None = None,
+) -> Path:
+    """out_dir に index.html と生データを書き出し、index.html のパスを返す。
+
+    scripts に相対パス (``asset_srcs(local=True)``) を渡し、同じディレクトリへ
+    その UMD ビルドを置けば、外部への通信が無い自己完結のサイトになる。
+    """
+    data = site_data(graph, findings, title, sources, suppressed, repo)
+    payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
+    tags = "\n".join(
+        f'<script src="{escape(src, quote=True)}"></script>'
+        for src in (asset_srcs() if scripts is None else scripts)
+    )
+
+    # __DATA__ の差し込みは最後に行う。定義ファイル由来の文字列が
+    # 他のプレースホルダとして解釈されないようにするため。
+    html = (
+        _read("site_template.html")
+        .replace("__TITLE__", escape(title))
+        .replace("__SCRIPTS__", tags)
+        .replace("__APP_JS__", app_js())
+        .replace("__DATA__", payload)
+    )
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    index = out_dir / "index.html"
+    index.write_text(html, encoding="utf-8")
+    (out_dir / "model.json").write_text(graph.to_json(), encoding="utf-8")
+    (out_dir / "graph.mmd").write_text(render_mermaid(graph), encoding="utf-8")
+    (out_dir / "graph.dot").write_text(render_dot(graph), encoding="utf-8")
+    return index

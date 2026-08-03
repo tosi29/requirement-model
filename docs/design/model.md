@@ -15,7 +15,7 @@ README の[メタモデル](../../README.md#メタモデル)と[検証 (3層)](.
   **「〜こと」**で判定する。
 
 いずれも末尾の句点は許容する。厳密に「〜したい」「〜すること」に戻すなら
-`src/reqmodel/model.py` の `_check_suffix` 2 か所を変えるだけでよい。
+`src/reqmodel/definition/nodes.py` の `_check_suffix` 2 か所を変えるだけでよい。
 
 ## `constrains` を `structure.status_inconsistent` の対象から外した
 

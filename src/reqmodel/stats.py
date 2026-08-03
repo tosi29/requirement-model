@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
-from .graph import RequirementGraph
+from .core.graph import RequirementGraph
 from .model import (
     EDGE_NAMES,
     STATUS_RANK,

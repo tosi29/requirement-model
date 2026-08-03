@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 
 from .codes import WAIVER_STALE
 from .findings import Finding, FindingList
-from .graph import RequirementGraph
+from .core.graph import RequirementGraph
 from .validate import attach_locations
 
 __all__ = ["Suppressed", "WaiverResult", "apply_waivers"]

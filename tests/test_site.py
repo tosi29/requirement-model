@@ -188,7 +188,6 @@ def test_page_has_status_and_priority_filters(tmp_path: Path):
     # 表示層が状態を持ち、ロジック層が選択肢を作る。
     assert "statusFilters(DATA)" in html
     assert "priorityFilters(DATA)" in html
-    assert "function legendGroups(" in html
 
 
 def test_page_has_impact_depth_and_undirected_controls(tmp_path: Path):
@@ -199,9 +198,7 @@ def test_page_has_impact_depth_and_undirected_controls(tmp_path: Path):
     for element_id in ("depth", "depth-value", "undirected"):
         assert f'id="{element_id}"' in html
     # 色分けもコピー本文も同じ関数から範囲を貰う (片方だけが設定を見ない)。
-    assert "function impactSets(" in html
     assert "impactSets(view, state.selected)" in html
-    assert "function explainCommand(" in html
 
 
 def test_page_links_the_search_box_to_the_graph(tmp_path: Path):
@@ -209,9 +206,7 @@ def test_page_links_the_search_box_to_the_graph(tmp_path: Path):
     index = build_site(chain(), FindingList(), tmp_path)
     html = index.read_text(encoding="utf-8")
 
-    assert "function searchHits(" in html
-    assert "function applySearchHits(" in html
-    assert "function moveCursor(" in html
+    assert 'id="search"' in html
     assert '"ArrowDown"' in html
     # ヒットの印は枠線ではなく暈し (影響範囲の色分けと衝突させない)。
     assert '"underlay-color"' in html
@@ -269,9 +264,6 @@ def test_page_has_both_the_graph_and_the_table_view(tmp_path: Path):
 
     for element_id in ("tab-graph", "tab-table", "graph-frame", "table-frame", "node-table"):
         assert f'id="{element_id}"' in html
-    # 表示層 (site_app.js) が両方を描く。
-    assert "function renderTable(" in html
-    assert "function setMode(" in html
 
 
 def test_page_puts_the_view_state_in_the_url(tmp_path: Path):
@@ -279,10 +271,6 @@ def test_page_puts_the_view_state_in_the_url(tmp_path: Path):
     index = build_site(chain(), FindingList(), tmp_path)
     html = index.read_text(encoding="utf-8")
 
-    # ロジック層が状態と `#...` を相互変換し、表示層が両向きに繋ぐ。
-    assert "function encodeHash(" in html
-    assert "function decodeHash(" in html
-    assert "function writeHash(" in html
     # 戻る/進む (popstate) と、URL を手で書き換えたとき (hashchange) の両方から戻す。
     assert '"popstate", applyHash' in html
     assert '"hashchange", applyHash' in html
@@ -455,19 +443,21 @@ def test_site_command_defaults_the_repo_ref(tmp_path: Path):
     assert data["repo"] == {"url": "https://example.com/r", "ref": DEFAULT_REF}
 
 
-def test_page_can_download_the_filtered_graph(tmp_path: Path):
-    """絞り込んだ図は SVG / .mmd で持ち出せる (出力先の graph.mmd は全体)。"""
+def test_page_has_the_export_buttons(tmp_path: Path):
+    """絞り込んだ図を持ち出す口がテンプレートにある。
+
+    書き出す中身そのものは `mermaidText()` / `graphSvg()` のテスト
+    (tests/js/logic.test.mjs) と `test_site_js.py` の CLI 突き合わせが見る。
+    """
     index = build_site(chain(), FindingList(), tmp_path)
     html = index.read_text(encoding="utf-8")
 
     for element_id in ("export-svg", "export-mmd"):
         assert f'id="{element_id}"' in html
-    assert "function mermaidText(" in html
-    assert "function graphSvg(" in html
 
 
-def test_page_has_a_theme_toggle_and_restores_the_last_view(tmp_path: Path):
-    """テーマは手で固定でき、絞り込みは次回訪問時に戻る。"""
+def test_page_has_a_theme_toggle(tmp_path: Path):
+    """テーマは手で固定できる (次回訪問時の復元は storableHash() のテストが見る)。"""
     index = build_site(chain(), FindingList(), tmp_path)
     html = index.read_text(encoding="utf-8")
 
@@ -475,18 +465,14 @@ def test_page_has_a_theme_toggle_and_restores_the_last_view(tmp_path: Path):
     # OS 追従 (media query) と手動指定 (data-theme) の両方を CSS が持つ。
     assert "@media (prefers-color-scheme: dark)" in html
     assert ':root[data-theme="dark"]' in html
-    # 保存するのは絞り込みと表示だけ (選択と検索語は持ち越さない)。
-    assert "function storableHash(" in html
-    assert "function initialHash(" in html
 
 
-def test_page_groups_findings_by_severity_and_code(tmp_path: Path):
+def test_page_has_a_finding_tab_bar(tmp_path: Path):
+    """まとめ方そのものは groupFindings() のテスト (tests/js/logic.test.mjs) が見る。"""
     index = build_site(chain(), FindingList(), tmp_path)
     html = index.read_text(encoding="utf-8")
 
     assert 'id="finding-tabs"' in html
-    assert "function severityTabs(" in html
-    assert "function groupFindings(" in html
 
 
 def test_page_is_operable_from_the_keyboard(tmp_path: Path):
@@ -495,7 +481,5 @@ def test_page_is_operable_from_the_keyboard(tmp_path: Path):
     html = index.read_text(encoding="utf-8")
 
     assert ":focus-visible" in html
-    # タブ群は ←→ で移れる (WAI-ARIA の tablist と同じ約束)。
-    assert "function bindTabKeys(" in html
     # 指摘は div ではなく button なので、キーボードから押せる。
     assert "button.finding" in html

@@ -910,7 +910,8 @@ $ req site -o site && python -m http.server -d site
 ## GitHub Pages への公開
 
 `.github/workflows/pages.yml` が、`main` への push (と手動実行) をきっかけに
-テスト → `req validate` → `req site` → デプロイまで行う。検証が通らなければ公開されない。
+`req validate --strict` → `req site` → デプロイまで行う。検証が通らなければ公開されない。
+ツール自体のテストは同じ push で `ci.yml` が回すので、こちらでは繰り返さない。
 
 **リポジトリ側の設定が 1 つだけ必要**: Settings → Pages → Build and deployment の
 Source を **GitHub Actions** にする。これは API やワークフローからは設定できない。

@@ -240,7 +240,7 @@ export const PRIORITY_BUCKETS = [
 ];
 
 /** 高優先度とみなす境界 (この値以下が高優先)。 */
-export function priorityThreshold(data) {
+function priorityThreshold(data) {
   const priority = (data.meta || {}).priority;
   return priority ? priority.threshold : 0;
 }
@@ -492,7 +492,7 @@ export const TABLE_COLUMNS = [
 ];
 
 /** 重い順。行の指摘数に色を付けるときの「最も重い指摘」を決めるのに使う。 */
-export const SEVERITY_ORDER = ["error", "severe", "warning", "info"];
+const SEVERITY_ORDER = ["error", "severe", "warning", "info"];
 
 /** 検索欄の絞り込み。id と本文の部分一致 (大文字小文字は区別しない)。 */
 export function matchesQuery(node, query) {
@@ -875,7 +875,7 @@ export function initialHash(hash, stored) {
 // 手で固定できるようにする。固定した選択は localStorage に残す。
 
 /** 選べるテーマ。押すたびにこの順で回る。 */
-export const THEMES = ["auto", "light", "dark"];
+const THEMES = ["auto", "light", "dark"];
 
 /** ボタンの表示。いま何が効いているかがそのまま読めるようにする。 */
 export const THEME_LABELS = { auto: "テーマ: 自動", light: "テーマ: 明", dark: "テーマ: 暗" };

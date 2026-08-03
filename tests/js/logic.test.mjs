@@ -5,6 +5,8 @@ import { test } from "node:test";
 
 import {
   FOCUS_DEPTHS,
+  LABEL_FONT,
+  LABEL_WRAP_WIDTH,
   PRIORITY_BUCKETS,
   TABLE_COLUMNS,
   activeEdgeNames,
@@ -17,6 +19,7 @@ import {
   defaultState,
   encodeHash,
   escapeHtml,
+  estimateTextWidth,
   explainCommand,
   focusSet,
   graphElements,
@@ -24,11 +27,13 @@ import {
   impactScope,
   impactSets,
   isNodeVisible,
+  labelChunks,
   layoutOptions,
   legendGroups,
   matchesQuery,
   nextSort,
   nodeContext,
+  nodeSize,
   priorityBucket,
   priorityFilters,
   reach,
@@ -41,7 +46,7 @@ import {
   truncate,
   wrapLabel,
 } from "../../src/reqmodel/site_logic.js";
-import { allOn, fixture, largeFixture } from "./fixture.mjs";
+import { ELLIPSE_FIT, allOn, fixture, largeFixture } from "./fixture.mjs";
 
 const viewOf = (state) => {
   const data = fixture();
@@ -413,17 +418,77 @@ test("truncate は末尾を省略記号に置き換える", () => {
   assert.equal(truncate("あいうえお", 5), "あいうえお");
 });
 
-test("wrapLabel は日本語を桁数で折り返す", () => {
-  assert.equal(wrapLabel("あいうえおかきくけこさ", 5), "あいうえお\nかきくけこ\nさ");
+//: 全角 1 文字ぶんの幅 (概算では font-size と同じ)。折り返し幅は文字数で指定する。
+const EM = LABEL_FONT.size;
+
+test("wrapLabel は幅に入るところまで詰めて折る", () => {
+  assert.equal(wrapLabel("あいうえおかきくけこさ", 5 * EM), "あいうえお\nかきくけこ\nさ");
+  assert.equal(wrapLabel("あいうえおかきくけこ", 5 * EM), "あいうえお\nかきくけこ");
+  assert.equal(wrapLabel("", 5 * EM), "");
 });
 
-test("wrapLabel は空白があればそこで折り返す", () => {
-  assert.equal(wrapLabel("abc defg hij", 5), "abc\ndefg\nhij");
+test("wrapLabel は空白で折り、行末に空白を残さない", () => {
+  assert.equal(wrapLabel("abc defg hij", 4 * EM), "abc\ndefg\nhij");
+  //: 1 行に収まるなら語の間の空白はそのまま。
+  assert.equal(wrapLabel("abc defg", 10 * EM), "abc defg");
 });
 
-test("wrapLabel は割り切れるとき空行を作らない", () => {
-  assert.equal(wrapLabel("あいうえおかきくけこ", 5), "あいうえお\nかきくけこ");
-  assert.equal(wrapLabel("", 5), "");
+test("wrapLabel は数値と単位を離さない", () => {
+  //: 「24 / 時間」と切れると読めない。空白ごと 1 つの塊として扱う。
+  const wrapped = wrapLabel("承認待ちのまま 24 時間を超えた申請を 1 日 1 回リマインド");
+  for (const line of wrapped.split("\n")) {
+    assert.doesNotMatch(line, /[0-9]$/, wrapped);
+  }
+  assert.ok(wrapped.includes("24 時間"), wrapped);
+});
+
+test("wrapLabel は数字だけの行を作らない", () => {
+  //: 幅を極端に狭めても、数値が単独の行に落ちることは無い。
+  for (const width of [2 * EM, 3 * EM, 4 * EM, 6 * EM]) {
+    const wrapped = wrapLabel("稼働率を 99.9% 以上とし 5 分で復旧すること", width);
+    for (const line of wrapped.split("\n")) {
+      assert.match(line, /[A-Za-z\u3041-\u30ff\u3400-\u9fff]/, `幅 ${width}: ${wrapped}`);
+    }
+  }
+});
+
+test("wrapLabel は句読点を行頭に落とさない", () => {
+  const wrapped = wrapLabel("金額を抽出し、初期値として表示する。", 5 * EM);
+  for (const line of wrapped.split("\n")) {
+    assert.doesNotMatch(line, /^[、。]/, wrapped);
+  }
+});
+
+test("wrapLabel は幅を超える塊も行に収まるところで切る", () => {
+  //: 助詞まで含めた塊が幅より長いときは、諦めて幅で切る (溢れさせない)。
+  const wrapped = wrapLabel("領収書画像から金額を抽出すること", 3 * EM);
+  for (const line of wrapped.split("\n")) {
+    assert.ok(estimateTextWidth(line) <= 3 * EM, `${line} / ${wrapped}`);
+  }
+});
+
+test("labelChunks は文節らしいまとまりに切る", () => {
+  assert.deepEqual(labelChunks("申請を 1 日 1 回リマインドする"), [
+    "申請を ",
+    "1 日 ",
+    "1 回",
+    "リマインドする",
+  ]);
+});
+
+test("nodeSize は図形ごとの係数でラベルの外形を決める", () => {
+  //: 全角 3 文字 2 行 = 30 x 25px。ellipse は √2 倍して余白を足す。
+  const size = nodeSize("あいう\nかきく", ELLIPSE_FIT);
+
+  assert.equal(size.w, Math.round(30 * 1.42 + 14));
+  assert.equal(size.h, Math.round(2 * EM * LABEL_FONT.lineHeight * 1.42 + 10));
+});
+
+test("nodeSize は fit が無ければ矩形として扱う", () => {
+  //: 倍率は掛けず、余白を足すだけ (旧いデータを読んでも図が壊れない)。
+  const size = nodeSize("あいう", undefined);
+
+  assert.equal(size.w, 3 * EM + 20);
 });
 
 test("escapeHtml は < & > だけを潰す", () => {
@@ -877,6 +942,45 @@ test("graphElements はノードとエッジをそのまま要素にする", () 
     target: "SRC-1",
     name: "has_source",
   });
+});
+
+test("graphElements はラベルを測って外形をデータに載せる", () => {
+  const elements = graphElements(fixture());
+  const goal = elements[0];
+
+  //: ラベル (id + 折り返した本文) を測った結果が w / h。
+  assert.deepEqual(
+    { w: goal.data.w, h: goal.data.h },
+    nodeSize(goal.data.label, ELLIPSE_FIT),
+  );
+  //: 折り返しは上限幅を超えない。
+  for (const line of goal.data.label.split("\n")) {
+    assert.ok(estimateTextWidth(line) <= LABEL_WRAP_WIDTH, line);
+  }
+});
+
+test("graphElements は渡された実測関数でラベルを測る", () => {
+  //: ブラウザでは canvas の実測を渡す。1 文字 = 20px として測らせると倍になる。
+  const wide = graphElements(fixture(), (text) => [...text].length * 20);
+  const narrow = graphElements(fixture(), (text) => [...text].length * 10);
+
+  assert.ok(wide[0].data.w > narrow[0].data.w);
+});
+
+test("graphStyle はノードの外形をデータから取る", () => {
+  //: `width: "label"` だとラベルの外接矩形になり、六角形や菱形からはみ出す。
+  const style = graphStyle(fixture().meta, {
+    fg: "#111",
+    bg: "#fff",
+    border: "#ddd",
+    muted: "#666",
+  });
+
+  const node = style.find((rule) => rule.selector === "node");
+  assert.equal(node.style.width, "data(w)");
+  assert.equal(node.style.height, "data(h)");
+  assert.equal(node.style["font-size"], LABEL_FONT.size);
+  assert.equal(node.style["font-family"], LABEL_FONT.family);
 });
 
 test("graphStyle は render_meta の形状・配色をそのまま使う", () => {

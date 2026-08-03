@@ -123,6 +123,9 @@ export function fixture(overrides = {}) {
   };
 }
 
+//: 外形の係数 (render_meta の types[].fit)。ここでは全型を ellipse で代表させる。
+export const ELLIPSE_FIT = { wmul: 1.42, wpad: 14, hmul: 1.42, hpad: 10 };
+
 /**
  * 大きい合成グラフ。`examples/bench.py` と同じ形 (1 本の Goal 木 → Need →
  * 同じ段に大量に並ぶ FR → QR) を JS 側だけで組む。
@@ -217,7 +220,10 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
 
 export const META = {
   types: Object.fromEntries(
-    TYPES.map((type) => [type, { shape: "ellipse", fill: "#fff", stroke: "#000" }]),
+    TYPES.map((type) => [
+      type,
+      { shape: "ellipse", fill: "#fff", stroke: "#000", fit: ELLIPSE_FIT },
+    ]),
   ),
   //: 並びは成熟度 (STATUS_RANK) の順。線種だけで 4 つを区別できるようにしてある。
   statuses: {

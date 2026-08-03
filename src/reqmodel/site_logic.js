@@ -336,13 +336,44 @@ export function priorityFilters(data) {
   }));
 }
 
+/** 図に既定で描かないもの (`site_data()` の `hidden_by_default`)。 */
+export function hiddenByDefault(data, key) {
+  return ((data || {}).hidden_by_default || {})[key] || [];
+}
+
+/** ある軸の既定の選択。全体から「既定で隠すもの」を引いたもの。 */
+export function initialSelection(data, all, key) {
+  const hidden = new Set(hiddenByDefault(data, key));
+  return all.filter((name) => !hidden.has(name));
+}
+
 /**
- * 選択中のエッジ種別。全部選ばれていれば「絞り込み無し」として null を返す
- * (`req explain` に `--edges` を渡さないのと同じ状態)。
+ * 選択中のエッジ種別が `req explain` のどの呼び方に当たるか。
+ *
+ * - `"default"` … 既定のまま (源泉エッジだけ外れている) → 引数なし
+ * - `"all"`     … 源泉エッジも含めて全部 → `--with-sources`
+ * - 配列        … それ以外 → `--edges a,b,c`
+ *
+ * CLI 側 (`explain.traversed_edges()`) と対応が崩れると、ページが配る
+ * コンテキストとコマンドの出力が食い違う。
+ */
+export function edgeSelection(view) {
+  const all = view.data.edge_names;
+  const selected = all.filter((name) => view.state.edges.has(name));
+  if (selected.length === all.length) return "all";
+  const initial = initialSelection(view.data, all, "edges");
+  if (selected.length === initial.length && initial.every((name) => view.state.edges.has(name))) {
+    return "default";
+  }
+  return selected;
+}
+
+/**
+ * 選択中のエッジ種別。`--edges` に渡す値で、渡さなくてよいなら null。
  */
 export function activeEdgeNames(view) {
-  const selected = view.data.edge_names.filter((name) => view.state.edges.has(name));
-  return selected.length === view.data.edge_names.length ? null : selected;
+  const selection = edgeSelection(view);
+  return Array.isArray(selection) ? selection : null;
 }
 
 /**
@@ -729,13 +760,31 @@ const DEFAULT_SORT = { key: "id", asc: true };
  * 集合で持つ絞り込みの軸。ハッシュのキー・state のキー・取りうる値の全体を
  * 1 か所で対応付ける。軸を足すときはここに 1 行足せば、既定値・URL への
  * 書き出し・復元の 3 つが揃って増える。
+ *
+ * `initial` は初期状態で選ばれているもの。`all` と違うのは種別とエッジで、
+ * Source と源泉エッジは既定で外れている (`site_data()` の `hidden_by_default`)。
+ * 「既定と違うところだけ URL に載せる」という規則はこの `initial` が基準になる。
  */
 const SET_FILTERS = [
-  { param: "types", key: "types", all: (data) => data.types },
-  { param: "edges", key: "edges", all: (data) => data.edge_names },
+  {
+    param: "types",
+    key: "types",
+    all: (data) => data.types,
+    initial: (data) => initialSelection(data, data.types, "types"),
+  },
+  {
+    param: "edges",
+    key: "edges",
+    all: (data) => data.edge_names,
+    initial: (data) => initialSelection(data, data.edge_names, "edges"),
+  },
   { param: "status", key: "statuses", all: (data) => statusNames(data) },
   { param: "priority", key: "priorities", all: () => PRIORITY_BUCKETS.map((b) => b.key) },
 ];
+
+/** 軸の初期選択。`initial` を持たない軸は全選択。 */
+const initialOf = (filter, data) =>
+  filter.initial ? filter.initial(data) : filter.all(data);
 
 /** ハッシュが無いときの状態。ページの初期 state でもある。 */
 export function defaultState(data) {
@@ -752,7 +801,7 @@ export function defaultState(data) {
     undirected: false,
     sort: { ...DEFAULT_SORT },
   };
-  for (const filter of SET_FILTERS) state[filter.key] = new Set(filter.all(data));
+  for (const filter of SET_FILTERS) state[filter.key] = new Set(initialOf(filter, data));
   return state;
 }
 
@@ -771,7 +820,13 @@ export function encodeHash(state, data) {
     const selected = state[filter.key];
     const all = filter.all(data);
     // 持っていない軸は createView() と同じく「絞り込み無し」として扱う。
-    if (!selected || selected.size === all.length) continue;
+    if (!selected) continue;
+    // 既定と同じなら書かない。基準は「全選択」ではなく初期選択なので、既定で
+    // 隠している Source を出した状態は (全選択であっても) URL に載る。
+    const initial = initialOf(filter, data);
+    if (selected.size === initial.length && initial.every((name) => selected.has(name))) {
+      continue;
+    }
     put(filter.param, list(selected, all));
   }
   if (state.direction === "LR") put("dir", "LR");
@@ -893,8 +948,91 @@ export function nextTheme(theme) {
 // 以下は `explain.py` の explain_text() / _describe() / _all_edge_names() の写し。
 // 出力が 1 文字でもずれるとテストが落ちるので、片方を直したら両方を直すこと。
 
+//: 源泉の索引 (has_source / part_of) を data ごとに 1 回だけ作る。詳細ペインと
+//: コンテキスト生成の両方が使い、どちらも全ノードを走るので、呼ぶたびに
+//: data.edges を舐めると O(ノード数 × エッジ数) になる。
+//: 埋め込みデータはページ読み込み後は変わらない前提で、最初の 1 回を使い回す。
+const SOURCE_INDEX = new WeakMap();
+
+function sourceIndex(data) {
+  let index = SOURCE_INDEX.get(data);
+  if (index) return index;
+  index = { has: new Map(), partOf: new Map() };
+  for (const edge of data.edges) {
+    if (edge.name === "has_source") {
+      if (!index.has.has(edge.source)) index.has.set(edge.source, []);
+      index.has.get(edge.source).push(edge.target);
+    } else if (edge.name === "part_of" && !index.partOf.has(edge.source)) {
+      index.partOf.set(edge.source, edge.target);
+    }
+  }
+  SOURCE_INDEX.set(data, index);
+  return index;
+}
+
+/**
+ * 源泉 1 件の表示 (`explain.py` の `source_label()` と同じ整形)。
+ * `SRC-A (本文) [位置] < 親の源泉` の形で、`part_of` の鎖を 1 行に畳む。
+ *
+ * 絞り込みで Source が消えていても引けるように、view ではなく data を見る。
+ */
+export function sourceLabel(data, sourceId) {
+  const byId = new Map(data.nodes.map((node) => [node.id, node]));
+  return sourceLabelFrom(byId, sourceIndex(data), sourceId);
+}
+
+function sourceLabelFrom(byId, index, sourceId) {
+  const parts = [];
+  const seen = new Set();
+  let current = sourceId;
+  while (current !== undefined && current !== null && !seen.has(current)) {
+    seen.add(current);
+    const node = byId.get(current);
+    if (!node) {
+      parts.push(current);
+      break;
+    }
+    let label = `${node.id} (${node.text})`;
+    if (node.locator) label += ` [${node.locator}]`;
+    parts.push(label);
+    current = index.partOf.get(current);
+  }
+  return parts.join(" < ");
+}
+
+/**
+ * ノードの源泉一覧。詳細ペインの「源泉」欄に使う。
+ * 絞り込みに関係なく出す (図から外しても属性としては読める、が要点)。
+ */
+export function sourceItems(data, id) {
+  const byId = new Map(data.nodes.map((node) => [node.id, node]));
+  const index = sourceIndex(data);
+  return (index.has.get(id) || []).map((sourceId) => {
+    const node = byId.get(sourceId);
+    //: 引用は part_of で親の文書・人にぶら下がる。図に出さない以上、辿れる
+    //: のはここだけなので鎖を畳んで一緒に返す (親から順に並べる)。
+    const parents = [];
+    const seen = new Set([sourceId]);
+    let current = index.partOf.get(sourceId);
+    while (current !== undefined && current !== null && !seen.has(current)) {
+      seen.add(current);
+      const parent = byId.get(current);
+      parents.push({ id: current, text: parent ? parent.text : "" });
+      current = index.partOf.get(current);
+    }
+    return {
+      id: sourceId,
+      text: node ? node.text : "",
+      kind: node ? node.kind : "",
+      locator: node && node.locator ? node.locator : "",
+      parents,
+      label: sourceLabelFrom(byId, index, sourceId),
+    };
+  });
+}
+
 /** ノード 1 件の記述。`explain.py` の `_describe()` と同じ整形。 */
-function describe(view, id) {
+function describe(view, id, inlineSources = true) {
   const node = view.byId.get(id);
   const attrs = [`status=${node.status}`];
   if (node.priority !== null && node.priority !== undefined) {
@@ -913,6 +1051,14 @@ function describe(view, id) {
   const lines = [`- [${node.type}] ${node.id}: ${node.text}`, `    (${attrs.join(", ")})`];
   for (const criterion of node.acceptance_criteria || []) {
     lines.push(`    受け入れ基準: ${criterion}`);
+  }
+  // 源泉は辿らない代わりに属性として書き出す。ここも絞り込み前の全エッジを見る。
+  if (inlineSources) {
+    const byId = new Map(view.data.nodes.map((item) => [item.id, item]));
+    const index = sourceIndex(view.data);
+    for (const sourceId of index.has.get(id) || []) {
+      lines.push(`    源泉: ${sourceLabelFrom(byId, index, sourceId)}`);
+    }
   }
   return lines;
 }
@@ -937,9 +1083,10 @@ export function allEdgeNames(data) {
  */
 export function explainCommand(view, id, scope = null) {
   const { depth, undirected } = scope || impactScope(view.state);
-  const edgeFilter = activeEdgeNames(view);
+  const selection = edgeSelection(view);
   const parts = [`req explain ${id}`];
-  if (edgeFilter) parts.push(`--edges ${edgeFilter.join(",")}`);
+  if (Array.isArray(selection)) parts.push(`--edges ${selection.join(",")}`);
+  else if (selection === "all") parts.push("--with-sources");
   if (depth !== null) parts.push(`--depth ${depth}`);
   if (undirected) parts.push("--undirected");
   return parts.join(" ");
@@ -953,7 +1100,11 @@ export function explainCommand(view, id, scope = null) {
  */
 export function nodeContext(view, id, scope = null) {
   const settings = scope || impactScope(view.state);
-  const edgeFilter = activeEdgeNames(view);
+  const selection = edgeSelection(view);
+  const edgeFilter = Array.isArray(selection) ? selection : null;
+  //: 源泉を辿ったときは Source 自身がブロックで出るので、畳んだ表示はしない
+  //: (`explain.py` の include_sources / inline_sources と同じ対応)。
+  const includeSources = selection === "all";
   const { upstream, downstream, whole, undirected } = impactSets(view, id, settings);
 
   const lines = [`# 影響部分グラフ: ${id}`, ""];
@@ -970,13 +1121,19 @@ export function nodeContext(view, id, scope = null) {
     );
   }
   if (edgeFilter) lines.push(`エッジ種別フィルタ: ${edgeFilter.join(", ")}`);
+  else if (!includeSources) {
+    lines.push(
+      `源泉エッジ (${[...hiddenByDefault(view.data, "edges")].sort().join(", ")}) は` +
+        "辿っていない。源泉は各ノードの「源泉:」行に畳んである",
+    );
+  }
   if (settings.depth !== null) lines.push(`探索深さ: ${settings.depth}`);
 
   const block = (title, ids) => {
     const sorted = [...ids].sort((a, b) => rankOf(view, a) - rankOf(view, b));
     if (!sorted.length) return;
     lines.push("", `## ${title} (${sorted.length} 件)`);
-    for (const nodeId of sorted) lines.push(...describe(view, nodeId));
+    for (const nodeId of sorted) lines.push(...describe(view, nodeId, !includeSources));
   };
 
   block("対象ノード", [id]);
@@ -1004,8 +1161,13 @@ export function nodeContext(view, id, scope = null) {
     }
   }
 
+  //: 既定で外した源泉エッジは「現れなかった」に混ぜない (`explain.py` と同じ)。
+  //: --edges 相当を明示しているときは書き手の指定なので畳まない。
+  const hidden = new Set(
+    edgeFilter || includeSources ? [] : hiddenByDefault(view.data, "edges"),
+  );
   const unused = allEdgeNames(view.data).filter(
-    (name) => !edges.some((edge) => edge.name === name),
+    (name) => !hidden.has(name) && !edges.some((edge) => edge.name === name),
   );
   if (unused.length) {
     lines.push("", `(部分グラフに現れなかったエッジ種別: ${unused.join(", ")})`);

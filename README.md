@@ -75,6 +75,7 @@ $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (
 | `--edges a,b` | plan, explain | 辿るエッジ種別を限定する |
 | `--depth N` | explain | 探索の深さ上限 |
 | `--undirected` | explain | エッジの向きを無視して辿る |
+| `--with-sources` | graph, explain | 源泉を図に描く / 辿る ([既定では出さない](#源泉の扱い)) |
 | `--highlight ID,ID` | graph | 指定ノードを強調する |
 | `--matrix` | doc | 仕様書ではなくトレーサビリティマトリクスを出す |
 | `--format md\|csv` | doc | 出力形式 (既定は `-o` の拡張子から判定。`csv` は `--matrix` 専用) |
@@ -214,10 +215,15 @@ FR / QR には `acceptance_criteria: list[str]` が加わる。
 | `satisfies` | FR→Need | 充足 |
 | `qualifies` | QR→FR, QR→System | 品質の付与 |
 | `constrains` | Constraint→{FR, QR, Decision} | 制約 |
-| `has_source` | {Goal, Need, FR, QR, Constraint}→Source | 源泉トレース |
-| `part_of` | Source→Source | 引用と、その引用元 (子 → 親) |
+| `has_source` | {Goal, Need, FR, QR, Constraint}→Source | 源泉トレース (図には描かない) |
+| `part_of` | Source→Source | 引用と、その引用元 (子 → 親。図には描かない) |
 | `conflicts` | FR↔FR, QR↔QR, FR↔QR | 対立の明示 |
 | `resolves` | Decision→conflicts ペア | 対立解消 |
+
+**源泉の 2 本 (`has_source` / `part_of`) は図に描かない。** Source は数十件の要求から
+参照されるハブなので、ノードとして置くと近傍が一気に広がり、レイアウトが源泉に
+引っ張られる。源泉は「どの要求がどこから来たか」をノードの属性として読む情報で
+あって、要求どうしの関係を辿る経路ではない ([源泉の扱い](#源泉の扱い))。
 
 エッジは Pydantic のフィールドとして `satisfies: list[Ref[Need]]` の形で宣言してある。
 **型規則はフィールド型そのもの**であり、mypy と IDE 補完が記述時点から効く。
@@ -310,6 +316,7 @@ impact(n) = ancestors(n) ∪ descendants(n)   # --edges でエッジ型を絞れ
 
 `req explain` は影響部分グラフの各ノードの `text` (自然言語) と受け入れ基準を含めて
 整形出力する。機械が網羅性を担保し、解釈は LLM に委ねるための入力を作る。
+源泉エッジは辿らず、各ノードの属性行に畳む ([源泉の扱い](#源泉の扱い))。
 
 有向の到達可能性では「その FR がなぜ必要か (Goal)」までは辿れないため、
 `--undirected` で向きを無視した近傍も集められる。
@@ -463,6 +470,49 @@ $ req stats examples/sample.py --json
 | DOT | `req graph --format dot` | Graphviz で画像に落とす |
 | 静的サイト | `req site` | ブラウザで探索する。GitHub Pages で公開する |
 
+### 源泉の扱い
+
+**Source は図に描かず、参照元ノードの属性として出す。** `req graph` / `req explain` /
+静的サイトの図のいずれも既定でそうなる。
+
+理由は数にある。`requirements.py` は Source 6 件に対し `has_source` が 60 本あり、
+**全エッジ 116 本の過半が源泉**になっている (図に残るのは 56 本)。Source は 1 件が平均
+10 件の要求から参照されるハブなので、ノードとして置くとレイアウトがそこに引っ張られ、
+要求どうしの関係が読めなくなる。
+
+情報は失われない。`req explain` は源泉を辿らない代わりに、各ノードの属性行に畳む。
+`part_of` の鎖 (引用 → 引用元) も 1 行に収める。
+
+```
+- [FunctionalRequirement] FR-3: 申請内容を経費精算規程の各ルールに照合し、…
+    (status=approved, priority=1)
+    源泉: SRC-POLICY-A12-3 (1万円を超える支出には領収書の添付を要する) [第12条第3項] < SRC-POLICY (経費精算規程 第4版)
+```
+
+これは `req doc` が最初からしていたこと (`- 源泉: SRC-EMP (申請者となる一般社員)`) で、
+図の側をそれに揃えたものである。静的サイトでは右ペインに**源泉**の欄が出る。
+
+源泉をハブとして見たいとき (この条文がどの要求に効いているか) は、集約する側の
+出力を使う。
+
+- `req doc` の源泉節
+- `req doc --matrix` の `Source × 要求` 表
+- 静的サイトのテーブルビュー
+
+図の上で見たいときは `--with-sources` を付ける。静的サイトでは左サイドバーで
+`Source` と `has_source` / `part_of` にチェックを入れると出る (この状態は既定では
+ないので URL に載り、そのまま共有できる)。
+
+```console
+$ req graph requirements.py --with-sources      # Source をノードとして描く
+$ req explain FR-3 -f requirements.py --with-sources   # 源泉エッジも辿る
+```
+
+**型としての `Source` は変わらない。** `has_source` / `part_of` フィールド、
+`structure.missing_source` / `structure.unused_source` / `structure.part_of_cycle`、
+源泉トレース率、トレーサビリティ表はすべてそのままで、変わるのは図に描くかどうか
+だけである。
+
 Mermaid / DOT のノード識別子は `n1`, `n2`, … の連番で、`ordered_nodes()` (型順 → id 順)
 の索引から振る (`render.py` の `_ids()`)。元の id を識別子に流用すると、非英数字を
 潰した結果が衝突して `FR-1` と `FR_1` が図の上で 1 ノードに融合してしまう
@@ -479,8 +529,9 @@ Mermaid / DOT のノード識別子は `n1`, `n2`, … の連番で、`ordered_n
 - **status を枠線の線種で、高優先度を枠の外側の輪で表示**する
 - ノード種別・status・優先度・エッジ種別の絞り込み。**絞り込みは影響範囲の計算にも効く**
   (`req explain --edges` と同じ考え方)
-- 本文・受け入れ基準・出所 (file:line)・出入りのエッジ・そのノードへの指摘を右ペインに表示。
-  **出入りのエッジには相手ノードの本文を併記**する (飛ぶ前に何に繋がっているか読める)
+- 本文・受け入れ基準・**源泉**・出所 (file:line)・出入りのエッジ・そのノードへの指摘を
+  右ペインに表示。**出入りのエッジには相手ノードの本文を併記**する (飛ぶ前に何に
+  繋がっているか読める)。源泉は図に描かないぶんここに出る ([源泉の扱い](#源泉の扱い))
 - `--repo-url` を渡して生成すると、**出所が定義ファイルへのリンク**になる
 - 「影響部分グラフをコピー」で `req explain` 相当のテキストをクリップボードへ (LLM 連携用)
 - 検証結果の一覧。**重大度で絞り、チェックコードごとにまとめて**表示する。
@@ -657,8 +708,7 @@ $ req site examples/sample.py -o site \
 (300 ノードのベンチ用モデルでアスペクト比 26:1)。全体を収める倍率では文字が読めない。
 
 ツールバーの選択で深さ (1〜3 ホップ) を選ぶと、図に描くのは**選択ノードの近傍だけ**に
-なり、その部分グラフだけで並べ直す。**深さ 2 以上では `has_source` を外す**とよい
-(Source は数十件の要求から参照されるハブなので、近傍が一気に広がる)。
+なり、その部分グラフだけで並べ直す。
 
 フォーカスは**図の描画にしか効かない**。左の一覧・テーブル・上流/下流の件数・
 「影響部分グラフをコピー」の本文は、フォーカス中も全体のまま変わらない。

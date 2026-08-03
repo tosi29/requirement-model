@@ -115,6 +115,11 @@ def build_parser() -> argparse.ArgumentParser:
     graph_parser.add_argument(
         "--highlight", help="強調するノード ID をカンマ区切りで指定する"
     )
+    graph_parser.add_argument(
+        "--with-sources",
+        action="store_true",
+        help="Source ノードと源泉エッジも描く (既定では描かない)",
+    )
 
     explain_parser = subparsers.add_parser(
         "explain", help="影響部分グラフを LLM 向けテキストに整形する"
@@ -129,6 +134,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--undirected",
         action="store_true",
         help="エッジの向きを無視して辿る (FR から Goal などの文脈も集める)",
+    )
+    explain_parser.add_argument(
+        "--with-sources",
+        action="store_true",
+        help="源泉エッジも辿る (既定では辿らず、源泉は各ノードの属性として出す)",
     )
     explain_parser.add_argument("-o", "--output", help="出力先ファイル")
     explain_parser.add_argument(
@@ -351,7 +361,14 @@ def cmd_graph(args: argparse.Namespace) -> int:
         else None
     )
     _write(
-        render(result.graph, args.format, args.max_label, highlight), args.output
+        render(
+            result.graph,
+            args.format,
+            args.max_label,
+            highlight,
+            args.with_sources,
+        ),
+        args.output,
     )
     return EXIT_OK
 
@@ -368,7 +385,12 @@ def cmd_explain(args: argparse.Namespace) -> int:
 
     if args.json:
         ancestors, descendants, whole = impact_set(
-            result.graph, args.ids, edges, args.depth, args.undirected
+            result.graph,
+            args.ids,
+            edges,
+            args.depth,
+            args.undirected,
+            args.with_sources,
         )
         sub = RequirementGraph(
             [result.graph.nodes[i] for i in whole if i in result.graph.nodes],
@@ -384,7 +406,14 @@ def cmd_explain(args: argparse.Namespace) -> int:
         _write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", args.output)
     else:
         _write(
-            explain_text(result.graph, args.ids, edges, args.depth, args.undirected),
+            explain_text(
+                result.graph,
+                args.ids,
+                edges,
+                args.depth,
+                args.undirected,
+                args.with_sources,
+            ),
             args.output,
         )
     return EXIT_OK

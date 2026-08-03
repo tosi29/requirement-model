@@ -49,6 +49,8 @@ import {
   searchHits,
   severityTabs,
   sortRows,
+  sourceItems,
+  sourceLabel,
   sourceUrl,
   statusFilters,
   stepHit,
@@ -57,7 +59,7 @@ import {
   truncate,
   wrapLabel,
 } from "../../src/reqmodel/site_logic.js";
-import { ELLIPSE_FIT, allOn, fixture, largeFixture } from "./fixture.mjs";
+import { ELLIPSE_FIT, allOn, defaultOn, fixture, largeFixture } from "./fixture.mjs";
 
 const viewOf = (state) => {
   const data = fixture();
@@ -814,6 +816,27 @@ test("何も選んでいない絞り込みも URL に出せる", () => {
   assert.equal(stateOf("#types=").types.size, 0);
 });
 
+test("初期状態では Source と源泉エッジが外れている", () => {
+  const state = defaultState(fixture());
+
+  assert.ok(!state.types.has("Source"));
+  assert.ok(!state.edges.has("has_source"));
+  //: 型・エッジとも、外れているのは源泉まわりだけ。
+  assert.ok(state.types.has("FunctionalRequirement"));
+  assert.ok(state.edges.has("satisfies"));
+});
+
+test("源泉を出した状態は既定ではないので URL に載る", () => {
+  const data = fixture();
+  //: 「既定と違うところだけ URL に出す」の基準は全選択ではなく初期選択。
+  //: 全選択のときに空ハッシュを返すと、Source を出した状態が共有できなくなる。
+  const hash = encodeHash({ ...defaultState(data), ...allOn(data) }, data);
+
+  assert.ok(hash.includes("Source"));
+  assert.ok(hash.includes("has_source"));
+  assert.deepEqual(decodeHash(hash, data).types, new Set(data.types));
+});
+
 test("壊れたエスケープはその組だけ捨てる", () => {
   const state = stateOf("#q=%E3%81&node=FR-1");
 
@@ -874,7 +897,10 @@ test("エッジを絞ると nodeContext にフィルタ行が出る", () => {
   const text = nodeContext(view, "FR-1");
 
   assert.match(text, /エッジ種別フィルタ: motivates, satisfies/);
-  assert.ok(!text.includes("SRC-1"));
+  //: has_source は辿っていないので Source はブロックとしては出ない。
+  //: 源泉は属性行に畳まれる (--edges 指定は --with-sources ではない)。
+  assert.ok(!text.includes("- [Source] SRC-1"));
+  assert.match(text, / {4}源泉: SRC-1 \(/);
 });
 
 test("絞り込みが無ければフィルタ行は出ない", () => {
@@ -912,7 +938,10 @@ test("explainCommand は画面の設定をそのまま引数にする", () => {
   const data = fixture();
   const edges = new Set(["satisfies", "motivates"]);
 
-  assert.equal(explainCommand(viewOf(), "FR-1"), "req explain FR-1");
+  //: 初期状態 (源泉エッジが外れている) が `req explain ID` の既定と同じ。
+  assert.equal(explainCommand(createView(data, defaultOn(data)), "FR-1"), "req explain FR-1");
+  //: 源泉も出している状態は既定ではないので、フラグとして現れる。
+  assert.equal(explainCommand(viewOf(), "FR-1"), "req explain FR-1 --with-sources");
   assert.equal(
     explainCommand(createView(data, { ...allOn(data), edges, depth: 2, undirected: true }), "FR-1"),
     "req explain FR-1 --edges motivates,satisfies --depth 2 --undirected",
@@ -1392,6 +1421,54 @@ test("絞り込みで消えたエッジは一覧にも出ない", () => {
   assert.deepEqual(
     edgeItems(view, "FR-1").out.map((item) => item.id),
     ["N-1"],
+  );
+});
+
+// --- 詳細ペインの源泉欄 ------------------------------------------------------
+
+test("源泉は絞り込みに関係なく引ける", () => {
+  //: 図から Source を外すのが既定なので、view ではなく data から引けないと
+  //: 詳細ペインから源泉が消える。ここが源泉の唯一の出口になる。
+  const items = sourceItems(fixture(), "FR-1");
+
+  assert.deepEqual(
+    items.map((item) => [item.id, item.text, item.kind]),
+    [["SRC-1", "申請者となる一般社員", "stakeholder"]],
+  );
+  assert.deepEqual(items[0].parents, []);
+});
+
+test("源泉を持たないノードでは空になる", () => {
+  assert.deepEqual(sourceItems(fixture(), "QR-1"), []);
+});
+
+test("引用は part_of の鎖を親から順に持つ", () => {
+  const data = fixture();
+  data.nodes.push(
+    { type: "Source", id: "SRC-DOC", text: "経費精算規程", status: "approved", priority: null, kind: "document" },
+    {
+      type: "Source",
+      id: "SRC-DOC-A12",
+      text: "領収書の添付を要する",
+      status: "approved",
+      priority: null,
+      kind: "document",
+      locator: "第12条第3項",
+    },
+  );
+  data.edges.push(
+    { source: "SRC-DOC-A12", name: "part_of", target: "SRC-DOC" },
+    { source: "QR-1", name: "has_source", target: "SRC-DOC-A12" },
+  );
+
+  const [item] = sourceItems(data, "QR-1");
+
+  assert.equal(item.locator, "第12条第3項");
+  assert.deepEqual(item.parents, [{ id: "SRC-DOC", text: "経費精算規程" }]);
+  //: 畳んだ表示は `explain.py` の source_label() と同じ形。
+  assert.equal(
+    sourceLabel(data, "SRC-DOC-A12"),
+    "SRC-DOC-A12 (領収書の添付を要する) [第12条第3項] < SRC-DOC (経費精算規程)",
   );
 });
 

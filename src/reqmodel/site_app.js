@@ -45,6 +45,7 @@ import {
   searchHits,
   severityTabs,
   sortRows,
+  sourceItems,
   sourceUrl,
   statusFilters,
   stepHit,
@@ -434,6 +435,29 @@ function renderDetail() {
   if ((node.acceptance_criteria || []).length) {
     rows.push("<h2>受け入れ基準</h2><ul>");
     for (const criterion of node.acceptance_criteria) rows.push(`<li>${escapeHtml(criterion)}</li>`);
+    rows.push("</ul>");
+  }
+
+  //: 源泉は図に描かない (`model.SOURCE_EDGES`) ので、ここが唯一の出口になる。
+  //: 絞り込みで Source を消していても読めるよう、view ではなく DATA から引く。
+  //: 飛び先にはしない。図に居ないノードへ飛ばすと選択が外れるだけになる。
+  const sources = sourceItems(DATA, node.id);
+  if (sources.length) {
+    rows.push("<h2>源泉</h2><ul class=\"sources\">");
+    for (const source of sources) {
+      const locator = source.locator ? ` <span class="locator">${escapeHtml(source.locator)}</span>` : "";
+      const kind = source.kind ? ` <span class="type">${escapeHtml(source.kind)}</span>` : "";
+      //: 引用元 (part_of の鎖) は「< 親」の形で 1 行に畳む。
+      const parents = source.parents
+        .map((parent) => ` &lt; ${escapeHtml(parent.id)} (${escapeHtml(truncate(parent.text, 30))})`)
+        .join("");
+      rows.push(
+        `<li><span class="id">${escapeHtml(source.id)}</span>${kind}${locator}` +
+          `<span class="text">${escapeHtml(source.text)}</span>` +
+          (parents ? `<span class="parents">${parents}</span>` : "") +
+          "</li>",
+      );
+    }
     rows.push("</ul>");
   }
 

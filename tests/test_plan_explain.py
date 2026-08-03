@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 from conftest import build, fr, goal, need, qr, source
-from reqmodel.explain import explain_text, impact_set
+from reqmodel.explain import explain_text, impact_set, source_label
 from reqmodel.loader import load_paths
 from reqmodel.plan import diff_graphs, format_plan, load_revision
 from reqmodel.render import render_dot, render_mermaid
@@ -159,9 +159,15 @@ def test_load_revision_tolerates_files_absent_in_the_revision(tmp_path: Path):
 
 def test_impact_set_splits_upstream_and_downstream():
     ancestors, descendants, whole = impact_set(chain(), ["FR-1"])
-    assert descendants == {"N-1", "S-1"}
+    #: 源泉エッジは既定で辿らないので S-1 は入らない。
+    assert descendants == {"N-1"}
     assert ancestors == set()
     assert "FR-1" in whole
+
+
+def test_impact_set_reaches_sources_only_when_asked():
+    _, descendants, _ = impact_set(chain(), ["FR-1"], include_sources=True)
+    assert descendants == {"N-1", "S-1"}
 
 
 def test_explain_text_contains_natural_language_and_edges():
@@ -183,7 +189,92 @@ def test_explain_reports_unknown_node():
     assert "存在しないノード: X-1" in explain_text(chain(), ["FR-1", "X-1"])
 
 
+# --- 源泉の扱い (図には出さず、ノードの属性として出す) ------------------------
+
+
+def quoted():
+    """引用 (part_of で文書にぶら下がる Source) を持つ最小のグラフ。"""
+    document = source("SRC-DOC", text="経費精算規程 第4版", kind="document")
+    clause = source(
+        "SRC-DOC-A12",
+        text="1万円を超える支出には領収書の添付を要する",
+        kind="document",
+        locator="第12条第3項",
+        part_of=[document],
+    )
+    return build(document, clause, fr("FR-1", has_source=[clause]))
+
+
+def test_explain_folds_the_source_into_an_attribute_line():
+    text = explain_text(quoted(), ["FR-1"])
+
+    #: 引用文・位置・引用元の 3 つが 1 行に畳まれる。
+    assert (
+        "    源泉: SRC-DOC-A12 (1万円を超える支出には領収書の添付を要する) "
+        "[第12条第3項] < SRC-DOC (経費精算規程 第4版)"
+    ) in text
+    #: Source はブロックとしては出ない (辿っていないので下流に入らない)。
+    assert "## 下流" not in text
+    assert "- [Source]" not in text
+
+
+def test_explain_says_it_did_not_follow_source_edges():
+    text = explain_text(quoted(), ["FR-1"])
+
+    assert "源泉エッジ (has_source, part_of) は辿っていない" in text
+    #: 辿らなかった種別を「現れなかった」にも出すと読み分けられなくなる。
+    unused = [line for line in text.splitlines() if "現れなかったエッジ種別" in line]
+    assert not any("has_source" in line or "part_of" in line for line in unused)
+
+
+def test_explain_with_sources_walks_them_instead_of_folding():
+    text = explain_text(quoted(), ["FR-1"], include_sources=True)
+
+    assert "- [Source] SRC-DOC-A12" in text
+    assert "FR-1 --has_source--> SRC-DOC-A12" in text
+    #: 辿ったならブロックで出ているので、属性行には畳まない。
+    assert "    源泉:" not in text
+    assert "源泉エッジ" not in text
+
+
+def test_explicit_edge_filter_still_folds_the_source():
+    """`--edges` は書き手の明示指定。源泉を辿らないので属性としては残す。"""
+    text = explain_text(quoted(), ["FR-1"], edge_names=["satisfies"])
+
+    assert "- [Source]" not in text
+    assert "    源泉: SRC-DOC-A12 " in text
+
+
+def test_source_label_stops_on_a_part_of_cycle():
+    """part_of の閉路は層2 がエラーにするが、整形側で無限ループにはしない。"""
+    a = source("SRC-A", text="A", part_of=["SRC-B"])
+    b = source("SRC-B", text="B", part_of=["SRC-A"])
+    label = source_label(build(a, b, fr("FR-1", has_source=[a])), "SRC-A")
+
+    assert label == "SRC-A (A) < SRC-B (B)"
+
+
 # --- render -----------------------------------------------------------------
+
+
+def test_graph_leaves_out_sources_by_default():
+    graph = quoted()
+    default = render_mermaid(graph)
+    with_sources = render_mermaid(graph, include_sources=True)
+
+    assert "[Source]" not in default
+    assert "has_source" not in default and "part_of" not in default
+    assert "[Source]" in with_sources
+    assert "has_source" in with_sources
+    #: 型としては残るので、凡例のもとになる classDef は既定でも出る。
+    assert "    classDef Source" in default
+
+
+def test_dot_leaves_out_sources_by_default():
+    graph = quoted()
+
+    assert "[Source]" not in render_dot(graph)
+    assert "[Source]" in render_dot(graph, include_sources=True)
 
 
 def test_mermaid_output_is_well_formed():
@@ -227,7 +318,8 @@ def collide():
 
 
 def test_ids_differing_only_in_punctuation_stay_separate_nodes():
-    text = render_mermaid(collide())
+    #: 識別子の衝突を見るテストなので、Source も描かせて全ノードを対象にする。
+    text = render_mermaid(collide(), include_sources=True)
     declared = dict(
         (node_id, identifier)
         for identifier, node_id in re.findall(
@@ -255,7 +347,11 @@ def test_edges_between_colliding_ids_keep_their_own_endpoints():
 
 
 def test_dot_gives_every_node_its_own_identifier():
-    declared = re.findall(r"^    (\w+) \[shape=", render_dot(collide()), re.MULTILINE)
+    declared = re.findall(
+        r"^    (\w+) \[shape=",
+        render_dot(collide(), include_sources=True),
+        re.MULTILINE,
+    )
     assert len(declared) == len(set(declared)) == 5
 
 
@@ -271,7 +367,7 @@ def test_highlight_marks_only_the_node_with_that_id():
 
 def test_identifiers_follow_the_order_of_ordered_nodes():
     graph = collide()
-    text = render_mermaid(graph)
+    text = render_mermaid(graph, include_sources=True)
     declared = [
         line.split("<b>")[1].split("</b>")[0]
         for line in text.splitlines()
@@ -279,4 +375,4 @@ def test_identifiers_follow_the_order_of_ordered_nodes():
     ]
     #: 宣言の順は ordered_nodes() そのもの = n1, n2, … が振られる順。
     assert declared == [node.id for node in graph.ordered_nodes()]
-    assert render_mermaid(graph) == text
+    assert render_mermaid(graph, include_sources=True) == text

@@ -528,7 +528,7 @@ const idsSortedBy = (key, asc) => {
   return sortRows(view, rows, { key, asc }).map((row) => row.id);
 };
 
-test("tableRows は 1 ノード 1 行にし、受け入れ基準と指摘を数える", () => {
+test("tableRows は 1 ノード 1 行にし、根拠と指摘を数える", () => {
   const { rows } = rowsOf();
 
   assert.equal(rows.length, 5);
@@ -538,13 +538,13 @@ test("tableRows は 1 ノード 1 行にし、受け入れ基準と指摘を数�
     text: "領収書画像から金額を抽出すること",
     status: "proposed",
     priority: 2,
-    criteria: 1,
+    evidence: 1,
     findings: 1,
     severity: "info",
   });
-  // 受け入れ基準を持たない型は 0 件、指摘の無いノードは 0 件。
+  // 根拠を持たない型は 0 件、指摘の無いノードは 0 件。
   const source = rows.find((row) => row.id === "SRC-1");
-  assert.equal(source.criteria, 0);
+  assert.equal(source.evidence, 0);
   assert.equal(source.findings, 0);
   assert.equal(source.severity, null);
 });
@@ -682,7 +682,7 @@ test("知らない列を押しても並び順は変わらない", () => {
 test("列の定義には issue の求める項目が揃っている", () => {
   assert.deepEqual(
     TABLE_COLUMNS.map((column) => column.key),
-    ["id", "type", "text", "status", "priority", "criteria", "findings"],
+    ["id", "type", "text", "status", "priority", "evidence", "findings"],
   );
 });
 
@@ -779,7 +779,7 @@ test("ハッシュ → 状態 → ハッシュでも元に戻る", () => {
   const hash =
     "#node=QR-1&types=Goal,QualityRequirement&edges=qualifies&status=proposed" +
     "&priority=high,normal&dir=LR&view=table&focus=1&depth=2&undir=1" +
-    `&q=${encodeURIComponent("3 秒")}&sort=criteria:desc`;
+    `&q=${encodeURIComponent("3 秒")}&sort=evidence:desc`;
 
   assert.equal(encodeHash(decodeHash(hash, data), data), hash);
 });

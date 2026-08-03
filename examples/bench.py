@@ -414,6 +414,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-3"],
+    evidence=["出荷の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["出荷の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -442,6 +443,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-6"],
+    evidence=["返品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["返品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -470,6 +472,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-9"],
+    evidence=["車両の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["車両の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -498,6 +501,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-12"],
+    evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["検品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -526,6 +530,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-15"],
+    evidence=["出荷の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["出荷の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -554,6 +559,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-18"],
+    evidence=["返品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["返品の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -582,6 +588,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     refines=["FR-20"],
+    evidence=["車両の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["車両の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -610,6 +617,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-24"],
+    evidence=["検品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["検品の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -638,6 +646,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-3"],
+    evidence=["出荷の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["出荷の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -666,6 +675,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-6"],
+    evidence=["返品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["返品の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -694,6 +704,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-9"],
+    evidence=["車両の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["車両の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -722,6 +733,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-12"],
+    evidence=["検品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["検品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -750,6 +762,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-15"],
+    evidence=["出荷の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["出荷の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -778,6 +791,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     refines=["FR-41"],
+    evidence=["返品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["返品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -806,6 +820,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-21"],
+    evidence=["車両の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["車両の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -834,6 +849,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-24"],
+    evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["検品の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -862,6 +878,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-3"],
+    evidence=["出荷の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["出荷の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -890,6 +907,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-6"],
+    evidence=["返品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["返品の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -918,6 +936,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-9"],
+    evidence=["車両の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["車両の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -946,6 +965,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-12"],
+    evidence=["検品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["検品の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -974,6 +994,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     refines=["FR-62"],
+    evidence=["出荷の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["出荷の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1002,6 +1023,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-18"],
+    evidence=["返品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["返品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1030,6 +1052,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-21"],
+    evidence=["車両の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["車両の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1058,6 +1081,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-24"],
+    evidence=["検品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["検品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1086,6 +1110,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-3"],
+    evidence=["出荷の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["出荷の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1114,6 +1139,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-6"],
+    evidence=["返品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["返品の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1142,6 +1168,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-9"],
+    evidence=["車両の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["車両の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1170,6 +1197,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     refines=["FR-83"],
+    evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["検品の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1198,6 +1226,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-15"],
+    evidence=["出荷の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["出荷の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1226,6 +1255,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-18"],
+    evidence=["返品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["返品の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1254,6 +1284,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-21"],
+    evidence=["車両の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["車両の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1282,6 +1313,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-24"],
+    evidence=["検品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["検品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1310,6 +1342,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-3"],
+    evidence=["出荷の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["出荷の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1338,6 +1371,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-6"],
+    evidence=["返品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["返品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1366,6 +1400,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     refines=["FR-104"],
+    evidence=["車両の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["車両の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1394,6 +1429,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-12"],
+    evidence=["検品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["検品の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1422,6 +1458,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-15"],
+    evidence=["出荷の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["出荷の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1450,6 +1487,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-18"],
+    evidence=["返品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["返品の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1478,6 +1516,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-21"],
+    evidence=["車両の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["車両の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1506,6 +1545,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-24"],
+    evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["検品の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1534,6 +1574,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-3"],
+    evidence=["出荷の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["出荷の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1562,6 +1603,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     refines=["FR-125"],
+    evidence=["返品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["返品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1590,6 +1632,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-9"],
+    evidence=["車両の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["車両の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1618,6 +1661,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-12"],
+    evidence=["検品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["検品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1646,6 +1690,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-15"],
+    evidence=["出荷の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["出荷の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1674,6 +1719,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-18"],
+    evidence=["返品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["返品の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1702,6 +1748,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-21"],
+    evidence=["車両の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["車両の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1730,6 +1777,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-24"],
+    evidence=["検品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["検品の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1758,6 +1806,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     refines=["FR-146"],
+    evidence=["出荷の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["出荷の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1786,6 +1835,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-6"],
+    evidence=["返品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["返品の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1814,6 +1864,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-9"],
+    evidence=["車両の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["車両の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1842,6 +1893,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-12"],
+    evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["検品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1870,6 +1922,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-15"],
+    evidence=["出荷の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["出荷の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1898,6 +1951,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-18"],
+    evidence=["返品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["返品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1926,6 +1980,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-21"],
+    evidence=["車両の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["車両の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1954,6 +2009,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     refines=["FR-167"],
+    evidence=["検品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["検品の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1982,6 +2038,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-3"],
+    evidence=["出荷の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["出荷の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2010,6 +2067,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-6"],
+    evidence=["返品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["返品の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2038,6 +2096,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-9"],
+    evidence=["車両の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["車両の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2066,6 +2125,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-12"],
+    evidence=["検品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["検品の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2094,6 +2154,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-15"],
+    evidence=["出荷の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["出荷の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2122,6 +2183,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-18"],
+    evidence=["返品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["返品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2150,6 +2212,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     refines=["FR-188"],
+    evidence=["車両の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["車両の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2178,6 +2241,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-6"],
     satisfies=["N-24"],
+    evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["検品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2206,6 +2270,7 @@ FunctionalRequirement(
     status="verified",
     has_source=["SRC-3"],
     satisfies=["N-3"],
+    evidence=["出荷の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["出荷の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2254,6 +2319,7 @@ QualityRequirement(
     status="verified",
     has_source=["SRC-6"],
     qualifies=["FR-13"],
+    evidence=["配送の受入テスト第 4 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
@@ -2290,6 +2356,7 @@ QualityRequirement(
     status="verified",
     has_source=["SRC-4"],
     qualifies=["FR-29"],
+    evidence=["倉庫の受入テスト第 8 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
@@ -2326,6 +2393,7 @@ QualityRequirement(
     status="verified",
     has_source=["SRC-2"],
     qualifies=["FR-45"],
+    evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
@@ -2362,6 +2430,7 @@ QualityRequirement(
     status="verified",
     has_source=["SRC-6"],
     qualifies=["FR-61"],
+    evidence=["配送の受入テスト第 7 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
@@ -2398,6 +2467,7 @@ QualityRequirement(
     status="verified",
     has_source=["SRC-4"],
     qualifies=["FR-77"],
+    evidence=["倉庫の受入テスト第 2 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
@@ -2434,6 +2504,7 @@ QualityRequirement(
     status="verified",
     has_source=["SRC-2"],
     qualifies=["FR-93"],
+    evidence=["検品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
@@ -2470,6 +2541,7 @@ QualityRequirement(
     status="verified",
     has_source=["SRC-6"],
     qualifies=["FR-109"],
+    evidence=["配送の受入テスト第 1 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
@@ -2506,6 +2578,7 @@ QualityRequirement(
     status="verified",
     has_source=["SRC-4"],
     qualifies=["FR-125"],
+    evidence=["倉庫の受入テスト第 5 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
@@ -2542,6 +2615,7 @@ QualityRequirement(
     status="verified",
     has_source=["SRC-2"],
     qualifies=["FR-141"],
+    evidence=["検品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
@@ -2578,6 +2652,7 @@ QualityRequirement(
     status="verified",
     has_source=["SRC-6"],
     qualifies=["FR-157"],
+    evidence=["配送の受入テスト第 4 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
@@ -2614,6 +2689,7 @@ QualityRequirement(
     status="verified",
     has_source=["SRC-4"],
     qualifies=["FR-173"],
+    evidence=["倉庫の受入テスト第 8 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
@@ -2653,6 +2729,7 @@ QualityRequirement(
     priority=2,
     has_source=["SRC-2"],
     qualifies=["SYS"],
+    evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 

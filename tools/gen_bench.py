@@ -115,6 +115,16 @@ STATUSES_FR = ["approved", "implemented", "verified"]
 STATUSES_QR = ["proposed", "approved", "implemented", "verified"]
 
 
+def evidence_for(status: str, index: int) -> list[str]:
+    """``verified`` と書いた分だけ根拠を添える (``structure.unverified_claim``)。
+
+    根拠が要るのは主張した時点だけなので、それ以外の status では空にする。
+    """
+    if status != "verified":
+        return []
+    return [f"{area(index)}の受入テスト第 {index % 9 + 1} 回で、全項目が合格している"]
+
+
 def area(index: int) -> str:
     return AREAS[index % len(AREAS)]
 
@@ -274,16 +284,18 @@ def render() -> str:
     for index in range(FRS):
         number = index + 1
         refines_parent = number % FR_REFINE_EVERY == 0
+        status = STATUSES_FR[index % len(STATUSES_FR)]
         parts.append(
             node(
                 "FunctionalRequirement",
                 id=f"FR-{number}",
                 text=f"{area(index)}の{thing(index)}を{FR_VERBS[index % len(FR_VERBS)]}",
-                status=STATUSES_FR[index % len(STATUSES_FR)],
+                status=status,
                 priority=index % 5 + 1 if index % 3 == 0 else None,
                 has_source=[source_of(index)],
                 satisfies=[] if refines_parent else [f"N-{index % NEEDS + 1}"],
                 refines=[f"FR-{number - 1}"] if refines_parent else [],
+                evidence=evidence_for(status, index),
                 acceptance_criteria=[
                     f"{area(index)}の{thing(index)}が 3 秒以内に画面へ出る",
                     "実行した担当者と日時が操作ログに残る",
@@ -302,15 +314,17 @@ def render() -> str:
         else:
             target = f"FR-{index * 4 % FRS + 1}"
             text = f"{area(index)}の{thing(index)}の表示を 2 秒以内に返すこと"
+        status = STATUSES_QR[index % len(STATUSES_QR)]
         parts.append(
             node(
                 "QualityRequirement",
                 id=f"QR-{number}",
                 text=text,
-                status=STATUSES_QR[index % len(STATUSES_QR)],
+                status=status,
                 priority=2 if on_system else None,
                 has_source=[source_of(index + 2)],
                 qualifies=[target],
+                evidence=evidence_for(status, index),
                 acceptance_criteria=[
                     "連続 30 日の計測で、上限を超えた回数が 0 件である",
                 ],

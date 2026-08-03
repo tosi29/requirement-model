@@ -178,6 +178,22 @@ def test_explain_text_contains_natural_language_and_edges():
     assert "FR-1 --satisfies--> N-1" in text
 
 
+def test_explain_text_carries_the_evidence():
+    """LLM に渡る文脈で最も具体的なのは、何をもって満たしたと判断したかの側。"""
+    s = source("S-1")
+    n = need("N-1", has_source=[s])
+    g = goal("G-1", motivates=[n], has_source=[s])
+    f = fr(
+        "FR-1",
+        satisfies=[n],
+        has_source=[s],
+        status="verified",
+        evidence=["受入テスト第 1 回で全項目が合格した"],
+    )
+    text = explain_text(build(s, n, g, f), ["FR-1"])
+    assert "    根拠: 受入テスト第 1 回で全項目が合格した" in text
+
+
 def test_explain_undirected_reaches_the_goal():
     directed = explain_text(chain(), ["FR-1"])
     undirected = explain_text(chain(), ["FR-1"], undirected=True)

@@ -158,9 +158,27 @@ def test_missing_source_is_reported():
     assert "structure.missing_source" in codes_for(findings, "N-1")
 
 
-def test_missing_acceptance_criteria_is_reported():
+def test_verified_without_evidence_is_reported():
+    findings = validate_structure(build(fr("FR-1", status="verified")))
+    assert "structure.unverified_claim" in codes_for(findings, "FR-1")
+
+
+def test_evidence_silences_the_verified_claim():
+    graph = build(fr("FR-1", status="verified", evidence=["受入テストで確認した"]))
+    assert "structure.unverified_claim" not in codes_for(validate_structure(graph), "FR-1")
+
+
+def test_unverified_claim_does_not_fire_before_the_claim():
+    """まだ確かめたと言っていない要求に根拠を求めない。"""
+    for status in ("proposed", "approved", "implemented"):
+        graph = build(fr("FR-1", status=status))
+        assert "structure.unverified_claim" not in codes_for(validate_structure(graph), "FR-1")
+
+
+def test_acceptance_criteria_are_optional():
+    """事前の基準は任意。無くても指摘は出ない。"""
     findings = validate_structure(build(fr("FR-1", acceptance_criteria=[])))
-    assert "structure.missing_acceptance_criteria" in codes_for(findings, "FR-1")
+    assert not [f for f in findings if f.node_id == "FR-1" and "criteria" in f.code]
 
 
 def test_approved_requirement_pointing_at_proposed_need_is_reported():
@@ -195,6 +213,12 @@ def test_ambiguous_terms_are_detected():
 
 def test_ambiguous_terms_are_detected_in_acceptance_criteria():
     graph = build(fr("FR-1", acceptance_criteria=["適切に表示される"]))
+    assert "semantics.ambiguous_term" in codes(validate_semantics_lexical(graph))
+
+
+def test_ambiguous_terms_are_detected_in_evidence():
+    """「十分高速だった」の類は根拠の側に出る。"""
+    graph = build(fr("FR-1", status="verified", evidence=["計測したところ高速に終わった"]))
     assert "semantics.ambiguous_term" in codes(validate_semantics_lexical(graph))
 
 

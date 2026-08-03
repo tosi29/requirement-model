@@ -113,6 +113,8 @@ def _describe(
     if decomposition is not None and graph.in_edges(node.id, ("refines",)):
         attrs.append(f"decomposition={decomposition}")
     lines.append(f"    ({', '.join(attrs)})")
+    for item in getattr(node, "evidence", []) or []:
+        lines.append(f"    根拠: {item}")
     for criterion in getattr(node, "acceptance_criteria", []) or []:
         lines.append(f"    受け入れ基準: {criterion}")
     #: 源泉は辿らない代わりに、参照元ノードの属性として書き出す。図から外しても

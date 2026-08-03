@@ -76,6 +76,7 @@ export function fixture(overrides = {}) {
       status: "proposed",
       priority: 2,
       has_source: ["SRC-1"],
+      evidence: ["受入テスト第 1 回で正解率 96% だった"],
       acceptance_criteria: ["正解率が 95% 以上である"],
       satisfies: ["N-1"],
       refines: [],
@@ -87,6 +88,7 @@ export function fixture(overrides = {}) {
       status: "proposed",
       priority: null,
       has_source: [],
+      evidence: [],
       acceptance_criteria: [],
       qualifies: ["FR-1"],
     },
@@ -175,6 +177,7 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
       text: `機能 ${i} を提供すること`,
       status: i % 3 === 0 ? "implemented" : "approved",
       priority: i % 11 === 0 ? 1 : null,
+      evidence: [`機能 ${i} の受入テスト結果`],
       acceptance_criteria: [`機能 ${i} の受け入れ基準`],
     });
     link(id, "satisfies", `N-${pick(i, needs)}`);
@@ -191,6 +194,7 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
       text: `品質 ${i} を保つこと`,
       status: "proposed",
       priority: null,
+      evidence: [`品質 ${i} の計測結果`],
       acceptance_criteria: [`品質 ${i} の受け入れ基準`],
     });
     link(id, "qualifies", `FR-${pick(i, frs)}`);

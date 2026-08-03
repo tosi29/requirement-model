@@ -140,13 +140,20 @@ def _relation_lines(graph: RequirementGraph, node: Node) -> list[str]:
     return lines
 
 
-def _criteria_lines(node: Node) -> list[str]:
-    criteria: Sequence[str] = getattr(node, "acceptance_criteria", []) or []
-    if not criteria:
+def _listed(node: Node, attr: str, label: str) -> list[str]:
+    items: Sequence[str] = getattr(node, attr, []) or []
+    if not items:
         return []
-    lines = ["- 受け入れ基準:"]
-    lines.extend(f"    - {_inline(c)}" for c in criteria)
+    lines = [f"- {label}:"]
+    lines.extend(f"    - {_inline(item)}" for item in items)
     return lines
+
+
+def _criteria_lines(node: Node) -> list[str]:
+    """根拠 (事後) を先、受け入れ基準 (事前) を後に置く。"""
+    return _listed(node, "evidence", "根拠") + _listed(
+        node, "acceptance_criteria", "受け入れ基準"
+    )
 
 
 def _node_block(graph: RequirementGraph, node: Node, level: int) -> list[str]:

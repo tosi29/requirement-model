@@ -183,8 +183,20 @@ class Sourced(Node):
 
 
 class Requirement(Sourced):
-    """FR と QR の共通部分。受け入れ基準を持つ。"""
+    """FR と QR の共通部分。検証に関わる 2 つの欄を持つ。
 
+    ``evidence`` が主で、``acceptance_criteria`` が従である。要求文が測定可能に
+    書けていれば「何をもって満たしたとするか」は text に入りきるので、事前の基準は
+    任意とし、検査は「``verified`` と主張したなら根拠を出せ」の側にだけ置いた
+    (docs/design/model.md の「検証可能性を evidence 側に置く」を参照)。
+    """
+
+    #: 何をもって満たしたと判断したか。``status="verified"`` の根拠になる
+    #: (``structure.unverified_claim``)。事後の事実を書く欄なので、テスト・計測・
+    #: レビューのいずれでもよい。
+    evidence: list[str] = []
+    #: text が測定可能に書けないときだけ、事前の基準としてその操作化を書く。
+    #: 書かなくても指摘は出ない。
     acceptance_criteria: list[str] = []
 
 

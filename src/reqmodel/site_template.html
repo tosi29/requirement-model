@@ -276,6 +276,15 @@ button.finding:hover { box-shadow: inset 0 0 0 1px var(--accent); }
 .detail .edge .arrow { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--muted); }
 .detail .edge .text { display: block; color: var(--muted); font-size: 12px; }
 .detail .loc a { overflow-wrap: anywhere; }
+/* 源泉は図に描かないので、ここが唯一の出口になる。飛び先ではないので
+   ボタンにせず、id・種別・位置を 1 行目、引用文と引用元を続く行に出す。 */
+.detail .sources { list-style: none; margin: 0 0 12px; padding: 0; }
+.detail .sources li { margin: 0 0 8px; font-size: 13px; }
+.detail .sources .id { font-family: ui-monospace, monospace; font-size: 11.5px; }
+.detail .sources .type { margin-left: 6px; color: var(--muted); font-size: 11.5px; }
+.detail .sources .locator { margin-left: 6px; color: var(--muted); font-size: 11.5px; }
+.detail .sources .text { display: block; color: var(--muted); font-size: 12px; }
+.detail .sources .parents { display: block; color: var(--muted); font-size: 11.5px; }
 .empty { color: var(--muted); font-size: 13px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }

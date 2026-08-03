@@ -6,9 +6,10 @@ from typing import Iterable
 
 from typing import Any
 
-from .graph import RequirementGraph
+from .graph import Edge, RequirementGraph
 from .model import (
     HIGH_PRIORITY_THRESHOLD,
+    SOURCE_EDGES,
     STATUS_RANK,
     TYPE_ORDER,
     Constraint,
@@ -237,6 +238,22 @@ def _ids(nodes: Iterable[Node]) -> dict[str, str]:
     return {node.id: f"n{index}" for index, node in enumerate(nodes, 1)}
 
 
+def _drawn(
+    graph: RequirementGraph, include_sources: bool
+) -> tuple[list[Node], list[Edge]]:
+    """図に出すノードとエッジ。
+
+    既定では Source ノードと源泉エッジを落とす (理由は ``model.SOURCE_EDGES``)。
+    識別子はここで残ったノードに振るので、除外しても連番に穴は空かない。
+    """
+    nodes = graph.ordered_nodes()
+    edges = list(graph.edges)
+    if include_sources:
+        return nodes, edges
+    nodes = [node for node in nodes if not isinstance(node, Source)]
+    return nodes, [edge for edge in edges if edge.name not in SOURCE_EDGES]
+
+
 def _mermaid_shape(node: Node) -> tuple[str, str]:
     for node_type, shape in _MERMAID_SHAPE.items():
         if isinstance(node, node_type):
@@ -264,10 +281,11 @@ def render_mermaid(
     graph: RequirementGraph,
     max_label: int = 40,
     highlight: Iterable[str] | None = None,
+    include_sources: bool = False,
 ) -> str:
     lines = ["flowchart TD"]
     highlighted = set(highlight or ())
-    nodes = graph.ordered_nodes()
+    nodes, drawn_edges = _drawn(graph, include_sources)
     ids = _ids(nodes)
 
     for node in nodes:
@@ -284,7 +302,7 @@ def render_mermaid(
         )
 
     lines.append("")
-    for edge in graph.edges:
+    for edge in drawn_edges:
         if edge.source not in ids or edge.target not in ids:
             continue
         arrow = _EDGE_STYLE_MERMAID.get(edge.name, "-->")
@@ -315,6 +333,7 @@ def render_dot(
     graph: RequirementGraph,
     max_label: int = 40,
     highlight: Iterable[str] | None = None,
+    include_sources: bool = False,
 ) -> str:
     highlighted = set(highlight or ())
     lines = [
@@ -323,7 +342,7 @@ def render_dot(
         '    node [fontname="sans-serif", style=filled, fillcolor=white];',
         '    edge [fontname="sans-serif", fontsize=10];',
     ]
-    nodes = graph.ordered_nodes()
+    nodes, drawn_edges = _drawn(graph, include_sources)
     ids = _ids(nodes)
     for node in nodes:
         shape = _dot_shape_of(node)
@@ -335,7 +354,7 @@ def render_dot(
             node_attrs += ', color="#d93025", penwidth=2'
         lines.append(f"    {ids[node.id]} [{node_attrs}];")
 
-    for edge in graph.edges:
+    for edge in drawn_edges:
         if edge.source not in ids or edge.target not in ids:
             continue
         edge_attrs = [f'label="{edge.name}"']
@@ -354,9 +373,10 @@ def render(
     fmt: str = "mermaid",
     max_label: int = 40,
     highlight: Iterable[str] | None = None,
+    include_sources: bool = False,
 ) -> str:
     if fmt == "mermaid":
-        return render_mermaid(graph, max_label, highlight)
+        return render_mermaid(graph, max_label, highlight, include_sources)
     if fmt == "dot":
-        return render_dot(graph, max_label, highlight)
+        return render_dot(graph, max_label, highlight, include_sources)
     raise ValueError(f"未対応の形式: {fmt}")

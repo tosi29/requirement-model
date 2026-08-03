@@ -524,6 +524,23 @@ fr_id_collision = FunctionalRequirement(
         "FR.1 と FR-1 を含むモデルの Mermaid 出力に、2 つのノードが別々に現れる",
     ],
 )
+fr_source_as_attribute = FunctionalRequirement(
+    id="FR-25",
+    text=(
+        "源泉を図に描かず、参照元ノードの属性として引用文・位置・引用元まで"
+        "出すこと"
+    ),
+    status="implemented",
+    priority=2,
+    satisfies=[need_readable, need_llm_context],
+    has_source=[src_owner],
+    acceptance_criteria=[
+        "既定の Mermaid / DOT 出力に Source ノードと has_source / part_of が現れない",
+        "req explain の各ノードに、引用文と locator と part_of の親を畳んだ源泉行が出る",
+        "閲覧用サイトの詳細ペインに源泉欄が出る (図の絞り込みに依らず読める)",
+        "--with-sources を付けると図に描き、源泉エッジも辿る",
+    ],
+)
 
 # --- 品質要求 ---------------------------------------------------------------
 

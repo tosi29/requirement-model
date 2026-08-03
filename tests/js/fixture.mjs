@@ -1,5 +1,7 @@
 /** テスト用の埋め込みデータ。`site_data()` が出す形の最小版。 */
 
+import { initialSelection } from "../../src/reqmodel/site_logic.js";
+
 export const EDGE_NAMES = [
   "has_source",
   "refines",
@@ -39,6 +41,12 @@ export const TYPES = [
   "System",
   "Source",
 ];
+
+//: 図に既定で描かないもの (`site_data()` の hidden_by_default と同じ形)。
+export const HIDDEN_BY_DEFAULT = {
+  types: ["Source"],
+  edges: ["has_source", "part_of"],
+};
 
 /**
  * G-1 --motivates--> N-1 <--satisfies-- FR-1 <--qualifies-- QR-1
@@ -112,6 +120,7 @@ export function fixture(overrides = {}) {
     generated_from: ["t.py"],
     types: TYPES,
     edge_names: EDGE_NAMES,
+    hidden_by_default: HIDDEN_BY_DEFAULT,
     edge_names_by_type: EDGE_NAMES_BY_TYPE,
     status_rank: STATUS_RANK,
     nodes,
@@ -210,6 +219,7 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
     generated_from: ["bench.py"],
     types: TYPES,
     edge_names: EDGE_NAMES,
+    hidden_by_default: HIDDEN_BY_DEFAULT,
     edge_names_by_type: EDGE_NAMES_BY_TYPE,
     status_rank: STATUS_RANK,
     nodes,
@@ -256,12 +266,24 @@ export const META = {
   search: { hit: "#00b8d4" },
 };
 
-/** 既定の state (すべて表示)。 */
+/** すべて表示した state (Source と源泉エッジも出す)。 */
 export function allOn(data) {
   return {
     types: new Set(data.types),
     edges: new Set(data.edge_names),
     statuses: new Set(Object.keys(data.meta.statuses)),
     priorities: new Set(["high", "normal", "none"]),
+  };
+}
+
+/**
+ * ページの初期 state。`allOn()` との違いは Source と源泉エッジが外れていること
+ * (`defaultState()` と同じ選択)。既定の振る舞いを見るテストはこちらを使う。
+ */
+export function defaultOn(data) {
+  return {
+    ...allOn(data),
+    types: new Set(initialSelection(data, data.types, "types")),
+    edges: new Set(initialSelection(data, data.edge_names, "edges")),
   };
 }

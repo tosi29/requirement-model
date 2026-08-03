@@ -178,6 +178,28 @@ def test_explain_edge_filter_rejects_unknown_edge(capsys):
     assert "未知のエッジ種別" in capsys.readouterr().err
 
 
+def test_graph_with_sources_opts_the_sources_back_in(capsys):
+    assert main(["graph", SAMPLE]) == 0
+    default = capsys.readouterr().out
+    assert main(["graph", SAMPLE, "--with-sources"]) == 0
+    with_sources = capsys.readouterr().out
+
+    assert "[Source]" not in default
+    assert "[Source]" in with_sources
+
+
+def test_explain_with_sources_opts_the_sources_back_in(capsys):
+    assert main(["explain", "FR-3", "-f", SAMPLE]) == 0
+    default = capsys.readouterr().out
+    assert main(["explain", "FR-3", "-f", SAMPLE, "--with-sources"]) == 0
+    with_sources = capsys.readouterr().out
+
+    #: 既定は「畳んで属性に出す」、--with-sources は「辿ってブロックに出す」。
+    assert "    源泉: SRC-POLICY-A12-3 " in default
+    assert "- [Source]" not in default
+    assert "- [Source] SRC-POLICY-A12-3" in with_sources
+
+
 def test_plan_command(tmp_path: Path, capsys, monkeypatch):
     def git(*args: str) -> None:
         subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)

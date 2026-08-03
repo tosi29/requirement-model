@@ -16,7 +16,10 @@ from reqmodel import (
 
 
 def source(node_id: str = "S-1", **kwargs) -> Source:
-    return Source(id=node_id, text="経理部長", kind="stakeholder", **kwargs)
+    #: 他の helper と同じく、呼び手が上書きできるようにする。
+    kwargs.setdefault("text", "経理部長")
+    kwargs.setdefault("kind", "stakeholder")
+    return Source(id=node_id, **kwargs)
 
 
 def need(node_id: str = "N-1", **kwargs) -> Need:

@@ -249,9 +249,27 @@ class Constraint(Sourced):
 
 
 class Source(Node):
-    """要求の源泉。構造的振る舞いが同一なので単一型とし kind で分類する。"""
+    """要求の源泉。構造的振る舞いが同一なので単一型とし kind で分類する。
+
+    引用 (規程の条文、ヒアリングでの発言) も Source として書き、``part_of`` で
+    親の源泉にぶら下げる。引用は「要求から参照される」「要求を持たない」という点で
+    源泉と構造的振る舞いが同じなので、型は分けない (Goal の refines と同じ同一型内
+    階層)。引用がノードになることで id を持ち、複数の要求が同じ引用を根拠にできる。
+    """
 
     kind: Literal["stakeholder", "document", "existing_system"]
+    #: 自分がどの源泉の一部か (子 → 親)。引用・抜粋を親の文書や人にぶら下げる。
+    part_of: list[Ref["Source"]] = []
+    #: 出典の位置 (「第12条第3項」「2026-03-12 第3回ヒアリング」)。
+    #: text は引用文そのものを書き、どこから引いたかはこちらに分ける。
+    locator: str | None = None
+
+    @field_validator("locator")
+    @classmethod
+    def _check_locator(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("locator は空文字にできない (書かないなら省略する)")
+        return value
 
 
 class System(Node):

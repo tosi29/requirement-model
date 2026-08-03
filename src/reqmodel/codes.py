@@ -51,6 +51,7 @@ CHECK_CODES: dict[str, CheckCode] = {
         _code("structure.edge_type", 2, "型規則違反エッジ", False),
         _code("structure.self_reference", 2, "自分自身への参照", False),
         _code("structure.refines_cycle", 2, "refines の閉路", False),
+        _code("structure.part_of_cycle", 2, "part_of の閉路", False),
         _code("structure.resolve_invalid", 2, "resolves のペアが不正", False),
         _code("structure.orphan_fr", 2, "Goal に到達できない FR", True),
         _code("structure.orphan_need", 2, "satisfies されない Need", True),

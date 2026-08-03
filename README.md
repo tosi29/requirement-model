@@ -124,13 +124,37 @@ import 文は実行されないが、mypy と IDE 補完のために必ず書く
 | `FunctionalRequirement` (FR) | システムが提供すべき機能 | 語尾規則・受け入れ基準 |
 | `QualityRequirement` (QR) | 品質要求 (性能・可用性等) | 「非機能要求」の語は使わない |
 | `Constraint` | 解決策の自由度を制限する条件 | 要求ではない |
-| `Source` | 要求の源泉 | `kind` で分類 |
+| `Source` | 要求の源泉 (引用も含む) | `kind` で分類、`part_of` で引用を束ねる |
 | `System` | 全体品質の張り先となるノード | 「稼働率 99.9%」等の受け皿 |
 | `Decision` | conflict 解消の記録 | |
 
 `Source` は単一型とし、`kind: "stakeholder" | "document" | "existing_system"` で分類する
 (3種の構造的振る舞いが同一のため)。将来 Stakeholder 固有のエッジが必要になったら
 `Stakeholder(Source)` としてサブクラス化すればよく、エッジ型定義は `Ref[Source]` のまま無傷。
+
+**引用も Source として書く。** 規程の条文やヒアリングでの発言は、`part_of` で親の源泉に
+ぶら下げた Source として表す。`text` に引用文そのもの、`locator` にどこから引いたか
+(「第12条第3項」「2026-03-12 第3回ヒアリング」) を書く。
+
+```python
+src_policy = Source(id="SRC-POLICY", text="経費精算規程 第4版", kind="document")
+
+src_policy_receipt = Source(
+    id="SRC-POLICY-A12-3",
+    text="1万円を超える支出には領収書の添付を要する",
+    kind="document",
+    locator="第12条第3項",
+    part_of=[src_policy],
+)
+```
+
+型を分けないのは、引用が「要求から参照される」「要求を持たない」という点で源泉と
+**構造的振る舞いが同じ**だからである (`part_of` の有無は Goal の `refines` と同じ同一型内
+階層であって、型分割の根拠にならない)。引用をノードにすると id を持つので、**同じ条文を
+複数の要求が根拠にできる**。これにより「この規程のどこが、どの要求に効いているか」を
+引用単位で数えられる (`req doc` の源泉節がこの入れ子をそのまま出す)。
+
+引用を書かず `has_source=[src_policy]` と文書ごと指すこともできる。粒度は書き手が選ぶ。
 
 FR と QR は型を分ける (qualifies を出せるのは QR のみ、孤立検出の規則が異なる)。
 型分割の一般原則: **型ごとに異なる構造規則が存在するときだけ型を分ける**。
@@ -153,6 +177,7 @@ FR / QR には `acceptance_criteria: list[str]` が加わる。
 | `qualifies` | QR→FR, QR→System | 品質の付与 |
 | `constrains` | Constraint→{FR, QR, Decision} | 制約 |
 | `has_source` | {Goal, Need, FR, QR, Constraint}→Source | 源泉トレース |
+| `part_of` | Source→Source | 引用と、その引用元 (子 → 親) |
 | `conflicts` | FR↔FR, QR↔QR, FR↔QR | 対立の明示 |
 | `resolves` | Decision→conflicts ペア | 対立解消 |
 
@@ -182,10 +207,11 @@ FR / QR には `acceptance_criteria: list[str]` が加わる。
 | `structure.dangling_ref` | error | 参照先ノードが存在しない |
 | `structure.self_reference` | error | 自分自身への参照 |
 | `structure.refines_cycle` | error | refines の閉路 (詳細化の破綻) |
+| `structure.part_of_cycle` | error | part_of の閉路 (引用の包含関係の破綻) |
 | `structure.orphan_fr` | warning | どの Goal にも到達できない FR |
 | `structure.orphan_need` | warning | どの FR からも satisfy されない Need |
 | `structure.orphan_qr` | warning | qualifies の張り先が無い QR |
-| `structure.unused_source` | info | どの要求からも参照されない Source |
+| `structure.unused_source` | info | どの要求からも参照されない Source (引用を持つ源泉は、子の側で報告するので除く) |
 | `structure.goal_decomposition` | warning | AND 分解で要求群に到達しない子がある / OR 分解でどの子も到達しない |
 | `structure.goal_leaf` | warning | 子 Goal も Need も持たない Goal |
 | `structure.conflict_unresolved` | warning / **severe** | 未解消の conflict (高優先度どうしなら severe) |
@@ -361,7 +387,7 @@ $ req stats examples/sample.py
 # モデル統計
 
 - 対象: examples/sample.py
-- 規模: 20 ノード / 34 エッジ
+- 規模: 23 ノード / 37 エッジ
 - 判定はしない。閾値を置かず、数と割合だけを出す。
 
 ## 1. ノード数 (型 × 状態)
@@ -375,12 +401,12 @@ $ req stats examples/sample.py
 | Constraint | 0 | 1 | 0 | 0 | 1 |
 | Decision | 0 | 1 | 0 | 0 | 1 |
 | System | 0 | 1 | 0 | 0 | 1 |
-| Source | 0 | 4 | 0 | 0 | 4 |
-| 計 | 1 | 19 | 0 | 0 | 20 |
+| Source | 0 | 7 | 0 | 0 | 7 |
+| 計 | 1 | 22 | 0 | 0 | 23 |
 
 ## 2. エッジ数 (種別)
 
-- has_source 16 / refines 3 / motivates 3 / satisfies 5 / conflicts 1 / qualifies 2 / constrains 2 / resolves 2
+- has_source 16 / refines 3 / motivates 3 / satisfies 5 / conflicts 1 / qualifies 2 / constrains 2 / resolves 2 / part_of 3
 
 ## 3. 充足率・保有率
 
@@ -391,7 +417,7 @@ $ req stats examples/sample.py
 
 ## 4. 曖昧語密度
 
-- 指摘 0 件 / 20 ノード = 0.00 件/ノード
+- 指摘 0 件 / 23 ノード = 0.00 件/ノード
 - 指摘の出たノード: 0 件
 ```
 

@@ -37,6 +37,7 @@ def validate_structure(graph: RequirementGraph) -> FindingList:
     findings = FindingList()
     _check_edges(graph, findings)
     _check_refines_cycles(graph, findings)
+    _check_part_of_cycles(graph, findings)
     _check_orphan_requirements(graph, findings)
     _check_orphan_needs(graph, findings)
     _check_orphan_quality(graph, findings)
@@ -125,6 +126,19 @@ def _check_refines_cycles(graph: RequirementGraph, findings: FindingList) -> Non
         )
 
 
+def _check_part_of_cycles(graph: RequirementGraph, findings: FindingList) -> None:
+    for cycle in graph.cycles(("part_of",)):
+        findings.add(
+            Finding(
+                severity="error",
+                code="structure.part_of_cycle",
+                layer=2,
+                message="part_of に閉路がある (引用の包含関係の破綻): " + " → ".join(cycle),
+                node_id=cycle[0],
+            )
+        )
+
+
 # ---------------------------------------------------------------------------
 # 孤立検出
 # ---------------------------------------------------------------------------
@@ -197,17 +211,31 @@ def _check_orphan_quality(graph: RequirementGraph, findings: FindingList) -> Non
 
 
 def _check_unused_sources(graph: RequirementGraph, findings: FindingList) -> None:
+    """要求からも引用からも辿られない源泉を報告する。
+
+    引用 (part_of で子を持つ源泉) は、それ自体が要求から参照されていなくても
+    「未使用」ではない。使われているかどうかは子の側で個別に報告されるので、
+    親を重ねて報告すると同じことを二重に言うことになる。
+    """
     for node in graph.by_type(Source):
-        if not graph.in_edges(node.id, ("has_source",)):
-            findings.add(
-                Finding(
-                    severity="info",
-                    code="structure.unused_source",
-                    layer=2,
-                    message="どの要求からも参照されていない源泉",
-                    node_id=node.id,
-                )
+        if graph.in_edges(node.id, ("has_source",)):
+            continue
+        if graph.in_edges(node.id, ("part_of",)):
+            continue
+        message = (
+            "どの要求からも根拠にされていない引用"
+            if node.part_of
+            else "どの要求からも参照されていない源泉"
+        )
+        findings.add(
+            Finding(
+                severity="info",
+                code="structure.unused_source",
+                layer=2,
+                message=message,
+                node_id=node.id,
             )
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -45,6 +45,34 @@ src_legacy = Source(
     status="approved",
 )
 
+# 引用。part_of で親の源泉にぶら下げ、text には引用文そのものを書く。
+# 同じ条文を複数の要求が根拠にできるので、「この規程のどこが使われているか」を
+# 引用単位で数えられる。
+src_policy_receipt = Source(
+    id="SRC-POLICY-A12-3",
+    text="1万円を超える支出には領収書の添付を要する",
+    kind="document",
+    locator="第12条第3項",
+    part_of=[src_policy],
+    status="approved",
+)
+src_policy_domestic = Source(
+    id="SRC-POLICY-A20-1",
+    text="経費に関する証憑は国内に保管しなければならない",
+    kind="document",
+    locator="第20条第1項",
+    part_of=[src_policy],
+    status="approved",
+)
+src_cfo_backlog = Source(
+    id="SRC-CFO-HEARING-3",
+    text="月末に承認待ちが溜まって、締めが 3 日ずれることがある",
+    kind="stakeholder",
+    locator="2026-03-12 第3回ヒアリング",
+    part_of=[src_finance_head],
+    status="approved",
+)
+
 # --- システム ---------------------------------------------------------------
 
 system = System(id="SYS", text="経費精算システム", status="approved")
@@ -63,14 +91,14 @@ need_early_violation = Need(
     text="経理担当者は、規程に反する申請を差し戻す前に検知したい",
     status="approved",
     priority=2,
-    has_source=[src_finance_head, src_policy],
+    has_source=[src_finance_head, src_policy_receipt],
 )
 need_notice_pending = Need(
     id="N-3",
     text="承認者は、自分が承認すべき申請にその日のうちに気づきたい",
     status="approved",
     priority=2,
-    has_source=[src_finance_head, src_legacy],
+    has_source=[src_cfo_backlog, src_legacy],
 )
 
 # --- ゴール -----------------------------------------------------------------
@@ -132,7 +160,7 @@ fr_rule_check = FunctionalRequirement(
     priority=1,
     satisfies=[need_early_violation],
     conflicts=[fr_short_form],
-    has_source=[src_policy],
+    has_source=[src_policy_receipt],
     acceptance_criteria=[
         "規程 第4版 の上限額ルールに違反する申請では、違反したルール番号が表示される",
         "違反がある状態では申請を確定できない",
@@ -194,7 +222,7 @@ constraint_region = Constraint(
     text="領収書画像は国内リージョンのストレージにのみ保存すること",
     status="approved",
     constrains=[fr_ocr, qr_ocr_latency],
-    has_source=[src_policy],
+    has_source=[src_policy_domestic],
 )
 
 # --- 決定 -------------------------------------------------------------------

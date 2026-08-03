@@ -135,4 +135,4 @@ def test_sample_definition_loads_cleanly():
     sample = Path(__file__).resolve().parents[1] / "examples" / "sample.py"
     result = load_paths([sample])
     assert result.ok, [f.format() for f in result.findings]
-    assert len(result.graph) == 20
+    assert len(result.graph) == 23

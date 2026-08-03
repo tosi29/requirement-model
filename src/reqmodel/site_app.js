@@ -41,7 +41,6 @@ import {
   nextTheme,
   nodeContext,
   normalizeTheme,
-  priorityFilters,
   searchHits,
   severityTabs,
   sortRows,
@@ -419,7 +418,6 @@ function renderDetail() {
   rows.push(`<p class="text">${escapeHtml(node.text)}</p>`);
   rows.push("<dl>");
   rows.push(`<dt>status</dt><dd>${node.status}</dd>`);
-  if (node.priority !== null && node.priority !== undefined) rows.push(`<dt>priority</dt><dd>${node.priority}</dd>`);
   if (node.kind) rows.push(`<dt>kind</dt><dd>${node.kind}</dd>`);
   if (node.decomposition) rows.push(`<dt>分解</dt><dd>${node.decomposition}</dd>`);
   if (node.location) rows.push(`<dt>出所</dt><dd class="loc">${locationHtml(node.location)}</dd>`);
@@ -600,7 +598,6 @@ function bindToggles(attribute, key) {
 const FILTER_SETS = [
   ["type", "types"],
   ["status", "statuses"],
-  ["priority", "priorities"],
   ["edge", "edges"],
 ];
 
@@ -617,7 +614,6 @@ function renderFilters() {
   const items = {
     types: DATA.types.map((type) => ({ key: type, label: type, count: typeCounts[type] || 0 })),
     statuses: statusFilters(DATA),
-    priorities: priorityFilters(DATA),
     edges: DATA.edge_names.map((name) => ({
       key: name,
       label: name,
@@ -778,7 +774,7 @@ function renderTable() {
       <button data-key="${column.key}" title="この列で並べ替える">${column.label}<span class="arrow">${arrow}</span></button></th>`;
   }).join("");
 
-  //: 値が無いこと (priority 無し・受け入れ基準 0 件) を空欄と区別して見せる。
+  //: 値が無いこと (受け入れ基準 0 件・指摘 0 件) を空欄と区別して見せる。
   const DASH = '<td class="num dash">—</td>';
   const cell = (row, key) => {
     switch (key) {
@@ -788,9 +784,6 @@ function renderTable() {
         return row.findings
           ? `<td class="num"><button class="finding-count ${row.severity || ""}" data-findings="${row.id}" title="このノードへの指摘を見る">${row.findings}</button></td>`
           : DASH;
-      // priority は 0 も有効な値なので、null だけを空欄にする。
-      case "priority":
-        return row.priority === null ? DASH : `<td class="num">${row.priority}</td>`;
       case "criteria":
         return row.criteria ? `<td class="num">${row.criteria}</td>` : DASH;
       default:
@@ -1120,7 +1113,6 @@ function currentScene() {
         id: element.id(),
         type: element.data("type"),
         status: element.data("status"),
-        priorityClass: element.data("priorityClass"),
         label: element.data("label"),
       });
     }

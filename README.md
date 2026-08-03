@@ -124,7 +124,7 @@ import 文は実行されないが、mypy と IDE 補完のために必ず書く
 
 ## メタモデル
 
-### ノード型 (8種)
+### ノード型 (7種)
 
 | 型 | 意味 | 備考 |
 |---|---|---|
@@ -135,7 +135,6 @@ import 文は実行されないが、mypy と IDE 補完のために必ず書く
 | `Constraint` | 解決策の自由度を制限する条件 | 要求ではない |
 | `Source` | 要求の源泉 (引用も含む) | `kind` で分類、`part_of` で引用を束ねる |
 | `System` | 全体品質の張り先となるノード | 「稼働率 99.9%」等の受け皿 |
-| `Decision` | conflict 解消の記録 | |
 
 `Source` は単一型とし、`kind: "stakeholder" | "document" | "existing_system"` で分類する。
 
@@ -195,7 +194,7 @@ Need は「〜たい」、FR は「〜こと」で終わる必要がある (層1
 `Need` / 要求系の境界は**割り当て先が環境の側かシステムの側か**の分岐に対応する。
 
 **機械が検査しているのは語尾だけで、主語は検査していない。** 上の規約は
-`requirements.py` と `examples/sample.py` の該当 60 ノード (Goal 8 / Need 11 / FR 29 /
+`requirements.py` と `examples/sample.py` の該当 63 ノード (Goal 8 / Need 11 / FR 32 /
 QR 6 / Constraint 6) すべてで守られているが、破っても `req validate` は何も言わない。
 
 ### 共通属性
@@ -214,11 +213,9 @@ FR / QR には `acceptance_criteria: list[str]` が加わる。
 | `motivates` | Goal→Need | 動機づけ |
 | `satisfies` | FR→Need | 充足 |
 | `qualifies` | QR→FR, QR→System | 品質の付与 |
-| `constrains` | Constraint→{FR, QR, Decision} | 制約 |
+| `constrains` | Constraint→{FR, QR} | 制約 |
 | `has_source` | {Goal, Need, FR, QR, Constraint}→Source | 源泉トレース (図には描かない) |
 | `part_of` | Source→Source | 引用と、その引用元 (子 → 親。図には描かない) |
-| `conflicts` | FR↔FR, QR↔QR, FR↔QR | 対立の明示 |
-| `resolves` | Decision→conflicts ペア | 対立解消 |
 
 **源泉の 2 本 (`has_source` / `part_of`) は図に描かない。** Source は数十件の要求から
 参照されるハブなので、ノードとして置くと近傍が一気に広がり、レイアウトが源泉に
@@ -258,8 +255,6 @@ FR / QR には `acceptance_criteria: list[str]` が加わる。
 | `structure.unused_source` | info | どの要求からも参照されない Source (引用を持つ源泉は、子の側で報告するので除く) |
 | `structure.goal_decomposition` | warning | AND 分解で要求群に到達しない子がある / OR 分解でどの子も到達しない |
 | `structure.goal_leaf` | warning | 子 Goal も Need も持たない Goal |
-| `structure.conflict_unresolved` | warning / **severe** | 未解消の conflict (高優先度どうしなら severe) |
-| `structure.resolve_no_conflict` | warning | conflicts が宣言されていないペアの resolves |
 | `structure.missing_source` | warning | 源泉リンクの無い要求 |
 | `structure.missing_acceptance_criteria` | warning | 受け入れ基準の無い FR / QR |
 | `structure.status_inconsistent` | warning | approved 以上のノードが proposed のノードを参照 (`constrains` を除く) |
@@ -361,23 +356,21 @@ Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`statu
 (`動機づけるニーズ`、`これを充足する機能要求` など)。全文は
 `req doc examples/sample.py` を叩けば出る。
 
-節の構成は次の 7 つで固定する (該当が無ければ「該当なし。」と出る)。
+節の構成は次の 5 つで固定する (該当が無ければ「該当なし。」と出る)。
 
 | 節 | 内容 |
 |---|---|
 | 1. 要求階層 | Goal → Need → FR → QR。Goal の詳細化は DFS の並び順で表す |
 | 2. システムに張られた品質要求 | `qualifies` の張り先が System の QR |
 | 3. 制約 | Constraint と、その制約対象 |
-| 4. 決定 | Decision と、それが解消した競合ペア |
-| 5. 競合 | conflict の一覧。解消済みなら Decision の id、未解消なら **未解消** |
-| 6. 源泉 | Source と、それを参照しているノード |
-| 7. 上記に現れなかったノード | どの節にも入らなかったもの (ゴール未接続の Need 等) |
+| 4. 源泉 | Source と、それを参照しているノード |
+| 5. 上記に現れなかったノード | どの節にも入らなかったもの (ゴール未接続の Need 等) |
 
 見出しの深さは Goal=h3 / Need=h4 / FR=h5 / QR=h6 に固定する。Goal の詳細化は
 何段でも書けるため、深さをそのまま見出しレベルに写すと h6 を超えてしまうため。
 同じノードが複数の親にぶら下がるとき (1 つの FR が 2 つの Need を満たす等) は、
 最初の 1 か所だけ本文を出し、以降は `- (前掲) FR-1 …` として参照だけを置く。
-**7 節があるので、どのノードも必ずどこかに現れる**。文書から要求が落ちない。
+**5 節があるので、どのノードも必ずどこかに現れる**。文書から要求が落ちない。
 
 ### トレーサビリティ表 (`req doc --matrix`)
 
@@ -427,9 +420,9 @@ $ req stats examples/sample.py
 ## 3. 充足率・保有率
 
 - Need の充足率 (satisfies されている): 100.0% (3/3)
-- FR の受け入れ基準保有率: 100.0% (5/5)
+- FR の受け入れ基準保有率: 100.0% (6/6)
 - QR の受け入れ基準保有率: 100.0% (2/2)
-- 源泉トレース率 (has_source を持つ要求): 100.0% (14/14)
+- 源泉トレース率 (has_source を持つ要求): 100.0% (15/15)
 ```
 
 率が 100% に満たないときは、その行に未達のノード id が並ぶ
@@ -808,7 +801,7 @@ skip されるので、CI では `.github/workflows/ci.yml` が node を明示�
 
 | 文書 | 中身 |
 |---|---|
-| [`docs/design/model.md`](docs/design/model.md) | 語尾規則を指示書より緩く取った理由、`constrains` を成熟度検査から外した理由、型を分ける基準 |
+| [`docs/design/model.md`](docs/design/model.md) | 語尾規則を指示書より緩く取った理由、`constrains` を成熟度検査から外した理由、`Decision` と `conflicts` を置かない理由、型を分ける基準 |
 | [`docs/design/site.md`](docs/design/site.md) | 描画エンジンの選定、フォーカスと見送った候補、帯表示、日本語ラベルの折り返し、表示状態の実装、JS の構成 |
 
 ## 非スコープ

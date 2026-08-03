@@ -157,7 +157,7 @@ def test_explain_command(capsys):
     assert main(["explain", "FR-3", "-f", SAMPLE]) == 0
     out = capsys.readouterr().out
     assert "# 影響部分グラフ: FR-3" in out
-    assert "FR-3 --conflicts--> FR-2" in out
+    assert "FR-3 --satisfies--> N-2" in out
 
 
 def test_explain_json_command(capsys):
@@ -262,8 +262,8 @@ def test_stats_command(capsys):
     assert main(["stats", SAMPLE]) == 0
     out = capsys.readouterr().out
     assert out.startswith("# モデル統計\n")
-    assert "- 規模: 23 ノード / 37 エッジ" in out
-    assert "| FunctionalRequirement | 1 | 4 | 0 | 0 | 5 |" in out
+    assert "- 規模: 23 ノード / 38 エッジ" in out
+    assert "| FunctionalRequirement | 1 | 5 | 0 | 0 | 6 |" in out
     assert "- Need の充足率 (satisfies されている): 100.0% (3/3)" in out
 
 

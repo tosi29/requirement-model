@@ -226,7 +226,7 @@ $ npm test        # node --test tests/js/*.test.mjs
 
 ## ベンチ用サンプル
 
-`examples/bench.py` は 300 ノード / 614 エッジの合成モデルである
+`examples/bench.py` は 300 ノード / 609 エッジの合成モデルである
 (FR 191 件。同じ段に並ぶ幅がそのまま図の横長さになる)。**生成物**であり、
 `python tools/gen_bench.py` が書き出す。定義ファイルは宣言のみ (層0) なので、
 生成器はモデルの外に置く。指摘が 0 件になるよう作ってあり

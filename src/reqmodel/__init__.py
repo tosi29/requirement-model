@@ -19,7 +19,6 @@ from .model import (
     FR,
     QR,
     Constraint,
-    Decision,
     FunctionalRequirement,
     Goal,
     Need,
@@ -48,7 +47,6 @@ __all__ = [
     "Constraint",
     "Source",
     "System",
-    "Decision",
     "FR",
     "QR",
     # 基底・補助型

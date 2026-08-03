@@ -8,7 +8,6 @@ from pydantic import ValidationError
 from conftest import fr, need, source
 from reqmodel.model import (
     Constraint,
-    Decision,
     FunctionalRequirement,
     Goal,
     Need,
@@ -69,7 +68,6 @@ def test_edge_specs_are_derived_from_field_annotations():
     fr_edges = edge_specs_for(FunctionalRequirement)
     assert fr_edges["satisfies"].targets == (Need,)
     assert fr_edges["refines"].targets == (FunctionalRequirement,)
-    assert fr_edges["conflicts"].symmetric is True
 
     qr_edges = edge_specs_for(QualityRequirement)
     assert qr_edges["qualifies"].targets == (FunctionalRequirement, System)
@@ -79,10 +77,7 @@ def test_edge_specs_are_derived_from_field_annotations():
     assert constraint_edges["constrains"].targets == (
         FunctionalRequirement,
         QualityRequirement,
-        Decision,
     )
-
-    assert edge_specs_for(Decision)["resolves"].pair is True
 
 
 def test_source_is_a_single_type_classified_by_kind():

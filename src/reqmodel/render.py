@@ -13,7 +13,6 @@ from .model import (
     STATUS_RANK,
     TYPE_ORDER,
     Constraint,
-    Decision,
     FunctionalRequirement,
     Goal,
     Need,
@@ -34,7 +33,6 @@ _MERMAID_SHAPE: dict[type[Node], tuple[str, str]] = {
     FunctionalRequirement: ("[", "]"),
     QualityRequirement: ("[/", "/]"),
     Constraint: ("[[", "]]"),
-    Decision: ("{", "}"),
     System: ("([", "])"),
     Source: ("[(", ")]"),
 }
@@ -46,7 +44,6 @@ _PALETTE: dict[str, tuple[str, str]] = {
     "FunctionalRequirement": ("#fff8e1", "#c9971c"),
     "QualityRequirement": ("#fdeef4", "#c2557f"),
     "Constraint": ("#f2f2f2", "#777777"),
-    "Decision": ("#ede7f6", "#6f4fbf"),
     "System": ("#e0f7fa", "#3a97a8"),
     "Source": ("#ffffff", "#999999"),
 }
@@ -63,7 +60,6 @@ _CYTOSCAPE_SHAPE: dict[type[Node], str] = {
     FunctionalRequirement: "round-rectangle",
     QualityRequirement: "rhomboid",
     Constraint: "cut-rectangle",
-    Decision: "diamond",
     System: "barrel",
     Source: "tag",
 }
@@ -142,13 +138,11 @@ _DOT_SHAPE: dict[type[Node], str] = {
     FunctionalRequirement: "box",
     QualityRequirement: "parallelogram",
     Constraint: "note",
-    Decision: "diamond",
     System: "box3d",
     Source: "cylinder",
 }
 
 _EDGE_STYLE_MERMAID = {
-    "conflicts": "-.->",
     "has_source": "-.->",
     "part_of": "-.->",
 }
@@ -358,7 +352,7 @@ def render_dot(
         if edge.source not in ids or edge.target not in ids:
             continue
         edge_attrs = [f'label="{edge.name}"']
-        if edge.name in ("conflicts", "has_source"):
+        if edge.name == "has_source":
             edge_attrs.append("style=dashed")
         lines.append(
             f"    {ids[edge.source]} -> {ids[edge.target]} "

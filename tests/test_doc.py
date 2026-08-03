@@ -6,7 +6,7 @@ import csv
 import io
 
 import pytest
-from conftest import build, constraint, decision, fr, goal, need, qr, source, system
+from conftest import build, constraint, fr, goal, need, qr, source, system
 
 from reqmodel.doc import (
     CSV_HEADER,
@@ -80,21 +80,15 @@ def test_spec_repeats_shared_node_as_reference():
     assert "- (前掲) FR-1 領収書を読み取ること" in text
 
 
-def test_spec_sections_cover_constraint_decision_conflict_and_source():
+def test_spec_sections_cover_constraint_and_source():
     graph = build(
         source("S-1"),
-        fr("FR-1", conflicts=["FR-2"]),
-        fr("FR-2", text="必須項目を 3 つ以下とすること"),
-        fr("FR-3", text="通知すること", conflicts=["FR-1"]),
+        fr("FR-1"),
         constraint("C-1", constrains=["FR-1"], has_source=["S-1"]),
-        decision("D-1", resolves=[("FR-1", "FR-2")]),
     )
     text = render_spec(graph)
     assert "### C-1 国内リージョンにのみ保存すること" in text
     assert "- 制約する対象: FR-1" in text
-    assert "- 解消する競合: FR-1 ⇄ FR-2" in text
-    assert "- FR-1 ⇄ FR-2 — 解消: D-1" in text
-    assert "- FR-1 ⇄ FR-3 — **未解消**" in text
     assert "- **S-1** (stakeholder) 経理部長 — C-1" in text
 
 
@@ -107,7 +101,7 @@ def test_spec_puts_system_quality_in_its_own_section():
 
 def test_spec_lists_nodes_that_no_section_reached():
     text = render_spec(build(need("N-9")))  # どの Goal からも動機づけられていない
-    assert "## 7. 上記に現れなかったノード" in text
+    assert "## 5. 上記に現れなかったノード" in text
     assert "- **N-9** (Need) 早く精算したい" in text
 
 

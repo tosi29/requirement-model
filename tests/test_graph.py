@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from conftest import build, decision, fr, goal, need, qr, source, system
+from conftest import build, fr, goal, need, qr, source, system
 from reqmodel.graph import RequirementGraph
 
 
@@ -47,15 +47,6 @@ def test_related_ignores_edge_direction():
     # 有向では Goal に届かないが、無向なら理由まで辿れる
     assert "G-1" not in graph.impact("FR-1")
     assert "G-1" in graph.related("FR-1")
-
-
-def test_pair_edges_expand_to_both_members():
-    a = fr("FR-1", conflicts=["FR-2"])
-    b = fr("FR-2")
-    d = decision("D-1", resolves=[(a, b)])
-    graph = build(a, b, d)
-    targets = {e.target for e in graph.out_edges("D-1", ("resolves",))}
-    assert targets == {"FR-1", "FR-2"}
 
 
 def test_cycles_are_detected_per_edge_type():

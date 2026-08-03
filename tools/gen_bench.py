@@ -10,9 +10,9 @@
 
 - Goal は数段の refines で積まれた木 (13 件)
 - Need は葉の Goal から動機づけられる (24 件)
-- FR は Need に対して大量に並ぶ (191 件)。**同じ段に並ぶ幅**がそのまま
+- FR は Need に対して大量に並ぶ (196 件)。**同じ段に並ぶ幅**がそのまま
   図の横長さになる (#17 で問題にしているのはここ)
-- QR / Constraint / Decision / Source は現実的な比率で少数
+- QR / Constraint / Source は現実的な比率で少数
 
 出力は決定的 (乱数を使わない)。`tests/test_bench_example.py` が、
 コミットされている `examples/bench.py` とこの生成結果の一致を見張る。
@@ -36,19 +36,16 @@ GOALS_MID = 4
 GOALS_LEAF = 8
 GOALS = 1 + GOALS_MID + GOALS_LEAF
 NEEDS = 24
-FRS = 191
+#: 全体で 300 ノード (tests/test_bench_example.py の MIN_NODES) に届く数。
+FRS = 196
 QRS = 50
 CONSTRAINTS = 10
-DECISIONS = 5
 SOURCES = 6
 
 #: FR どうしの詳細化。この倍数の FR は Need ではなく 1 つ前の FR を詳細化する。
 FR_REFINE_EVERY = 7
 #: System に張る QR (残りは FR に張る)。
 QR_ON_SYSTEM = 5
-
-#: conflicts を宣言する FR (自身と 1 つ後ろの FR が競合する)。Decision で解消する。
-CONFLICT_HEADS = [10 + step * 30 for step in range(DECISIONS)]
 
 # --- 語彙 -------------------------------------------------------------------
 #
@@ -144,7 +141,6 @@ HEADER = '''"""ベンチ用の大きいサンプル定義ファイル (物流管
 
 from reqmodel import (
     Constraint,
-    Decision,
     FunctionalRequirement,
     Goal,
     Need,
@@ -288,7 +284,6 @@ def render() -> str:
                 has_source=[source_of(index)],
                 satisfies=[] if refines_parent else [f"N-{index % NEEDS + 1}"],
                 refines=[f"FR-{number - 1}"] if refines_parent else [],
-                conflicts=[f"FR-{number + 1}"] if number in CONFLICT_HEADS else [],
                 acceptance_criteria=[
                     f"{area(index)}の{thing(index)}が 3 秒以内に画面へ出る",
                     "実行した担当者と日時が操作ログに残る",
@@ -334,21 +329,6 @@ def render() -> str:
                 status="approved" if index % 2 else "proposed",
                 has_source=[source_of(index + 4)],
                 constrains=[f"FR-{index * 17 % FRS + 1}"],
-            )
-        )
-
-    # 決定 ------------------------------------------------------------------
-    #
-    # 上で宣言した conflicts をすべて解消しておく (未解消の競合は警告になる)。
-    parts.append(section("決定 (競合の解消)"))
-    for index, head in enumerate(CONFLICT_HEADS, start=1):
-        parts.append(
-            node(
-                "Decision",
-                id=f"D-{index}",
-                text=f"FR-{head} と FR-{head + 1} は画面を分けて両立させる",
-                status="approved",
-                resolves=[(f"FR-{head}", f"FR-{head + 1}")],
             )
         )
 

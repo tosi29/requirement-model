@@ -7,7 +7,6 @@ from conftest import (
     codes,
     codes_for,
     constraint,
-    decision,
     fr,
     goal,
     need,
@@ -40,7 +39,7 @@ def test_dangling_reference_is_an_error():
 
 
 def test_edge_type_violation_is_an_error():
-    # Constraint→Goal は型規則違反 (constrains は FR/QR/Decision のみ)
+    # Constraint→Goal は型規則違反 (constrains は FR/QR のみ)
     graph = build(goal("G-1"), constraint("C-1", constrains=["G-1"]))
     findings = validate_structure(graph)
     assert "structure.edge_type" in codes_for(findings, "C-1")
@@ -152,44 +151,6 @@ def test_or_decomposition_needs_only_one_child():
 def test_goal_without_children_or_needs_is_reported():
     findings = validate_structure(build(goal("G-1")))
     assert "structure.goal_leaf" in codes_for(findings, "G-1")
-
-
-def test_unresolved_conflict_is_a_warning():
-    a = fr("FR-1", conflicts=["FR-2"])
-    b = fr("FR-2")
-    findings = [
-        f
-        for f in validate_structure(build(a, b))
-        if f.code == "structure.conflict_unresolved"
-    ]
-    assert findings and findings[0].severity == "warning"
-
-
-def test_conflict_between_high_priority_requirements_is_severe():
-    a = fr("FR-1", priority=1, conflicts=["FR-2"])
-    b = fr("FR-2", priority=2)
-    findings = [
-        f
-        for f in validate_structure(build(a, b))
-        if f.code == "structure.conflict_unresolved"
-    ]
-    assert findings and findings[0].severity == "severe"
-
-
-def test_decision_resolves_the_conflict():
-    a = fr("FR-1", priority=1, conflicts=["FR-2"])
-    b = fr("FR-2", priority=1)
-    d = decision("D-1", resolves=[(a, b)])
-    findings = validate_structure(build(a, b, d))
-    assert "structure.conflict_unresolved" not in codes(findings)
-
-
-def test_decision_resolving_a_non_conflict_is_reported():
-    a = fr("FR-1")
-    b = fr("FR-2")
-    d = decision("D-1", resolves=[(a, b)])
-    findings = validate_structure(build(a, b, d))
-    assert "structure.resolve_no_conflict" in codes_for(findings, "D-1")
 
 
 def test_missing_source_is_reported():

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from reqmodel import (
     Constraint,
-    Decision,
     FunctionalRequirement,
     Goal,
     Need,
@@ -47,11 +46,6 @@ def qr(node_id: str = "QR-1", **kwargs) -> QualityRequirement:
 def constraint(node_id: str = "C-1", **kwargs) -> Constraint:
     kwargs.setdefault("text", "国内リージョンにのみ保存すること")
     return Constraint(id=node_id, **kwargs)
-
-
-def decision(node_id: str = "D-1", **kwargs) -> Decision:
-    kwargs.setdefault("text", "既定値で自動補完する")
-    return Decision(id=node_id, **kwargs)
 
 
 def system(node_id: str = "SYS", **kwargs) -> System:

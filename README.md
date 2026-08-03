@@ -131,12 +131,12 @@ import 文は実行されないが、mypy と IDE 補完のために必ず書く
 | `System` | 全体品質の張り先となるノード | 「稼働率 99.9%」等の受け皿 |
 | `Decision` | conflict 解消の記録 | |
 
-`Source` は単一型とし、`kind: "stakeholder" | "document" | "existing_system"` で分類する
-(3種の構造的振る舞いが同一のため)。将来 Stakeholder 固有のエッジが必要になったら
-`Stakeholder(Source)` としてサブクラス化すればよく、エッジ型定義は `Ref[Source]` のまま無傷。
-
+`Source` は単一型とし、`kind: "stakeholder" | "document" | "existing_system"` で分類する。
 FR と QR は型を分ける (qualifies を出せるのは QR のみ、孤立検出の規則が異なる)。
-型分割の一般原則: **型ごとに異なる構造規則が存在するときだけ型を分ける**。
+型分割の一般原則は **型ごとに異なる構造規則が存在するときだけ型を分ける**
+([なぜそうするか](docs/design/model.md#型を分ける基準))。
+
+Need は「〜たい」、FR は「〜こと」で終わる必要がある (層1 の語尾規則。末尾の句点は許容)。
 
 ### 共通属性
 
@@ -203,10 +203,8 @@ FR / QR には `acceptance_criteria: list[str]` が加わる。
 の経路で判定する。曖昧語辞書は `src/reqmodel/lexicon.py` で編集できる。
 
 `structure.status_inconsistent` が見るのは `satisfies` / `refines` / `qualifies` /
-`motivates` の 4 種で、**`constrains` は対象外**である (`validate.py` の `_STATUS_EDGES`)。
-制約は制約対象より先に決まりうる — 「MCP サーバを作るなら依存を増やさない範囲で」は
-着手前に決まっているからこそ意味があり、承認済みの Constraint が proposed の要求を
-指すのは逆転ではない。制約側の status を下げれば黙るが、それは実態に反する。
+`motivates` の 4 種で、**`constrains` は対象外**である (`validate.py` の `_STATUS_EDGES`。
+制約は制約対象より先に決まりうるため。[理由](docs/design/model.md#constrains-を-structurestatus_inconsistent-の対象から外した))。
 
 ### 指摘の抑制 (waiver)
 
@@ -695,9 +693,9 @@ $ req site -o site && python -m http.server -d site
 - **曖昧語辞書が語の使用と言及を区別しない。** 「安定」(ソートの安定性)、
   「高速」(曖昧語検査そのものの受け入れ基準に出てくる引用) が指摘される
 - **未着手の要求に張った制約が `structure.status_inconsistent` になっていた。**
-  approved な Constraint が proposed な FR を `constrains` すると成熟度の逆転として
-  報告されたが、着手前の要求に制約を張るのは普通のことなので、`constrains` を
-  チェックの対象外にした ([層2 のチェック一覧](#検証-3層))。誤検出そのものが直った例
+  検査のほうを直し、`constrains` を対象外にした
+  ([理由](docs/design/model.md#constrains-を-structurestatus_inconsistent-の対象から外した))。
+  誤検出そのものが直った例
 
 残る指摘は抑制 (waiver) で理由付きで残してあり、`req validate --show-suppressed` で読める。
 **`--strict` を通すために表現を歪めてはいない**。2 件の抑制はすべて理由が書かれ、
@@ -742,18 +740,14 @@ $ npm run bench   # 300 ノード級の合成グラフで探索の時間を測�
 `pytest` からも同じものが走る (`tests/test_site_js.py`)。node が入っていない環境では
 skip されるので、CI では `.github/workflows/ci.yml` が node を明示的に用意している。
 
-## 指示書からの解釈
+## 設計判断の記録
 
-実装にあたり、指示書の記述をそのまま条件式にすると実務的に破綻する箇所が 2 つあり、
-意図を汲んで次のように解釈した。
+規則や実装の「なぜ」は `docs/design/` に置いてある。
 
-- **Need の語尾規則**: 指示書は「〜したい」。ただし「気づきたい」「知りたい」のような
-  サ変以外の願望形を弾いてしまうため、**「〜たい」**で判定する。
-- **FR の語尾規則**: 指示書は「〜すること」。同様に「読み取ること」「送ること」を弾くため、
-  **「〜こと」**で判定する。
-
-いずれも末尾の句点は許容する。厳密に「〜したい」「〜すること」に戻すなら
-`src/reqmodel/model.py` の `_check_suffix` 2 か所を変えるだけでよい。
+| 文書 | 中身 |
+|---|---|
+| [`docs/design/model.md`](docs/design/model.md) | 語尾規則を指示書より緩く取った理由、`constrains` を成熟度検査から外した理由、型を分ける基準 |
+| [`docs/design/site.md`](docs/design/site.md) | 描画エンジンの選定、フォーカスと見送った候補、帯表示、日本語ラベルの折り返し、表示状態の実装、JS の構成 |
 
 ## 非スコープ (初期実装では作らない)
 

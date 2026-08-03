@@ -124,44 +124,26 @@ need_ci = Need(
 
 # --- ゴール -----------------------------------------------------------------
 
-goal_machine_checked = Goal(
+goal_less_rework = Goal(
     id="G-1",
-    text="要求の構造的な誤りと変更の影響を、人手のレビューに頼らず機械的に把握できる状態にする",
+    text="要求の不備が後工程で見つかることによる手戻りを減らす",
     status="approved",
-    decomposition="AND",
-    has_source=[src_spec, src_owner],
-)
-goal_find_defects = Goal(
-    id="G-2",
-    text="要求の構造上の誤りを、レビュー会を待たずに発見できる状態にする",
-    status="approved",
-    refines=[goal_machine_checked],
     motivates=[need_self_check, need_no_dangling, need_ci],
-    has_source=[src_spec],
+    has_source=[src_spec, src_owner, src_legacy],
 )
-goal_trace_change = Goal(
-    id="G-3",
-    text="要求変更の影響範囲を、確認漏れなく把握できる状態にする",
+goal_less_survey = Goal(
+    id="G-2",
+    text="要求を変えるたびに繰り返される影響調査の負荷を減らす",
     status="approved",
-    refines=[goal_machine_checked],
     motivates=[need_impact, need_review_diff],
-    has_source=[src_spec],
+    has_source=[src_spec, src_legacy],
 )
-goal_llm_ready = Goal(
-    id="G-4",
-    text="要求の意味の判断を LLM に委ねられる形で、機械が文脈を揃える",
+goal_shared_understanding = Goal(
+    id="G-3",
+    text="要求の理解が書き手に依存する度合いを下げる",
     status="approved",
-    refines=[goal_machine_checked],
-    motivates=[need_llm_context],
-    has_source=[src_spec, src_owner],
-)
-goal_shareable = Goal(
-    id="G-5",
-    text="要求モデルを、専用のツールを持たない関係者にも読める形で配る",
-    status="approved",
-    refines=[goal_machine_checked],
-    motivates=[need_readable, need_metrics],
-    has_source=[src_owner, src_legacy],
+    motivates=[need_llm_context, need_readable, need_metrics],
+    has_source=[src_spec, src_owner, src_legacy],
 )
 
 # --- 機能要求: 検証 (層0〜層3) -----------------------------------------------

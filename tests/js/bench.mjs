@@ -10,7 +10,7 @@
  * 実装を直したときに「速くなったつもり」で終わらせないための、唯一の物差し。
  */
 
-import { createView, focusSet, reach } from "../../src/reqmodel/site_logic.js";
+import { createView, focusSet, reach } from "../../src/reqmodel/presentation/site_logic.js";
 import { allOn, largeFixture } from "./fixture.mjs";
 
 /** 隣接マップを使わない、書き換え前の reach()。比較対象として残してある。 */

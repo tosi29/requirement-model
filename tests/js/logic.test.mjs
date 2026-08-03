@@ -55,7 +55,7 @@ import {
   tableRows,
   truncate,
   wrapLabel,
-} from "../../src/reqmodel/site_logic.js";
+} from "../../src/reqmodel/presentation/site_logic.js";
 import { ELLIPSE_FIT, allOn, defaultOn, fixture, largeFixture } from "./fixture.mjs";
 
 const viewOf = (state) => {

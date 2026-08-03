@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .model import NODE_TYPES
+from .core.metamodel import NODE_TYPES
 
 __all__ = ["RawNode", "ExtractResult", "extract_source", "extract_file", "ALLOWED_IMPORT_ROOTS"]
 

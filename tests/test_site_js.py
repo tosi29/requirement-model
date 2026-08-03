@@ -75,12 +75,12 @@ def sample_graph():
 def test_js_modules_are_syntactically_valid_on_their_own():
     """切り出した JS は、埋め込まなくても単体で構文検査できる。"""
     for name in ("site_logic.js", "site_app.js"):
-        result = run_node(["--check", str(ROOT / "src" / "reqmodel" / name)])
+        result = run_node(["--check", str(ROOT / "src" / "reqmodel" / "presentation" / name)])
         assert result.returncode == 0, result.stderr
 
 
 def test_js_unit_tests_pass():
-    result = run_node(["--test", str(JS_TESTS / "*.test.mjs")])
+    result = run_node(["--test", str(JS_TESTS / "logic.test.mjs")])
     assert result.returncode == 0, result.stdout + result.stderr
 
 

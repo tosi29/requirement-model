@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
-from .graph import RequirementGraph, node_to_json_obj
+from .core.graph import RequirementGraph, node_to_json_obj
 from .loader import LoadResult, load_sources
 
 __all__ = ["GraphDiff", "diff_graphs", "load_revision", "format_plan"]

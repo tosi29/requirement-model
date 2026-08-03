@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from .findings import Finding, FindingList
-from .graph import RequirementGraph
+from .core.graph import RequirementGraph
 from .lexicon import find_ambiguous_terms
 from .model import (
     STATUS_RANK,

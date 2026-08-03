@@ -13,7 +13,7 @@ import {
   createView,
   initialSelection,
   mermaidText,
-} from "../../src/reqmodel/site_logic.js";
+} from "../../src/reqmodel/presentation/site_logic.js";
 
 const { data, types, edges } = JSON.parse(await new Response(process.stdin).text());
 

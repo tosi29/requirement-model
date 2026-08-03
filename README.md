@@ -690,9 +690,19 @@ skip されるので、CI では `.github/workflows/ci.yml` が node を明示�
 | [`docs/design/model.md`](docs/design/model.md) | 語尾規則を指示書より緩く取った理由、`constrains` を成熟度検査から外した理由、型を分ける基準 |
 | [`docs/design/site.md`](docs/design/site.md) | 描画エンジンの選定、フォーカスと見送った候補、帯表示、日本語ラベルの折り返し、表示状態の実装、JS の構成 |
 
-## 非スコープ (初期実装では作らない)
+## 非スコープ
 
-- RDB / 外部ストレージ、Web UI
-- LLM API の直接呼び出し (`explain` はコンテキスト生成まで)
+**意図して持たないものは Constraint として `requirements.py` にモデル化してある。**
+RDB / 外部ストレージを持たないこと、LLM API を直接呼ばず文脈生成に留めること、
+定義ファイルを実行しないこと、実行時の依存を pydantic だけに保つこと、公開サイトを
+外部への通信なしで表示できるようにすること — いずれも `req doc -o spec.md` の
+「3. 制約」に一覧で出る。ここに散文で書き写すと二重管理になるので置かない。
+
+モデルに載せていない非スコープは次の 3 つ。
+
+- 要求を**編集する** Web UI (`req site` が出すのは閲覧専用の静的サイト)
 - i* のアクター依存モデル、KAOS の Obstacle
 - 複数体系の統合メタモデル
+
+未着手の機能 (MCP サーバ、SARIF 出力、設定ファイル等) は非スコープではなく
+`proposed` の要求として `requirements.py` に載っている。

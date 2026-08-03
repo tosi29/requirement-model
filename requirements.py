@@ -587,14 +587,6 @@ constraint_pydantic_only = Constraint(
     priority=2,
     constrains=[fr_mcp, fr_svg],
     has_source=[src_spec],
-    suppress=[
-        (
-            "structure.status_inconsistent",
-            "制約そのものは承認済みで、制約対象の FR (#10, #24) がまだ proposed である"
-            "ことによる指摘。着手前の要求に制約を張るために制約側の成熟度を下げるのは"
-            "実態に反するため抑制する",
-        ),
-    ],
 )
 constraint_git_only = Constraint(
     id="C-3",
@@ -619,13 +611,6 @@ constraint_no_llm_call = Constraint(
     priority=2,
     constrains=[fr_explain, fr_mcp],
     has_source=[src_spec],
-    suppress=[
-        (
-            "structure.status_inconsistent",
-            "制約そのものは承認済みで、制約対象の FR-20 (#10) がまだ proposed である"
-            "ことによる指摘。C-2 と同じ理由で抑制する",
-        ),
-    ],
 )
 
 # --- 決定 -------------------------------------------------------------------

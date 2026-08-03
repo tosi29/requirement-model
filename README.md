@@ -195,12 +195,18 @@ FR / QR には `acceptance_criteria: list[str]` が加わる。
 | `structure.resolve_no_conflict` | warning | conflicts が宣言されていないペアの resolves |
 | `structure.missing_source` | warning | 源泉リンクの無い要求 |
 | `structure.missing_acceptance_criteria` | warning | 受け入れ基準の無い FR / QR |
-| `structure.status_inconsistent` | warning | approved 以上のノードが proposed のノードを参照 |
+| `structure.status_inconsistent` | warning | approved 以上のノードが proposed のノードを参照 (`constrains` を除く) |
 | `semantics.ambiguous_term` | warning | 曖昧語 (「高速に」「適切に」等) |
 | `waiver.stale` | warning | 陳腐化した抑制 (対象の指摘が出ていない) |
 
 「FR から Goal への到達」は `FR --refines--> FR --satisfies--> Need <--motivates-- Goal`
 の経路で判定する。曖昧語辞書は `src/reqmodel/lexicon.py` で編集できる。
+
+`structure.status_inconsistent` が見るのは `satisfies` / `refines` / `qualifies` /
+`motivates` の 4 種で、**`constrains` は対象外**である (`validate.py` の `_STATUS_EDGES`)。
+制約は制約対象より先に決まりうる — 「MCP サーバを作るなら依存を増やさない範囲で」は
+着手前に決まっているからこそ意味があり、承認済みの Constraint が proposed の要求を
+指すのは逆転ではない。制約側の status を下げれば黙るが、それは実態に反する。
 
 ### 指摘の抑制 (waiver)
 
@@ -890,14 +896,15 @@ $ req site -o site && python -m http.server -d site
   メタモデルにそのフィールドが無く、issue ごとに `Source` を作るのは意味的に歪む。
   現状は**ノード直前のコメント** (`# → issue #6`) に逃がしてある。コメントは AST に
   現れないのでモデルには入らない = 機械が辿れない
-- **未着手の要求に張った制約が `structure.status_inconsistent` になる。** approved な
-  Constraint が proposed な FR を `constrains` すると成熟度の逆転として報告されるが、
-  着手前の要求に制約を張るのは普通のことで、制約側の status を下げるのは実態に反する
 - **曖昧語辞書が語の使用と言及を区別しない。** 「安定」(ソートの安定性)、
   「高速」(曖昧語検査そのものの受け入れ基準に出てくる引用) が指摘される
+- **未着手の要求に張った制約が `structure.status_inconsistent` になっていた。**
+  approved な Constraint が proposed な FR を `constrains` すると成熟度の逆転として
+  報告されたが、着手前の要求に制約を張るのは普通のことなので、`constrains` を
+  チェックの対象外にした ([層2 のチェック一覧](#検証-3層))。誤検出そのものが直った例
 
-いずれも抑制 (waiver) で理由付きで残してあり、`req validate --show-suppressed` で読める。
-**`--strict` を通すために表現を歪めてはいない**。5 件の抑制はすべて理由が書かれ、
+残る指摘は抑制 (waiver) で理由付きで残してあり、`req validate --show-suppressed` で読める。
+**`--strict` を通すために表現を歪めてはいない**。2 件の抑制はすべて理由が書かれ、
 対象の指摘が消えれば `waiver.stale` で気付ける。
 
 ## GitHub Pages への公開

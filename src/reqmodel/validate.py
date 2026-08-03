@@ -29,7 +29,11 @@ from .model import (
 __all__ = ["validate_structure", "validate_semantics_lexical", "attach_locations"]
 
 #: 上流ノードの承認状態を検査するエッジ。
-_STATUS_EDGES = ("satisfies", "refines", "qualifies", "motivates", "constrains")
+#:
+#: `constrains` は入れない。制約は制約対象より先に決まりうる (「MCP サーバを作るなら
+#: 依存を増やさない範囲で」は着手前に決まっているからこそ意味がある) ため、承認済みの
+#: Constraint が proposed の要求を指すのは成熟度の逆転ではない。
+_STATUS_EDGES = ("satisfies", "refines", "qualifies", "motivates")
 
 
 def validate_structure(graph: RequirementGraph) -> FindingList:

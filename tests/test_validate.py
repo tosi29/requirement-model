@@ -186,6 +186,17 @@ def test_approved_requirement_pointing_at_proposed_need_is_reported():
     assert inconsistent and inconsistent[0].node_id == "FR-1"
 
 
+def test_approved_constraint_on_proposed_requirement_is_not_reported():
+    # 制約は制約対象より先に決まりうるので、constrains は成熟度の逆転にしない
+    s = source("S-1")
+    n = need("N-1", has_source=[s], status="approved")
+    g = goal("G-1", motivates=[n], has_source=[s], status="approved")
+    f = fr("FR-1", satisfies=[n], has_source=[s], status="proposed")
+    c = constraint("C-1", constrains=[f], has_source=[s], status="approved")
+    findings = validate_structure(build(s, n, g, f, c))
+    assert "structure.status_inconsistent" not in codes(findings)
+
+
 def test_ambiguous_terms_are_detected():
     graph = build(fr("FR-1", text="検索結果を高速に表示すること"))
     findings = validate_semantics_lexical(graph)

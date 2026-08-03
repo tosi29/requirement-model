@@ -8,7 +8,6 @@ from typing import Any
 
 from .graph import Edge, RequirementGraph
 from .model import (
-    HIGH_PRIORITY_THRESHOLD,
     SOURCE_EDGES,
     STATUS_RANK,
     TYPE_ORDER,
@@ -104,9 +103,9 @@ _IMPACT_COLORS = {
     "related": "#8430ce",
 }
 
-#: 検索ヒットの暈し (halo) の色。枠線は型 (色) と status (線種)、その外側の輪は
-#: 優先度、枠線の色と太さは影響範囲で埋まっているので、検索はノードの下に敷く
-#: underlay を使う。他のどの表現とも property が衝突しない。
+#: 検索ヒットの暈し (halo) の色。枠線は型 (色) と status (線種)、枠線の色と太さは
+#: 影響範囲で埋まっているので、検索はノードの下に敷く underlay を使う。
+#: 他のどの表現とも property が衝突しない。
 _SEARCH_HIT = "#00b8d4"
 
 #: status → 枠線の (線種, 太さ)。成熟するほど「実線に近く・太く」なる。
@@ -120,10 +119,6 @@ _STATUS_BORDER: dict[str, tuple[str, float]] = {
     "implemented": ("solid", 2),
     "verified": ("double", 4),
 }
-
-#: 高優先度 (priority <= HIGH_PRIORITY_THRESHOLD) を囲む輪の色。
-#: 枠線は型 (色) と status (線種) で埋まっているので、その外側の outline を使う。
-_HIGH_PRIORITY_OUTLINE = "#f9ab00"
 
 #: 静的サイトで帯 (枠) にまとめて上に出す型。並びがそのまま上からの帯の順になる。
 #: Goal (最上位) → Need (上位) の階層が、エッジの向きに関わらず常に図の上に来る。
@@ -162,7 +157,7 @@ def _mermaid_shape_of_type(node_type: type[Node]) -> tuple[str, str]:
 
 
 def render_meta() -> dict[str, Any]:
-    """型・status・優先度ごとの描画情報。ブラウザ側 (Cytoscape.js) の初期化に使う。
+    """型・status ごとの描画情報。ブラウザ側 (Cytoscape.js) の初期化に使う。
 
     形状・配色・線種の定義をこのモジュールに一本化し、静的サイト側に複製しない
     ための出口。凡例もここから作るので、定義を足せば凡例にも自動で並ぶ。
@@ -190,10 +185,6 @@ def render_meta() -> dict[str, Any]:
                 "border_width": _STATUS_BORDER[status][1],
             }
             for status in sorted(STATUS_RANK, key=lambda name: STATUS_RANK[name])
-        },
-        "priority": {
-            "threshold": HIGH_PRIORITY_THRESHOLD,
-            "outline": _HIGH_PRIORITY_OUTLINE,
         },
         "bands": [
             {"type": node_type.__name__, "label": label}

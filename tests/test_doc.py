@@ -26,7 +26,7 @@ def sample():
         source("S-1"),
         goal("G-1", motivates=["N-1"], has_source=["S-1"]),
         need("N-1", has_source=["S-1"]),
-        fr("FR-1", satisfies=["N-1"], priority=1),
+        fr("FR-1", satisfies=["N-1"]),
         qr("QR-1", qualifies=["FR-1"]),
     )
 
@@ -56,7 +56,7 @@ def test_spec_lists_attributes_criteria_and_traces():
     text = render_spec(sample(), title="経費精算 仕様書", sources=["examples/x.py"])
     assert text.startswith("# 経費精算 仕様書\n")
     assert "- 生成元: examples/x.py" in text
-    assert "種別: FunctionalRequirement / 状態: proposed / 優先度: 1" in text
+    assert "種別: FunctionalRequirement / 状態: proposed" in text
     assert "- 充足するニーズ: N-1" in text
     assert "- 源泉: S-1 (経理部長)" in text
     assert "    - 読み取り率 95% 以上" in text  # 受け入れ基準

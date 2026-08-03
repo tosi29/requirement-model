@@ -105,8 +105,6 @@ def _describe(
     head = f"- [{type_name}] {node.id}: {node.text}"
     lines = [head]
     attrs = [f"status={node.status}"]
-    if node.priority is not None:
-        attrs.append(f"priority={node.priority}")
     if isinstance(node, Source):
         attrs.append(f"kind={node.kind}")
     decomposition = getattr(node, "decomposition", None)

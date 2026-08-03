@@ -12,16 +12,12 @@ from .findings import Finding, FindingList
 from .graph import RequirementGraph
 from .lexicon import find_ambiguous_terms
 from .model import (
-    HIGH_PRIORITY_THRESHOLD,
     STATUS_RANK,
     Constraint,
-    Decision,
     FunctionalRequirement,
     Goal,
     Need,
-    Node,
     QualityRequirement,
-    Requirement,
     Source,
     edge_specs_for,
 )
@@ -47,7 +43,6 @@ def validate_structure(graph: RequirementGraph) -> FindingList:
     _check_orphan_quality(graph, findings)
     _check_unused_sources(graph, findings)
     _check_goal_decomposition(graph, findings)
-    _check_conflicts(graph, findings)
     _check_sources_present(graph, findings)
     _check_acceptance_criteria(graph, findings)
     _check_status_consistency(graph, findings)
@@ -323,85 +318,6 @@ def _check_goal_decomposition(graph: RequirementGraph, findings: FindingList) ->
                     node_id=goal.id,
                 )
             )
-
-
-# ---------------------------------------------------------------------------
-# conflicts / Decision
-# ---------------------------------------------------------------------------
-
-
-def _is_high_priority(node: Node) -> bool:
-    return node.priority is not None and node.priority <= HIGH_PRIORITY_THRESHOLD
-
-
-def _check_conflicts(graph: RequirementGraph, findings: FindingList) -> None:
-    resolved: set[frozenset[str]] = set()
-    for decision in graph.by_type(Decision):
-        for pair in decision.resolves:
-            ids = frozenset(str(member) for member in pair)
-            resolved.add(ids)
-            missing = [i for i in ids if i not in graph.nodes]
-            if missing:
-                continue
-            if len(ids) < 2:
-                findings.add(
-                    Finding(
-                        severity="error",
-                        code="structure.resolve_invalid",
-                        layer=2,
-                        message="resolves のペアが同一ノードを指している",
-                        node_id=decision.id,
-                    )
-                )
-                continue
-            if not _declared_conflict(graph, ids):
-                findings.add(
-                    Finding(
-                        severity="warning",
-                        code="structure.resolve_no_conflict",
-                        layer=2,
-                        message=(
-                            "conflicts が宣言されていないペアを resolves している: "
-                            + " / ".join(sorted(ids))
-                        ),
-                        node_id=decision.id,
-                    )
-                )
-
-    seen: set[frozenset[str]] = set()
-    for node in graph.by_type(Requirement):
-        for edge in graph.out_edges(node.id, ("conflicts",)):
-            conflict = frozenset({edge.source, edge.target})
-            if len(conflict) < 2 or conflict in seen:
-                continue
-            seen.add(conflict)
-            if conflict in resolved:
-                continue
-            other = graph.nodes.get(edge.target)
-            if other is None:
-                continue
-            high = _is_high_priority(node) and _is_high_priority(other)
-            findings.add(
-                Finding(
-                    severity="severe" if high else "warning",
-                    code="structure.conflict_unresolved",
-                    layer=2,
-                    message=(
-                        f"{edge.target} との conflict が未解消 "
-                        f"(解消する Decision が無い)"
-                        + ("。高優先度どうしの対立" if high else "")
-                    ),
-                    node_id=node.id,
-                )
-            )
-
-
-def _declared_conflict(graph: RequirementGraph, ids: frozenset[str]) -> bool:
-    for node_id in ids:
-        for edge in graph.out_edges(node_id, ("conflicts",)):
-            if frozenset({edge.source, edge.target}) == ids:
-                return True
-    return False
 
 
 # ---------------------------------------------------------------------------

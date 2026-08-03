@@ -7,19 +7,16 @@ export const EDGE_NAMES = [
   "refines",
   "motivates",
   "satisfies",
-  "conflicts",
   "qualifies",
   "constrains",
-  "resolves",
 ];
 
 export const EDGE_NAMES_BY_TYPE = {
   Goal: ["has_source", "refines", "motivates"],
   Need: ["has_source"],
-  FunctionalRequirement: ["has_source", "satisfies", "refines", "conflicts"],
-  QualityRequirement: ["has_source", "qualifies", "conflicts"],
+  FunctionalRequirement: ["has_source", "satisfies", "refines"],
+  QualityRequirement: ["has_source", "qualifies"],
   Constraint: ["has_source", "constrains"],
-  Decision: ["resolves"],
   System: [],
   Source: [],
 };
@@ -37,7 +34,6 @@ export const TYPES = [
   "FunctionalRequirement",
   "QualityRequirement",
   "Constraint",
-  "Decision",
   "System",
   "Source",
 ];
@@ -83,7 +79,6 @@ export function fixture(overrides = {}) {
       acceptance_criteria: ["正解率が 95% 以上である"],
       satisfies: ["N-1"],
       refines: [],
-      conflicts: [],
     },
     {
       type: "QualityRequirement",
@@ -94,7 +89,6 @@ export function fixture(overrides = {}) {
       has_source: [],
       acceptance_criteria: [],
       qualifies: ["FR-1"],
-      conflicts: [],
     },
     {
       type: "Source",
@@ -256,7 +250,7 @@ export const META = {
     { type: "Goal", label: "Goal (最上位)" },
     { type: "Need", label: "Need (上位)" },
   ],
-  dashed_edges: ["conflicts", "has_source"],
+  dashed_edges: ["has_source"],
   impact_colors: {
     selected: "#d93025",
     upstream: "#1a73e8",

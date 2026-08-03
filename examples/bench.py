@@ -12,7 +12,6 @@
 
 from reqmodel import (
     Constraint,
-    Decision,
     FunctionalRequirement,
     Goal,
     Need,
@@ -481,7 +480,6 @@ FunctionalRequirement(
     priority=5,
     has_source=["SRC-4"],
     satisfies=["N-10"],
-    conflicts=["FR-11"],
     acceptance_criteria=["積載の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -762,7 +760,6 @@ FunctionalRequirement(
     priority=5,
     has_source=["SRC-4"],
     satisfies=["N-16"],
-    conflicts=["FR-41"],
     acceptance_criteria=["配送の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1043,7 +1040,6 @@ FunctionalRequirement(
     priority=5,
     has_source=["SRC-4"],
     refines=["FR-69"],
-    conflicts=["FR-71"],
     acceptance_criteria=["積載の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1324,7 +1320,6 @@ FunctionalRequirement(
     priority=5,
     has_source=["SRC-4"],
     satisfies=["N-4"],
-    conflicts=["FR-101"],
     acceptance_criteria=["配送の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1605,7 +1600,6 @@ FunctionalRequirement(
     priority=5,
     has_source=["SRC-4"],
     satisfies=["N-10"],
-    conflicts=["FR-131"],
     acceptance_criteria=["積載の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2178,6 +2172,53 @@ FunctionalRequirement(
     acceptance_criteria=["通関の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
+FunctionalRequirement(
+    id="FR-192",
+    text="検品の引当状況を基幹システムへ連携すること",
+    status="verified",
+    has_source=["SRC-6"],
+    satisfies=["N-24"],
+    acceptance_criteria=["検品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
+)
+
+FunctionalRequirement(
+    id="FR-193",
+    text="受注の進捗を一覧画面に表示すること",
+    status="approved",
+    priority=3,
+    has_source=["SRC-1"],
+    satisfies=["N-1"],
+    acceptance_criteria=["受注の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
+)
+
+FunctionalRequirement(
+    id="FR-194",
+    text="在庫の履歴を日次で集計すること",
+    status="implemented",
+    has_source=["SRC-2"],
+    satisfies=["N-2"],
+    acceptance_criteria=["在庫の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
+)
+
+FunctionalRequirement(
+    id="FR-195",
+    text="出荷の実績を担当者に通知すること",
+    status="verified",
+    has_source=["SRC-3"],
+    satisfies=["N-3"],
+    acceptance_criteria=["出荷の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
+)
+
+FunctionalRequirement(
+    id="FR-196",
+    text="配送の予定をCSV として出力すること",
+    status="approved",
+    priority=1,
+    has_source=["SRC-4"],
+    refines=["FR-195"],
+    acceptance_criteria=["配送の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
+)
+
 # --- 品質要求 ----------------------------------------------------------------------
 
 QualityRequirement(
@@ -2715,41 +2756,4 @@ Constraint(
     status="approved",
     has_source=["SRC-2"],
     constrains=["FR-154"],
-)
-
-# --- 決定 (競合の解消) ----------------------------------------------------------------
-
-Decision(
-    id="D-1",
-    text="FR-10 と FR-11 は画面を分けて両立させる",
-    status="approved",
-    resolves=[("FR-10", "FR-11")],
-)
-
-Decision(
-    id="D-2",
-    text="FR-40 と FR-41 は画面を分けて両立させる",
-    status="approved",
-    resolves=[("FR-40", "FR-41")],
-)
-
-Decision(
-    id="D-3",
-    text="FR-70 と FR-71 は画面を分けて両立させる",
-    status="approved",
-    resolves=[("FR-70", "FR-71")],
-)
-
-Decision(
-    id="D-4",
-    text="FR-100 と FR-101 は画面を分けて両立させる",
-    status="approved",
-    resolves=[("FR-100", "FR-101")],
-)
-
-Decision(
-    id="D-5",
-    text="FR-130 と FR-131 は画面を分けて両立させる",
-    status="approved",
-    resolves=[("FR-130", "FR-131")],
 )

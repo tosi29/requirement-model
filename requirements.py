@@ -16,7 +16,6 @@ status="proposed" で置き、対応する issue 番号を各ノードの直前�
 
 from reqmodel import (
     Constraint,
-    Decision,
     FunctionalRequirement,
     Goal,
     Need,
@@ -340,7 +339,7 @@ fr_doc = FunctionalRequirement(
     satisfies=[need_readable],
     has_source=[src_legacy],
     acceptance_criteria=[
-        "仕様書は 7 節構成で、どのノードも必ずいずれかの節に現れる",
+        "仕様書は 5 節構成で、どのノードも必ずいずれかの節に現れる",
         "トレーサビリティ表はエッジ型ごとに 1 枚出て、トレースの無い行と列を併記する",
         "表は Markdown と CSV の両方で出せる",
     ],
@@ -359,15 +358,17 @@ fr_site = FunctionalRequirement(
 )
 fr_fit_whole = FunctionalRequirement(
     id="FR-13",
-    text="図の初期表示で、グラフ全体を 1 画面に収めること",
+    text=(
+        "図の初期表示でグラフ全体を 1 画面に収め、この表示は俯瞰の用途に限ること"
+    ),
     status="implemented",
     priority=3,
     refines=[fr_site],
     satisfies=[need_readable],
-    conflicts=["QR-1"],
     has_source=[src_owner],
     acceptance_criteria=[
         "読み込み直後の倍率は、全ノードが表示領域に入る値になる",
+        "ラベルを読む倍率の保証はこの表示には求めず、フォーカス表示 (FR-26) が担う",
     ],
 )
 fr_table = FunctionalRequirement(
@@ -541,6 +542,19 @@ fr_source_as_attribute = FunctionalRequirement(
         "--with-sources を付けると図に描き、源泉エッジも辿る",
     ],
 )
+fr_focus = FunctionalRequirement(
+    id="FR-26",
+    text="選択したノードの近傍だけを図に描くフォーカス表示を設けること",
+    status="implemented",
+    priority=2,
+    refines=[fr_site],
+    satisfies=[need_readable],
+    has_source=[src_owner, src_bench],
+    acceptance_criteria=[
+        "深さ (1〜3 ホップ) を選ぶと、図に描かれるのは選択ノードの近傍だけになる",
+        "フォーカスは図の描画にしか効かず、一覧・テーブル・上流/下流の件数は全体のまま",
+    ],
+)
 
 # --- 品質要求 ---------------------------------------------------------------
 
@@ -549,7 +563,7 @@ qr_readable_zoom = QualityRequirement(
     text="図に描かれるノードのラベルが読める倍率 (0.5 倍以上) を保つこと",
     status="approved",
     priority=2,
-    qualifies=[fr_site],
+    qualifies=[fr_focus],
     has_source=[src_bench, src_owner],
     acceptance_criteria=[
         "300 ノードの合成モデルで、フォーカス 2 ホップ表示の倍率が 0.5 倍以上である",
@@ -634,16 +648,3 @@ constraint_no_llm_call = Constraint(
     has_source=[src_spec],
 )
 
-# --- 決定 -------------------------------------------------------------------
-
-decision_focus = Decision(
-    id="D-1",
-    text=(
-        "選択したノードの近傍だけを描くフォーカス表示を設け、全体を 1 画面に収める表示は"
-        "俯瞰の用途に限る。要求グラフは 1 つの Need に FR がぶら下がる形のため図が横長になり、"
-        "全体を収める倍率ではラベルが読めなくなる。"
-    ),
-    status="approved",
-    priority=2,
-    resolves=[(fr_fit_whole, qr_readable_zoom)],
-)

@@ -951,7 +951,7 @@ test("explainCommand は画面の設定をそのまま引数にする", () => {
 test("部分グラフに現れなかったエッジ種別を末尾に並べる", () => {
   const text = nodeContext(viewOf(), "FR-1");
 
-  assert.match(text, /\(部分グラフに現れなかったエッジ種別: refines, motivates, conflicts\)\n$/);
+  assert.match(text, /\(部分グラフに現れなかったエッジ種別: refines, motivates\)\n$/);
 });
 
 test("allEdgeNames はノード型から現れうるエッジ種別を数える", () => {
@@ -960,7 +960,6 @@ test("allEdgeNames はノード型から現れうるエッジ種別を数える"
     "refines",
     "motivates",
     "satisfies",
-    "conflicts",
     "qualifies",
   ]);
 });

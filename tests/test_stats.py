@@ -20,7 +20,7 @@ def test_counts_nodes_by_type_and_status():
 
     assert stats.nodes == 5
     assert stats.by_type["FunctionalRequirement"] == 1
-    assert stats.by_type["Decision"] == 0  # 存在しない型も 0 で並ぶ (分布として読む)
+    assert stats.by_type["Constraint"] == 0  # 存在しない型も 0 で並ぶ (分布として読む)
     assert stats.by_status == {
         "proposed": 3,
         "approved": 1,
@@ -42,7 +42,7 @@ def test_counts_edges_by_name():
     assert stats.edges == 3
     assert stats.by_edge["has_source"] == 2
     assert stats.by_edge["satisfies"] == 1
-    assert stats.by_edge["conflicts"] == 0
+    assert stats.by_edge["qualifies"] == 0
 
 
 def test_need_satisfaction_ratio_lists_the_uncovered():

@@ -22,7 +22,6 @@ from typing import Iterable, Sequence
 from .graph import RequirementGraph
 from .model import (
     Constraint,
-    Decision,
     FunctionalRequirement,
     Goal,
     Need,
@@ -40,8 +39,6 @@ __all__ = [
     "Matrix",
     "MATRICES",
     "build_matrix",
-    "conflict_pairs",
-    "resolutions",
     "DEFAULT_SPEC_TITLE",
     "DEFAULT_MATRIX_TITLE",
     "DOC_FORMATS",
@@ -73,29 +70,6 @@ def _cell(text: str) -> str:
 
 def _unique(ids: Iterable[str]) -> list[str]:
     return list(dict.fromkeys(ids))
-
-
-def _pair(left: str, right: str) -> tuple[str, str]:
-    """競合ペアの正規形 (対称エッジなので向きを持たせない)。"""
-    return (left, right) if left <= right else (right, left)
-
-
-def conflict_pairs(graph: RequirementGraph) -> list[tuple[str, str]]:
-    """グラフ中の conflict を重複なく列挙する。"""
-    return sorted({
-        _pair(edge.source, edge.target)
-        for edge in graph.edges
-        if edge.name == "conflicts"
-    })
-
-
-def resolutions(graph: RequirementGraph) -> dict[tuple[str, str], list[str]]:
-    """競合ペア → それを解消している Decision の id。"""
-    resolved: dict[tuple[str, str], list[str]] = {}
-    for decision in graph.by_type(Decision):
-        for left, right in decision.resolves:
-            resolved.setdefault(_pair(str(left), str(right)), []).append(decision.id)
-    return resolved
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +122,7 @@ def _attr_line(graph: RequirementGraph, node: Node) -> str:
 
 
 def _relation_lines(graph: RequirementGraph, node: Node) -> list[str]:
-    """conflicts 以外のエッジを、向きごとに 1 行ずつ並べる。"""
+    """エッジを、向きごとに 1 行ずつ並べる。"""
     lines: list[str] = []
     for labels, edges_of, attr in (
         (_OUT_LABELS, graph.out_edges, "target"),
@@ -166,29 +140,6 @@ def _relation_lines(graph: RequirementGraph, node: Node) -> list[str]:
     return lines
 
 
-def _conflict_lines(
-    graph: RequirementGraph,
-    node: Node,
-    resolved: dict[tuple[str, str], list[str]],
-) -> list[str]:
-    others = _unique(
-        edge.target for edge in graph.out_edges(node.id, ("conflicts",))
-    ) + _unique(edge.source for edge in graph.in_edges(node.id, ("conflicts",)))
-    entries = []
-    for other in _unique(others):
-        by = resolved.get(_pair(node.id, other))
-        entries.append(f"{other} ({'解消: ' + ', '.join(by) if by else '未解消'})")
-    return [f"- 競合: {', '.join(entries)}"] if entries else []
-
-
-def _resolves_lines(node: Node) -> list[str]:
-    """Decision が解消した競合ペア。エッジではペアの組が失われるので属性から出す。"""
-    if not isinstance(node, Decision) or not node.resolves:
-        return []
-    pairs = ", ".join(f"{left} ⇄ {right}" for left, right in node.resolves)
-    return [f"- 解消する競合: {pairs}"]
-
-
 def _criteria_lines(node: Node) -> list[str]:
     criteria: Sequence[str] = getattr(node, "acceptance_criteria", []) or []
     if not criteria:
@@ -198,17 +149,10 @@ def _criteria_lines(node: Node) -> list[str]:
     return lines
 
 
-def _node_block(
-    graph: RequirementGraph,
-    node: Node,
-    level: int,
-    resolved: dict[tuple[str, str], list[str]],
-) -> list[str]:
+def _node_block(graph: RequirementGraph, node: Node, level: int) -> list[str]:
     lines = ["", f"{'#' * level} {node.id} {_inline(node.text)}", ""]
     lines.append(_attr_line(graph, node))
     lines.extend(_relation_lines(graph, node))
-    lines.extend(_conflict_lines(graph, node, resolved))
-    lines.extend(_resolves_lines(node))
     lines.extend(_criteria_lines(node))
     where = graph.location_of(node.id)
     if where is not None:
@@ -276,11 +220,7 @@ def _targets_of(graph: RequirementGraph, node_id: str, edge: str) -> list[Node]:
     ]
 
 
-def _hierarchy_lines(
-    graph: RequirementGraph,
-    emitted: set[str],
-    resolved: dict[tuple[str, str], list[str]],
-) -> list[str]:
+def _hierarchy_lines(graph: RequirementGraph, emitted: set[str]) -> list[str]:
     lines: list[str] = []
 
     def emit(node: Node, level: int) -> bool:
@@ -289,7 +229,7 @@ def _hierarchy_lines(
             lines.extend(_repeat_lines(node))
             return False
         emitted.add(node.id)
-        lines.extend(_node_block(graph, node, level, resolved))
+        lines.extend(_node_block(graph, node, level))
         return True
 
     for goal in _goal_order(graph):
@@ -306,49 +246,25 @@ def _hierarchy_lines(
     return lines
 
 
-def _system_lines(
-    graph: RequirementGraph,
-    emitted: set[str],
-    resolved: dict[tuple[str, str], list[str]],
-) -> list[str]:
+def _system_lines(graph: RequirementGraph, emitted: set[str]) -> list[str]:
     lines: list[str] = []
     for system in graph.by_type(System):
         emitted.add(system.id)
-        lines.extend(_node_block(graph, system, 3, resolved))
+        lines.extend(_node_block(graph, system, 3))
         for qr in _sources_of(graph, system.id, "qualifies"):
             if isinstance(qr, QualityRequirement) and qr.id not in emitted:
                 emitted.add(qr.id)
-                lines.extend(_node_block(graph, qr, 4, resolved))
+                lines.extend(_node_block(graph, qr, 4))
     return lines
 
 
 def _simple_section(
-    graph: RequirementGraph,
-    nodes: Sequence[Node],
-    emitted: set[str],
-    resolved: dict[tuple[str, str], list[str]],
+    graph: RequirementGraph, nodes: Sequence[Node], emitted: set[str]
 ) -> list[str]:
     lines: list[str] = []
     for node in nodes:
         emitted.add(node.id)
-        lines.extend(_node_block(graph, node, 3, resolved))
-    return lines
-
-
-def _conflict_section(
-    graph: RequirementGraph, resolved: dict[tuple[str, str], list[str]]
-) -> list[str]:
-    lines: list[str] = []
-    for left, right in conflict_pairs(graph):
-        by = resolved.get((left, right))
-        state = f"解消: {', '.join(by)}" if by else "**未解消**"
-        lines.append(
-            f"- {left} ⇄ {right} — {state}"
-        )
-        for node_id in (left, right):
-            node = graph.nodes.get(node_id)
-            if node is not None:
-                lines.append(f"    - {node_id}: {_inline(node.text)}")
+        lines.extend(_node_block(graph, node, 3))
     return lines
 
 
@@ -428,7 +344,6 @@ def render_spec(
     sources: Sequence[str] = (),
 ) -> str:
     """Goal → Need → FR/QR の階層で並べた Markdown 仕様書。"""
-    resolved = resolutions(graph)
     emitted: set[str] = set()
 
     lines = [f"# {title}", ""]
@@ -440,14 +355,9 @@ def render_spec(
     )
 
     body = [
-        ("要求階層 (Goal → Need → FR → QR)", _hierarchy_lines(graph, emitted, resolved)),
-        ("システムに張られた品質要求", _system_lines(graph, emitted, resolved)),
-        (
-            "制約",
-            _simple_section(graph, graph.by_type(Constraint), emitted, resolved),
-        ),
-        ("決定", _simple_section(graph, graph.by_type(Decision), emitted, resolved)),
-        ("競合", _conflict_section(graph, resolved)),
+        ("要求階層 (Goal → Need → FR → QR)", _hierarchy_lines(graph, emitted)),
+        ("システムに張られた品質要求", _system_lines(graph, emitted)),
+        ("制約", _simple_section(graph, graph.by_type(Constraint), emitted)),
         ("源泉", _source_section(graph, emitted)),
     ]
     for number, (heading, content) in enumerate(body, start=1):
@@ -503,7 +413,7 @@ MATRICES: tuple[MatrixSpec, ...] = (
         "Constraint × 制約対象",
         "constrains",
         (Constraint,),
-        (FunctionalRequirement, QualityRequirement, Decision),
+        (FunctionalRequirement, QualityRequirement),
     ),
 )
 

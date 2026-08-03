@@ -9,7 +9,6 @@
 
 from reqmodel import (
     Constraint,
-    Decision,
     FunctionalRequirement,
     Goal,
     Need,
@@ -159,7 +158,6 @@ fr_rule_check = FunctionalRequirement(
     status="approved",
     priority=1,
     satisfies=[need_early_violation],
-    conflicts=[fr_short_form],
     has_source=[src_policy_receipt],
     acceptance_criteria=[
         "規程 第4版 の上限額ルールに違反する申請では、違反したルール番号が表示される",
@@ -187,6 +185,21 @@ fr_remind = FunctionalRequirement(
     has_source=[src_legacy],
     acceptance_criteria=[
         "承認待ち 24 時間経過後、毎営業日 9 時にリマインドが送信される",
+    ],
+)
+fr_autofill = FunctionalRequirement(
+    id="FR-6",
+    text=(
+        "規程照合に要する項目を既定値から自動補完し、違反が検出された場合に限り"
+        "申請者に追加入力を求めること"
+    ),
+    status="approved",
+    priority=1,
+    satisfies=[need_photo_only, need_early_violation],
+    has_source=[src_employee, src_policy_receipt],
+    acceptance_criteria=[
+        "自動補完のあと、新規申請画面の必須項目数が 3 以下のままである",
+        "違反が検出されない申請では、追加入力を求められない",
     ],
 )
 
@@ -225,14 +238,3 @@ constraint_region = Constraint(
     has_source=[src_policy_domestic],
 )
 
-# --- 決定 -------------------------------------------------------------------
-
-decision_autofill = Decision(
-    id="D-1",
-    text=(
-        "規程照合に要する項目は既定値から自動補完し、必須入力は 3 項目に保つ。"
-        "違反が検出された場合に限り、追加入力を求める。"
-    ),
-    status="approved",
-    resolves=[(fr_rule_check, fr_short_form)],
-)

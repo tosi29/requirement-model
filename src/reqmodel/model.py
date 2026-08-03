@@ -36,7 +36,6 @@ __all__ = [
     "Constraint",
     "Source",
     "System",
-    "Decision",
     "FR",
     "QR",
     "Ref",
@@ -239,7 +238,6 @@ class FunctionalRequirement(Requirement):
 
     satisfies: list[Ref[Need]] = []
     refines: list[Ref["FunctionalRequirement"]] = []
-    conflicts: list[Ref[Requirement]] = []
 
     @field_validator("text")
     @classmethod
@@ -255,15 +253,12 @@ class QualityRequirement(Requirement):
     """品質要求。qualifies を出せるのは QR だけ。"""
 
     qualifies: list[Ref[Union["FunctionalRequirement", "System"]]] = []
-    conflicts: list[Ref[Requirement]] = []
 
 
 class Constraint(Sourced):
     """解決策の自由度を制限する条件。要求ではない。"""
 
-    constrains: list[
-        Ref[Union["FunctionalRequirement", "QualityRequirement", "Decision"]]
-    ] = []
+    constrains: list[Ref[Union["FunctionalRequirement", "QualityRequirement"]]] = []
 
 
 class Source(Node):
@@ -294,12 +289,6 @@ class System(Node):
     """全体品質の張り先となるノード。"""
 
 
-class Decision(Node):
-    """conflict 解消の記録。"""
-
-    resolves: list[tuple[Ref[Requirement], Ref[Requirement]]] = []
-
-
 #: 短縮名 (指示書中の FR / QR 表記に対応)。
 FR = FunctionalRequirement
 QR = QualityRequirement
@@ -312,7 +301,6 @@ TYPE_ORDER: tuple[type[Node], ...] = (
     FunctionalRequirement,
     QualityRequirement,
     Constraint,
-    Decision,
     System,
     Source,
 )
@@ -336,47 +324,34 @@ class EdgeSpec:
     name: str
     owner: type[Node]
     targets: tuple[type[Node], ...]
-    #: 要素がペア (tuple) かどうか。resolves のみ True。
-    pair: bool = False
-    #: 対称エッジかどうか。conflicts のみ True。
-    symmetric: bool = False
 
     def target_names(self) -> str:
         return " | ".join(t.__name__ for t in self.targets)
 
 
-SYMMETRIC_EDGES = frozenset({"conflicts"})
-
-
-def _analyze(annotation: Any) -> tuple[tuple[type, ...], bool]:
-    """注釈を辿り (参照先型, ペアかどうか) を返す。参照でなければ空タプル。"""
+def _analyze(annotation: Any) -> tuple[type, ...]:
+    """注釈を辿り参照先の型を返す。参照でなければ空タプル。"""
     origin = get_origin(annotation)
 
     if origin is Annotated:
         args = get_args(annotation)
         if any(isinstance(meta, RefMarker) for meta in args[1:]):
-            targets = tuple(
+            return tuple(
                 arg
                 for arg in (get_args(args[0]) or (args[0],))
                 if isinstance(arg, type) and arg is not str
             )
-            return targets, False
         return _analyze(args[0])
 
-    if origin in (list, set, frozenset, tuple) or origin is Union:
+    if origin in (list, set, frozenset) or origin is Union:
         collected: list[type] = []
-        pair = origin is tuple
         for arg in get_args(annotation):
-            if arg is Ellipsis:
-                continue
-            sub_targets, sub_pair = _analyze(arg)
-            pair = pair or sub_pair
-            for target in sub_targets:
+            for target in _analyze(arg):
                 if target not in collected:
                     collected.append(target)
-        return tuple(collected), pair
+        return tuple(collected)
 
-    return (), False
+    return ()
 
 
 def _build_edge_specs() -> dict[type[Node], dict[str, EdgeSpec]]:
@@ -385,15 +360,13 @@ def _build_edge_specs() -> dict[type[Node], dict[str, EdgeSpec]]:
         hints = get_type_hints(node_type, include_extras=True)
         found: dict[str, EdgeSpec] = {}
         for field_name in node_type.model_fields:
-            targets, pair = _analyze(hints.get(field_name))
+            targets = _analyze(hints.get(field_name))
             if not targets:
                 continue
             found[field_name] = EdgeSpec(
                 name=field_name,
                 owner=node_type,
-                targets=tuple(targets),
-                pair=pair,
-                symmetric=field_name in SYMMETRIC_EDGES,
+                targets=targets,
             )
         specs[node_type] = found
     return specs

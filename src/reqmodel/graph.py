@@ -74,13 +74,7 @@ class RequirementGraph:
     @staticmethod
     def _targets_of(node: Node, edge_name: str) -> list[str]:
         values = getattr(node, edge_name, []) or []
-        targets: list[str] = []
-        for value in values:
-            if isinstance(value, (tuple, list)):
-                targets.extend(str(v) for v in value)
-            else:
-                targets.append(str(value))
-        return targets
+        return [str(value) for value in values]
 
     # -- 参照 ---------------------------------------------------------------
 

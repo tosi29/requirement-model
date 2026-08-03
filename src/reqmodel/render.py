@@ -158,6 +158,14 @@ def _fit_of(shape: str) -> dict[str, float]:
     return {"wmul": wmul, "wpad": wpad, "hmul": hmul, "hpad": hpad}
 
 
+def _mermaid_shape_of_type(node_type: type[Node]) -> tuple[str, str]:
+    """型 (クラス) の Mermaid 形状。サブクラスは親の形状を継ぐ。"""
+    for base, shape in _MERMAID_SHAPE.items():
+        if issubclass(node_type, base):
+            return shape
+    raise KeyError(node_type.__name__)  # pragma: no cover
+
+
 def render_meta() -> dict[str, Any]:
     """型・status・優先度ごとの描画情報。ブラウザ側 (Cytoscape.js) の初期化に使う。
 
@@ -172,6 +180,11 @@ def render_meta() -> dict[str, Any]:
                 "stroke": _PALETTE[node_type.__name__][1],
                 # ラベルが図形の内側に収まる外形の決め方 (_SHAPE_FIT を参照)。
                 "fit": _fit_of(_CYTOSCAPE_SHAPE[node_type]),
+                # 画面から Mermaid を書き出す (絞り込み後の図) ときの形状。
+                # 書式そのものは render_mermaid() と揃える。
+                "mermaid": dict(
+                    zip(("open", "close"), _mermaid_shape_of_type(node_type))
+                ),
             }
             for node_type in TYPE_ORDER
         },
@@ -206,9 +219,22 @@ def _truncate(text: str, limit: int) -> str:
     return text
 
 
-def _safe_id(node_id: str) -> str:
-    """Mermaid / DOT のノード識別子として使える形に直す。"""
-    return "n_" + "".join(c if c.isalnum() or c == "_" else "_" for c in node_id)
+def _ids(nodes: Iterable[Node]) -> dict[str, str]:
+    """ノード id → Mermaid / DOT の識別子 (``n1``, ``n2``, …)。
+
+    元の id から識別子を作ると、記号を潰した結果が衝突する。``FR-1`` と ``FR_1``
+    はモデルとしては別ノードだが、非英数字を ``_`` に置き換えると同じ識別子になり、
+    図の上で 1 ノードに融合してしまう (ラベルは後勝ち、エッジも合流する)。
+    黙って壊れるのを避けるため、``ordered_nodes()`` の索引で連番を振る。
+
+    - 衝突が構造的に起こり得ない (エスケープ規則を設計・検証しなくてよい)
+    - Mermaid / DOT の識別子として常に安全
+    - 元の id はラベルに出るので、表示上の情報は失われない
+
+    並びは ``ordered_nodes()`` (型順 → id 順) が唯一の出典なので、同じモデルから
+    は常に同じ識別子が出る。
+    """
+    return {node.id: f"n{index}" for index, node in enumerate(nodes, 1)}
 
 
 def _mermaid_shape(node: Node) -> tuple[str, str]:
@@ -241,8 +267,10 @@ def render_mermaid(
 ) -> str:
     lines = ["flowchart TD"]
     highlighted = set(highlight or ())
+    nodes = graph.ordered_nodes()
+    ids = _ids(nodes)
 
-    for node in graph.ordered_nodes():
+    for node in nodes:
         open_shape, close_shape = _mermaid_shape(node)
         type_name = type(node).__name__
         label = "<br/>".join(
@@ -252,29 +280,29 @@ def render_mermaid(
             ]
         )
         lines.append(
-            f'    {_safe_id(node.id)}{open_shape}"{label}"{close_shape}'
+            f'    {ids[node.id]}{open_shape}"{label}"{close_shape}'
         )
 
     lines.append("")
     for edge in graph.edges:
-        if edge.target not in graph.nodes:
+        if edge.source not in ids or edge.target not in ids:
             continue
         arrow = _EDGE_STYLE_MERMAID.get(edge.name, "-->")
         lines.append(
-            f"    {_safe_id(edge.source)} {arrow}|{edge.name}| {_safe_id(edge.target)}"
+            f"    {ids[edge.source]} {arrow}|{edge.name}| {ids[edge.target]}"
         )
 
     lines.append("")
     for type_name, style in _MERMAID_CLASSDEF.items():
         lines.append(f"    classDef {type_name} {style}")
-    for node in graph.ordered_nodes():
-        lines.append(f"    class {_safe_id(node.id)} {type(node).__name__}")
+    for node in nodes:
+        lines.append(f"    class {ids[node.id]} {type(node).__name__}")
 
     if highlighted:
         lines.append("    classDef highlight stroke-width:3px,stroke:#d93025")
         for node_id in sorted(highlighted):
-            if node_id in graph.nodes:
-                lines.append(f"    class {_safe_id(node_id)} highlight")
+            if node_id in ids:
+                lines.append(f"    class {ids[node_id]} highlight")
 
     return "\n".join(lines) + "\n"
 
@@ -295,7 +323,9 @@ def render_dot(
         '    node [fontname="sans-serif", style=filled, fillcolor=white];',
         '    edge [fontname="sans-serif", fontsize=10];',
     ]
-    for node in graph.ordered_nodes():
+    nodes = graph.ordered_nodes()
+    ids = _ids(nodes)
+    for node in nodes:
         shape = _dot_shape_of(node)
         label = _dot_escape(
             f"{node.id} [{type(node).__name__}]\\n{_truncate(node.text, max_label)}"
@@ -303,16 +333,16 @@ def render_dot(
         node_attrs = f'shape={shape}, label="{label}"'
         if node.id in highlighted:
             node_attrs += ', color="#d93025", penwidth=2'
-        lines.append(f"    {_safe_id(node.id)} [{node_attrs}];")
+        lines.append(f"    {ids[node.id]} [{node_attrs}];")
 
     for edge in graph.edges:
-        if edge.target not in graph.nodes:
+        if edge.source not in ids or edge.target not in ids:
             continue
         edge_attrs = [f'label="{edge.name}"']
         if edge.name in ("conflicts", "has_source"):
             edge_attrs.append("style=dashed")
         lines.append(
-            f"    {_safe_id(edge.source)} -> {_safe_id(edge.target)} "
+            f"    {ids[edge.source]} -> {ids[edge.target]} "
             f"[{', '.join(edge_attrs)}];"
         )
     lines.append("}")

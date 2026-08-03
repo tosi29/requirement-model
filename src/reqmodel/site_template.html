@@ -6,7 +6,12 @@
 <title>__TITLE__</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%94%97%3C/text%3E%3C/svg%3E">
 <style>
+/* テーマは OS 設定に従い (既定)、ヘッダのボタンで明 / 暗に固定もできる。
+   固定したときは <html data-theme="light|dark"> が付き、自動に戻すと外れる。
+   暗色の値は「OS が暗い & 明に固定していない」と「暗に固定した」の 2 か所に
+   同じものを書く。CSS では条件を纏められないので、**片方だけ直さないこと**。 */
 :root {
+  color-scheme: light;
   --bg: #ffffff;
   --panel: #f7f8fa;
   --border: #dfe3e8;
@@ -20,7 +25,8 @@
   --shadow: 0 1px 2px rgba(0,0,0,.06);
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #0f1216;
     --panel: #161b22;
     --border: #2b3440;
@@ -33,6 +39,20 @@
     --info: #9198a1;
     --shadow: none;
   }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1216;
+  --panel: #161b22;
+  --border: #2b3440;
+  --fg: #e6edf3;
+  --muted: #9198a1;
+  --accent: #6ea8fe;
+  --error: #ff7b72;
+  --severe: #ffa657;
+  --warning: #e3b341;
+  --info: #9198a1;
+  --shadow: none;
 }
 * { box-sizing: border-box; }
 body {
@@ -168,6 +188,13 @@ button, select, input[type="search"] {
 }
 input[type="search"] { cursor: text; width: 100%; }
 button:hover { border-color: var(--accent); }
+button[disabled] { opacity: .5; cursor: default; }
+button[disabled]:hover { border-color: var(--border); }
+a { color: var(--accent); }
+/* キーボードで辿っている位置が常に見えるようにする。マウス操作では出ない
+   (:focus ではなく :focus-visible)。図の中 (canvas) 以外はすべてここを通る。 */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+table.nodes tbody tr:focus-visible, .node-btn:focus-visible { outline-offset: -2px; }
 label.toggle {
   display: flex;
   align-items: center;
@@ -206,18 +233,49 @@ input[type="range"] { width: 100%; margin: 2px 0 6px; cursor: pointer; accent-co
   font-size: 12.5px;
   cursor: pointer;
 }
+/* 指摘はクリックで該当ノードへ飛ぶ操作子なので、button で出す
+   (キーボードで辿れ、読み上げにもボタンとして伝わる)。 */
+button.finding {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 12.5px;
+  border: 0;
+  border-left: 3px solid var(--border);
+}
+button.finding:hover { box-shadow: inset 0 0 0 1px var(--accent); }
 .finding.error { border-left-color: var(--error); }
 .finding.severe { border-left-color: var(--severe); }
 .finding.warning { border-left-color: var(--warning); }
 .finding.info { border-left-color: var(--info); }
 .finding .code { color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; }
+/* 指摘一覧の重大度タブと、チェックコードごとの見出し。 */
+.seg { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.seg button { font-size: 12px; padding: 2px 8px; }
+.seg button.active { border-color: var(--accent); background: var(--panel); font-weight: 600; }
+.seg .count { color: var(--muted); margin-left: 4px; font-size: 11px; }
+.code-head {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 12px 0 5px;
+  font-family: ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.code-head:first-child { margin-top: 0; }
 .loc { color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
 .detail h3 { margin: 0 0 4px; font-size: 15px; }
 .detail .text { margin: 0 0 10px; }
 .detail dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0 0 12px; font-size: 13px; }
 .detail dt { color: var(--muted); }
 .detail dd { margin: 0; }
-.detail .edge { font-family: ui-monospace, monospace; font-size: 12px; }
+/* エッジ 1 本は「向き付きの種別 + 相手の id」と「相手の本文」の 2 行で出す。
+   id だけでは、飛んでみるまで何に繋がっているのか分からない。 */
+.detail .edge .arrow { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--muted); }
+.detail .edge .text { display: block; color: var(--muted); font-size: 12px; }
+.detail .loc a { overflow-wrap: anywhere; }
 .empty { color: var(--muted); font-size: 13px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
@@ -235,13 +293,17 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
   <h1>__TITLE__</h1>
   <span class="sub" id="sources"></span>
   <span class="chips" id="stats"></span>
+  <!-- 表示は site_app.js が THEME_LABELS から入れる。 -->
+  <button id="theme" title="配色を 自動 (OS 設定) → 明 → 暗 で切り替える"></button>
 </header>
 
 <main>
-  <aside class="pane">
-    <h2>ノード検索</h2>
-    <input type="search" id="search" placeholder="id / 本文で絞り込む" autocomplete="off">
-    <p class="hint">ヒットは図の上でも暈しで示す。↑↓ で候補を送り、Enter で選ぶ。</p>
+  <aside class="pane" aria-label="検索と絞り込み">
+    <h2 id="search-label">ノード検索</h2>
+    <input type="search" id="search" placeholder="id / 本文で絞り込む" autocomplete="off"
+           aria-labelledby="search-label">
+    <p class="hint">ヒットは図の上でも暈しで示す。↑↓ で候補を送り、Enter で選ぶ。
+      どこからでも <code>/</code> でこの欄に戻り、<code>Esc</code> で選択を解除する。</p>
     <ul class="plain" id="node-list"></ul>
 
     <h2>影響範囲</h2>
@@ -268,40 +330,48 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
 
   <section class="graph-pane">
     <div class="toolbar">
-      <span class="tabs" role="tablist">
+      <!-- タブの間は ←→ で移動する (WAI-ARIA の tablist と同じ操作)。
+           そのため選択中のタブだけが tab 順に乗る (roving tabindex)。 -->
+      <span class="tabs" role="tablist" aria-label="中央ペインの表示">
         <button id="tab-graph" role="tab" class="active" aria-selected="true" aria-controls="graph-frame">グラフ</button>
-        <button id="tab-table" role="tab" aria-selected="false" aria-controls="table-frame">テーブル</button>
+        <button id="tab-table" role="tab" aria-selected="false" aria-controls="table-frame" tabindex="-1">テーブル</button>
       </span>
       <span class="tool-group graph-only" id="graph-tools">
-        <button id="zoom-out" title="縮小">−</button>
-        <button id="zoom-in" title="拡大">＋</button>
+        <button id="zoom-out" title="縮小" aria-label="縮小">−</button>
+        <button id="zoom-in" title="拡大" aria-label="拡大">＋</button>
         <button id="zoom-reset">等倍</button>
         <button id="zoom-fit">全体表示</button>
-        <select id="direction">
+        <select id="direction" aria-label="図の向き">
           <option value="TD">縦 (TD)</option>
           <option value="LR">横 (LR)</option>
         </select>
         <!-- 選択肢は site_app.js が FOCUS_DEPTHS から作る。 -->
-        <select id="focus" title="選択したノードの近傍だけを図に描く (一覧・表・コピー本文は全体のまま)"></select>
+        <select id="focus" aria-label="フォーカス (近傍だけを描く)" title="選択したノードの近傍だけを図に描く (一覧・表・コピー本文は全体のまま)"></select>
         <button id="relayout" title="表示中のノードだけで並べ直す">整列</button>
       </span>
       <button id="clear">選択解除</button>
       <button id="copy-link" title="いまの表示状態 (選択・絞り込み・表示) の URL をコピーする">リンクをコピー</button>
+      <span class="tool-group">
+        <button id="export-svg" title="いま図に描かれているものを SVG で保存する">SVG</button>
+        <button id="export-mmd" title="いま見えているノードとエッジを Mermaid (.mmd) で保存する">.mmd</button>
+      </span>
       <span class="legend graph-only" id="legend"></span>
     </div>
-    <div class="graph-frame" id="graph-frame"><div id="graph"></div></div>
-    <div class="table-frame" id="table-frame" hidden>
+    <div class="graph-frame" id="graph-frame" role="tabpanel" aria-label="グラフ"><div id="graph"></div></div>
+    <div class="table-frame" id="table-frame" role="tabpanel" aria-label="テーブル" hidden>
       <p class="table-note" id="table-note"></p>
       <table class="nodes" id="node-table"></table>
     </div>
   </section>
 
-  <aside class="pane detail">
+  <aside class="pane detail" aria-label="ノード詳細と検証結果">
     <h2>ノード詳細</h2>
     <div id="detail"><p class="empty">グラフのノードをクリックすると、本文・受け入れ基準・影響範囲を表示する。</p></div>
 
     <h2>検証結果</h2>
-    <div id="findings"></div>
+    <!-- 重大度タブとチェックコード別のまとめは site_app.js が入れる。 -->
+    <div class="seg" id="finding-tabs" role="tablist" aria-label="指摘の重大度"></div>
+    <div id="findings" role="tabpanel" aria-label="指摘一覧"></div>
   </aside>
 </main>
 

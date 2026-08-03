@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -187,9 +188,10 @@ def test_explain_reports_unknown_node():
 
 def test_mermaid_output_is_well_formed():
     text = render_mermaid(chain())
+    #: 識別子は ordered_nodes() の索引 (型順 → id 順) なので G-1 → N-1 → FR-1 → S-1。
     assert text.startswith("flowchart TD")
-    assert 'n_FR_1["<b>FR-1</b> [FunctionalRequirement]' in text
-    assert "n_FR_1 -->|satisfies| n_N_1" in text
+    assert 'n3["<b>FR-1</b> [FunctionalRequirement]' in text
+    assert "n3 -->|satisfies| n2" in text
     assert "classDef Goal" in text
 
 
@@ -200,11 +202,81 @@ def test_mermaid_escapes_reserved_characters():
 
 def test_mermaid_highlight():
     text = render_mermaid(chain(), highlight=["FR-1"])
-    assert "class n_FR_1 highlight" in text
+    assert "class n3 highlight" in text
 
 
 def test_dot_output_is_well_formed():
     text = render_dot(chain())
     assert text.startswith("digraph requirements {")
-    assert 'n_FR_1 -> n_N_1 [label="satisfies"]' in text
+    assert 'n3 -> n2 [label="satisfies"]' in text
     assert text.rstrip().endswith("}")
+
+
+# 記号だけが異なる id は、元の id をそのまま識別子にすると衝突する
+# (`FR-1` と `FR_1` の非英数字を潰すとどちらも同じになる)。連番なら起こり得ない。
+
+
+def collide():
+    """記号だけが異なる id を持つノードの組。"""
+    s = source("S-1")
+    n_dash = need("N-1", has_source=[s])
+    n_under = need("N_1", has_source=[s])
+    f_dash = fr("FR-1", satisfies=[n_dash], has_source=[s])
+    f_dot = fr("FR.1", text="金額を表示すること", satisfies=[n_under], has_source=[s])
+    return build(s, n_dash, n_under, f_dash, f_dot)
+
+
+def test_ids_differing_only_in_punctuation_stay_separate_nodes():
+    text = render_mermaid(collide())
+    declared = dict(
+        (node_id, identifier)
+        for identifier, node_id in re.findall(
+            r"^    (\w+)\W*\"<b>(.+?)</b>", text, re.MULTILINE
+        )
+    )
+
+    assert set(declared) == {"N-1", "N_1", "FR-1", "FR.1", "S-1"}
+    #: 5 ノードに 5 つの識別子。1 つでも重なればノードが融合している。
+    assert len(set(declared.values())) == 5
+
+
+def test_edges_between_colliding_ids_keep_their_own_endpoints():
+    graph = collide()
+    mermaid = render_mermaid(graph)
+    dot = render_dot(graph)
+    ids = {node.id: f"n{i}" for i, node in enumerate(graph.ordered_nodes(), 1)}
+
+    assert f"    {ids['FR-1']} -->|satisfies| {ids['N-1']}" in mermaid
+    assert f"    {ids['FR.1']} -->|satisfies| {ids['N_1']}" in mermaid
+    assert f'{ids["FR-1"]} -> {ids["N-1"]} [label="satisfies"]' in dot
+    assert f'{ids["FR.1"]} -> {ids["N_1"]} [label="satisfies"]' in dot
+    #: 融合していれば同じ端点の行が 2 本出る (どちらも satisfies)。
+    assert mermaid.count("-->|satisfies|") == 2
+
+
+def test_dot_gives_every_node_its_own_identifier():
+    declared = re.findall(r"^    (\w+) \[shape=", render_dot(collide()), re.MULTILINE)
+    assert len(declared) == len(set(declared)) == 5
+
+
+def test_highlight_marks_only_the_node_with_that_id():
+    graph = collide()
+    ids = {node.id: f"n{i}" for i, node in enumerate(graph.ordered_nodes(), 1)}
+    text = render_mermaid(graph, highlight=["FR-1"])
+
+    assert f"    class {ids['FR-1']} highlight" in text
+    assert f"    class {ids['FR.1']} highlight" not in text
+    assert text.count(" highlight\n") == 1
+
+
+def test_identifiers_follow_the_order_of_ordered_nodes():
+    graph = collide()
+    text = render_mermaid(graph)
+    declared = [
+        line.split("<b>")[1].split("</b>")[0]
+        for line in text.splitlines()
+        if "<b>" in line
+    ]
+    #: 宣言の順は ordered_nodes() そのもの = n1, n2, … が振られる順。
+    assert declared == [node.id for node in graph.ordered_nodes()]
+    assert render_mermaid(graph) == text

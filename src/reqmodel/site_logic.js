@@ -21,6 +21,11 @@ export function escapeHtml(text) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/** 属性値に入れる文字列。引用符まで潰す。 */
+export function escapeAttr(text) {
+  return escapeHtml(String(text)).replace(/"/g, "&quot;");
+}
+
 // --- ラベルの折り返し ------------------------------------------------------
 //
 // Cytoscape の text-wrap は空白でしか折り返さず、日本語には効かない。かといって
@@ -235,7 +240,7 @@ export const PRIORITY_BUCKETS = [
 ];
 
 /** 高優先度とみなす境界 (この値以下が高優先)。 */
-export function priorityThreshold(data) {
+function priorityThreshold(data) {
   const priority = (data.meta || {}).priority;
   return priority ? priority.threshold : 0;
 }
@@ -440,7 +445,7 @@ export function impactSets(view, id, scope = null) {
 // --- フォーカス (近傍だけを描く) --------------------------------------------
 //
 // 要求グラフは同じ段に FR が何十個も並ぶため、全体を 1 枚に収めると横長になり
-// 文字が読めない (詳細は README「大きいグラフでの表示戦略」)。選んだノードの
+// 文字が読めない (詳細は docs/design/site.md「大きいグラフでの表示戦略」)。選んだノードの
 // 近傍だけを描けば、規模に関わらず読める倍率のまま中身を確認できる。
 
 /** 選べる近傍の深さ (ホップ数)。0 はフォーカス無し。 */
@@ -487,7 +492,7 @@ export const TABLE_COLUMNS = [
 ];
 
 /** 重い順。行の指摘数に色を付けるときの「最も重い指摘」を決めるのに使う。 */
-export const SEVERITY_ORDER = ["error", "severe", "warning", "info"];
+const SEVERITY_ORDER = ["error", "severe", "warning", "info"];
 
 /** 検索欄の絞り込み。id と本文の部分一致 (大文字小文字は区別しない)。 */
 export function matchesQuery(node, query) {
@@ -598,6 +603,114 @@ export function nextSort(sort, key) {
   if (!column) return sort;
   if (sort.key === key) return { key, asc: !sort.asc };
   return { key, asc: !column.numeric };
+}
+
+// --- 詳細ペイン ------------------------------------------------------------
+
+/**
+ * 詳細ペインに出す出入りのエッジ。**相手ノードの本文まで持たせる**。
+ *
+ * id だけを並べても、クリックして飛ぶまで何に繋がっているのか分からない。
+ * 並びは正規化 JSON の順 (`view.edges` の順) のまま。両端が見えているエッジしか
+ * view に無いので、相手ノードは必ず引ける。
+ */
+export function edgeItems(view, id) {
+  const item = (edge, direction) => {
+    const other = direction === "out" ? edge.target : edge.source;
+    const node = view.byId.get(other);
+    return {
+      id: other,
+      name: edge.name,
+      direction,
+      arrow: direction === "out" ? `--${edge.name}-->` : `<--${edge.name}--`,
+      type: node ? node.type : "",
+      text: node ? node.text : "",
+    };
+  };
+  return {
+    out: view.edges.filter((edge) => edge.source === id).map((edge) => item(edge, "out")),
+    in: view.edges.filter((edge) => edge.target === id).map((edge) => item(edge, "in")),
+  };
+}
+
+/**
+ * 出所 (`examples/sample.py:42`) を GitHub の blob URL にする。
+ *
+ * repo は `site_data()` の `repo` (`req site --repo-url / --repo-ref` で入る)。
+ * 渡されていなければ null を返し、呼び出し側はただの文字列として出す。
+ *
+ * 出所は生成時の作業ディレクトリからの相対パスなので、絶対パスのときは
+ * リポジトリ内の位置が決まらない。黙って null にする (誤ったリンクは出さない)。
+ */
+export function sourceUrl(data, location) {
+  const repo = (data || {}).repo;
+  if (!repo || !repo.url || !location) return null;
+  const match = /^(.+?)(?::(\d+))?$/.exec(String(location).trim());
+  if (!match) return null;
+  const path = match[1].replace(/\\/g, "/").replace(/^\.\//, "");
+  if (!path || path.startsWith("/") || path.startsWith("../") || /^[A-Za-z]:/.test(path)) {
+    return null;
+  }
+  const base = repo.url.replace(/\/+$/, "");
+  const ref = encodeURIComponent(repo.ref || "main");
+  const url = `${base}/blob/${ref}/${path.split("/").map(encodeURIComponent).join("/")}`;
+  return match[2] ? `${url}#L${match[2]}` : url;
+}
+
+// --- 指摘一覧 --------------------------------------------------------------
+//
+// 指摘は数が増えるほど「重い順に 1 本の帯」では読めなくなる。重大度で絞り、
+// 残ったものをチェックコードごとにまとめる。同じ規則の違反はまとめて片付ける
+// (あるいはまとめて抑制する) ものなので、コードが読む単位になる。
+
+/** 重大度タブの「すべて」の key。 */
+export const ALL_SEVERITIES = "all";
+
+/**
+ * 重大度タブ。件数が 0 の重大度は出さない (押しても何も起きないタブを並べない)。
+ * 「すべて」は指摘が 1 件も無くても出す。
+ */
+export function severityTabs(findings) {
+  const counts = new Map();
+  for (const finding of findings) {
+    counts.set(finding.severity, (counts.get(finding.severity) || 0) + 1);
+  }
+  return [
+    { key: ALL_SEVERITIES, label: "すべて", count: findings.length },
+    ...SEVERITY_ORDER.filter((severity) => counts.get(severity)).map((severity) => ({
+      key: severity,
+      label: severity,
+      count: counts.get(severity),
+    })),
+  ];
+}
+
+/**
+ * 指摘をチェックコードごとにまとめる。severity を渡すとその重大度だけに絞る。
+ *
+ * 群の並びは「その群で最も重い指摘」の重大度 → コード名。群の中は渡された順
+ * (Python 側が重い順に並べたもの) のまま。
+ */
+export function groupFindings(findings, severity = ALL_SEVERITIES) {
+  const groups = new Map();
+  for (const finding of findings) {
+    if (severity !== ALL_SEVERITIES && finding.severity !== severity) continue;
+    if (!groups.has(finding.code)) groups.set(finding.code, []);
+    groups.get(finding.code).push(finding);
+  }
+  //: 知らない重大度は最も軽いものとして扱う (並びが未定義にならないように)。
+  const severityRank = (finding) => {
+    const at = SEVERITY_ORDER.indexOf(finding.severity);
+    return at < 0 ? SEVERITY_ORDER.length : at;
+  };
+  return [...groups.entries()]
+    .map(([code, items]) => ({ code, items, rank: Math.min(...items.map(severityRank)) }))
+    .sort((a, b) => a.rank - b.rank || compare(a.code, b.code))
+    .map(({ code, items, rank }) => ({
+      code,
+      items,
+      severity: SEVERITY_ORDER[rank] || items[0].severity,
+    }));
 }
 
 // --- URL ハッシュ ----------------------------------------------------------
@@ -730,6 +843,49 @@ function parseSort(raw) {
   if (!TABLE_COLUMNS.some((column) => column.key === key)) return null;
   if (order !== "asc" && order !== "desc") return null;
   return { key, asc: order === "asc" };
+}
+
+// --- 次回訪問時の復元 (localStorage) ----------------------------------------
+//
+// パーマリンク (URL) は「いまの画面を人に渡す」ためのもので、次に自分が開いた
+// ときには効かない。絞り込みを毎回引き直すのは棚卸しの邪魔なので、**絞り込みと
+// 表示だけ**を localStorage に置く。選択ノードと検索語は持ち越さない (前回見て
+// いた 1 件が復活しても嬉しくない)。
+//
+// URL のハッシュが最優先。ハッシュ付きの URL を渡された側で、その人の前回の
+// 絞り込みが混ざってはならない。
+
+//: 保存先のキー。表示状態とテーマで分ける (テーマはモデルに依らない好み)。
+export const VIEW_STORAGE_KEY = "reqmodel:site:view";
+export const THEME_STORAGE_KEY = "reqmodel:site:theme";
+
+/** 次回に持ち越す状態を `#...` にしたもの。既定のままなら空文字。 */
+export function storableHash(state, data) {
+  return encodeHash({ ...state, selected: null, query: "" }, data);
+}
+
+/** 開いたときに適用するハッシュ。URL に何か載っていればそれ、無ければ保存。 */
+export function initialHash(hash, stored) {
+  return (hash || "").replace(/^#/, "") ? hash : stored || "";
+}
+
+// --- テーマ ------------------------------------------------------------------
+//
+// 既定は OS 設定への追従 (auto)。プロジェクタや明るい部屋で開いたときのために
+// 手で固定できるようにする。固定した選択は localStorage に残す。
+
+/** 選べるテーマ。押すたびにこの順で回る。 */
+const THEMES = ["auto", "light", "dark"];
+
+/** ボタンの表示。いま何が効いているかがそのまま読めるようにする。 */
+export const THEME_LABELS = { auto: "テーマ: 自動", light: "テーマ: 明", dark: "テーマ: 暗" };
+
+/** 保存値や属性値をテーマに直す。知らない値は auto。 */
+export const normalizeTheme = (value) => (THEMES.includes(value) ? value : "auto");
+
+/** 次のテーマ。 */
+export function nextTheme(theme) {
+  return THEMES[(THEMES.indexOf(normalizeTheme(theme)) + 1) % THEMES.length];
 }
 
 // --- LLM 用コンテキスト -----------------------------------------------------
@@ -1387,4 +1543,351 @@ export function bandedLayout(bands, placed, edges, direction) {
     });
   }
   return { positions, frames };
+}
+
+// --- 書き出し (Mermaid / SVG) ------------------------------------------------
+//
+// 出力先に置かれる `graph.mmd` / `graph.dot` は**全体**のグラフである。画面で
+// 絞り込んだ図をそのまま PR や資料に持っていけるよう、いま見えているぶんだけを
+// ページ側で書き出す。
+//
+// Mermaid は `render.py` の `render_mermaid()` と同じ書式で組む。絞り込みが無い
+// ときは一字一句同じになり、`tests/test_site_js.py` が両者を突き合わせる。
+// 形状・配色は meta が唯一の出典なので、ここには表を持たない。
+
+//: ラベルの上限文字数 (`render.py` の max_label と同じ既定)。
+const EXPORT_LABEL_LIMIT = 40;
+
+/** `render.py` の `_truncate()`。空白を潰してから切る。 */
+function collapse(text, limit) {
+  const collapsed = String(text).split(/\s+/).filter(Boolean).join(" ");
+  const chars = [...collapsed];
+  if (limit > 0 && chars.length > limit) return chars.slice(0, limit - 1).join("") + "…";
+  return collapsed;
+}
+
+/**
+ * `render.py` の `_ids()`。ノード id → Mermaid の識別子 (`n1`, `n2`, …)。
+ *
+ * 元の id から作ると、記号を潰した結果が衝突する (`FR-1` と `FR_1` が同じ
+ * 識別子になり、図の上で 1 ノードに融合する)。描く順の索引で連番を振れば
+ * 衝突は起こり得ず、元の id はラベルに出るので情報も失われない。
+ */
+function exportIds(nodes) {
+  return new Map(nodes.map((node, index) => [node.id, `n${index + 1}`]));
+}
+
+/** `render.py` の `_mermaid_escape()`。 */
+function mermaidEscape(text) {
+  return text
+    .replace(/\\/g, "＼")
+    .replace(/"/g, "#quot;")
+    .replace(/</g, "#lt;")
+    .replace(/>/g, "#gt;");
+}
+
+/**
+ * いま見えているグラフの Mermaid。`render_mermaid()` と同じ書式。
+ *
+ * 形状は `meta.types[].mermaid`、配色は `meta.types[].fill / stroke`、破線に
+ * するエッジ種別は `meta.dashed_edges` から取る (どれも `render.py` が出典)。
+ * classDef は全型ぶん出す (絞り込みで消えている型も含む) ので、絞り込みの
+ * 有無で classDef の並びは変わらない。
+ */
+export function mermaidText(view, maxLabel = EXPORT_LABEL_LIMIT) {
+  const meta = view.data.meta || {};
+  const types = meta.types || {};
+  const dashed = new Set(meta.dashed_edges || []);
+  const ids = exportIds(view.nodes);
+  const lines = ["flowchart TD"];
+
+  for (const node of view.nodes) {
+    const shape = (types[node.type] || {}).mermaid || { open: "[", close: "]" };
+    const label = [
+      `<b>${node.id}</b> [${node.type}]`,
+      mermaidEscape(collapse(node.text, maxLabel)),
+    ].join("<br/>");
+    lines.push(`    ${ids.get(node.id)}${shape.open}"${label}"${shape.close}`);
+  }
+
+  lines.push("");
+  for (const edge of view.edges) {
+    if (!ids.has(edge.source) || !ids.has(edge.target)) continue;
+    const arrow = dashed.has(edge.name) ? "-.->" : "-->";
+    lines.push(`    ${ids.get(edge.source)} ${arrow}|${edge.name}| ${ids.get(edge.target)}`);
+  }
+
+  lines.push("");
+  for (const [type, typeMeta] of Object.entries(types)) {
+    lines.push(`    classDef ${type} fill:${typeMeta.fill},stroke:${typeMeta.stroke}`);
+  }
+  for (const node of view.nodes) lines.push(`    class ${ids.get(node.id)} ${node.type}`);
+
+  return lines.join("\n") + "\n";
+}
+
+// --- SVG --------------------------------------------------------------------
+//
+// 図の見た目 (位置・大きさ・折り返し済みのラベル) は Cytoscape が持っているので、
+// 表示層が実測値を集めて scene として渡し、ここは**組み立てだけ**を行う。
+//
+// 形状は Cytoscape の描画そのものではなく**近似**である。書き出しの用途 (資料に
+// 貼る) では、位置関係とラベルと配色が保たれていれば足りる。近似の範囲は
+// 各定数のコメントに書く。
+
+//: 図の周りに空ける余白 (px)。
+export const SVG_PADDING = 24;
+
+//: Cytoscape の多角形を、外形の矩形に内接する頂点 (-1..1 の座標) で写したもの。
+const SVG_POLYGONS = {
+  hexagon: [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1],
+  rhomboid: [-1, -1, 0.333, -1, 1, 1, -0.333, 1],
+  diamond: [0, -1, 1, 0, 0, 1, -1, 0],
+  tag: [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1],
+};
+
+//: 角を落とす比率 (cut-rectangle)。Cytoscape は固定長で落とすが、書き出しでは
+//: 大きさに対する比で近似する。
+const SVG_CUT_RATIO = 0.16;
+//: 角の丸め (round-rectangle) と、樽の膨らみ (barrel) の代わりの丸め。
+const SVG_CORNER = 8;
+const SVG_BARREL_RATIO = 0.3;
+//: 高優先度の輪を、枠線からどれだけ外に出すか。
+const SVG_OUTLINE_GAP = 6;
+
+//: status の線種 → SVG の stroke-dasharray。二重線 (verified) は SVG に無いので
+//: 実線で近似する (太さは meta の border_width が残るので区別は付く)。
+const SVG_DASH = { dotted: "1 3", dashed: "6 4", solid: "", double: "" };
+
+const attrs = (values) =>
+  Object.entries(values)
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .map(([name, value]) => `${name}="${escapeAttr(value)}"`)
+    .join(" ");
+
+const element = (name, values, children) => {
+  const head = [name, attrs(values)].filter(Boolean).join(" ");
+  return children === undefined ? `<${head}/>` : `<${head}>${children}</${name}>`;
+};
+
+const round = (value) => Math.round(value * 100) / 100;
+
+/** 図形 1 つぶんの要素。box は中心と外形 `{ x, y, w, h }`。 */
+function shapeElement(shape, box, style) {
+  const { x, y, w, h } = box;
+  const polygon = (points) =>
+    element("polygon", {
+      points: points
+        .map((value, index) => round(index % 2 ? y + (value * h) / 2 : x + (value * w) / 2))
+        .join(" "),
+      ...style,
+    });
+
+  if (shape === "ellipse") {
+    return element("ellipse", { cx: round(x), cy: round(y), rx: round(w / 2), ry: round(h / 2), ...style });
+  }
+  if (SVG_POLYGONS[shape]) return polygon(SVG_POLYGONS[shape]);
+  if (shape === "cut-rectangle") {
+    const cut = Math.min(w, h) * SVG_CUT_RATIO;
+    const cx = cut / (w / 2);
+    const cy = cut / (h / 2);
+    return polygon([
+      -1 + cx, -1, 1 - cx, -1, 1, -1 + cy, 1, 1 - cy, 1 - cx, 1, -1 + cx, 1, -1, 1 - cy, -1, -1 + cy,
+    ]);
+  }
+  const radius = shape === "barrel" ? Math.min(w, h) * SVG_BARREL_RATIO : SVG_CORNER;
+  return element("rect", {
+    x: round(x - w / 2),
+    y: round(y - h / 2),
+    width: round(w),
+    height: round(h),
+    rx: round(Math.min(radius, Math.min(w, h) / 2)),
+    ...style,
+  });
+}
+
+/** 改行入りのラベル。中心 (x, y) に上下中央で置く。 */
+function labelElement(label, x, y, { size = LABEL_FONT.size, fill, weight } = {}) {
+  const lines = String(label).split("\n");
+  const step = size * LABEL_FONT.lineHeight;
+  const top = y - ((lines.length - 1) * step) / 2 + size * 0.35;
+  const spans = lines
+    .map((line, index) =>
+      element("tspan", { x: round(x), y: round(top + index * step) }, escapeHtml(line)),
+    )
+    .join("");
+  return element(
+    "text",
+    {
+      "text-anchor": "middle",
+      "font-family": LABEL_FONT.family,
+      "font-size": size,
+      "font-weight": weight,
+      fill,
+    },
+    spans,
+  );
+}
+
+/**
+ * いま図に描かれているものを SVG 1 枚にする。
+ *
+ * scene は表示層 (`site_app.js`) が Cytoscape から集めた実測値:
+ *
+ * - `nodes`: `{ id, type, status, priorityClass, label, x, y, w, h }`
+ * - `edges`: `{ name, dashed, x1, y1, x2, y2 }` (端点はノードの縁の座標)
+ * - `bands`: `{ type, label, x, y, w, h }` (Goal / Need の帯枠)
+ * - `meta`: `render_meta()` の内容、`palette`: テーマ依存の色
+ *
+ * ノードが 1 つも無ければ空の図 (背景だけ) を返す。
+ */
+export function graphSvg(scene) {
+  const nodes = scene.nodes || [];
+  const edges = scene.edges || [];
+  const bands = scene.bands || [];
+  const meta = scene.meta || {};
+  const palette = scene.palette || {};
+  const types = meta.types || {};
+  const statuses = meta.statuses || {};
+
+  const xs = [];
+  const ys = [];
+  for (const box of [...nodes, ...bands]) {
+    xs.push(box.x - box.w / 2, box.x + box.w / 2);
+    ys.push(box.y - box.h / 2, box.y + box.h / 2);
+  }
+  for (const edge of edges) {
+    xs.push(edge.x1, edge.x2);
+    ys.push(edge.y1, edge.y2);
+  }
+  const minX = (xs.length ? Math.min(...xs) : 0) - SVG_PADDING;
+  const minY = (ys.length ? Math.min(...ys) : 0) - SVG_PADDING;
+  const width = (xs.length ? Math.max(...xs) : 0) + SVG_PADDING - minX;
+  const height = (ys.length ? Math.max(...ys) : 0) + SVG_PADDING - minY;
+
+  const body = [];
+
+  body.push(
+    element("rect", {
+      x: round(minX),
+      y: round(minY),
+      width: round(width),
+      height: round(height),
+      fill: palette.bg || "#ffffff",
+    }),
+  );
+
+  //: 帯枠はノード・エッジの下に敷く (画面と同じ重なり順)。
+  for (const band of bands) {
+    const typeMeta = types[band.type] || {};
+    body.push(
+      shapeElement("round-rectangle", band, {
+        fill: typeMeta.fill || "none",
+        "fill-opacity": 0.3,
+        stroke: typeMeta.stroke || palette.border,
+        "stroke-width": 1,
+        "stroke-dasharray": SVG_DASH.dashed,
+      }),
+    );
+    body.push(
+      labelElement(band.label, band.x, band.y - band.h / 2 - 6, {
+        size: 11,
+        weight: "bold",
+        fill: typeMeta.stroke || palette.muted,
+      }),
+    );
+  }
+
+  for (const edge of edges) {
+    body.push(
+      element("line", {
+        x1: round(edge.x1),
+        y1: round(edge.y1),
+        x2: round(edge.x2),
+        y2: round(edge.y2),
+        stroke: palette.border,
+        "stroke-width": 1.2,
+        "stroke-dasharray": edge.dashed ? SVG_DASH.dashed : "",
+        "marker-end": "url(#req-arrow)",
+      }),
+    );
+    //: エッジ名は線の上に置く。背景を敷けないので、縁取り (paint-order) で抜く。
+    body.push(
+      element(
+        "text",
+        {
+          x: round((edge.x1 + edge.x2) / 2),
+          y: round((edge.y1 + edge.y2) / 2),
+          "text-anchor": "middle",
+          "font-family": LABEL_FONT.family,
+          "font-size": 9,
+          fill: palette.muted,
+          stroke: palette.bg,
+          "stroke-width": 3,
+          "paint-order": "stroke",
+        },
+        escapeHtml(edge.name),
+      ),
+    );
+  }
+
+  for (const node of nodes) {
+    const typeMeta = types[node.type] || {};
+    const statusMeta = statuses[node.status] || {};
+    if (node.priorityClass === "high" && meta.priority) {
+      body.push(
+        shapeElement(
+          typeMeta.shape,
+          {
+            x: node.x,
+            y: node.y,
+            w: node.w + SVG_OUTLINE_GAP * 2,
+            h: node.h + SVG_OUTLINE_GAP * 2,
+          },
+          { fill: "none", stroke: meta.priority.outline, "stroke-width": 3 },
+        ),
+      );
+    }
+    body.push(
+      shapeElement(typeMeta.shape, node, {
+        fill: typeMeta.fill || "#ffffff",
+        stroke: typeMeta.stroke || palette.fg,
+        "stroke-width": statusMeta.border_width || 1.5,
+        "stroke-dasharray": SVG_DASH[statusMeta.border_style] || "",
+      }),
+    );
+    //: ラベルの色は図の塗り (明るい固定色) に対して読める色。テーマには従わない。
+    body.push(labelElement(node.label, node.x, node.y, { fill: "#1f2328" }));
+  }
+
+  const defs = element(
+    "defs",
+    {},
+    element(
+      "marker",
+      {
+        id: "req-arrow",
+        viewBox: "0 0 10 10",
+        refX: 9,
+        refY: 5,
+        markerWidth: 6,
+        markerHeight: 6,
+        orient: "auto-start-reverse",
+      },
+      element("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: palette.border }),
+    ),
+  );
+
+  return (
+    element(
+      "svg",
+      {
+        xmlns: "http://www.w3.org/2000/svg",
+        viewBox: `${round(minX)} ${round(minY)} ${round(width)} ${round(height)}`,
+        width: round(width),
+        height: round(height),
+      },
+      `\n${element("title", {}, escapeHtml(scene.title || "要求グラフ"))}\n${defs}\n${body.join("\n")}\n`,
+    ) + "\n"
+  );
 }

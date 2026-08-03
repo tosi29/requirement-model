@@ -9,6 +9,7 @@ import {
   LABEL_WRAP_WIDTH,
   PRIORITY_BUCKETS,
   TABLE_COLUMNS,
+  ALL_SEVERITIES,
   activeEdgeNames,
   allEdgeNames,
   bandDefs,
@@ -17,6 +18,7 @@ import {
   createView,
   decodeHash,
   defaultState,
+  edgeItems,
   encodeHash,
   escapeHtml,
   estimateTextWidth,
@@ -24,24 +26,33 @@ import {
   focusSet,
   graphElements,
   graphStyle,
+  graphSvg,
+  groupFindings,
   impactScope,
   impactSets,
+  initialHash,
   isNodeVisible,
   labelChunks,
   layoutOptions,
   legendGroups,
   matchesQuery,
+  mermaidText,
   nextSort,
+  nextTheme,
   nodeContext,
   nodeSize,
+  normalizeTheme,
   priorityBucket,
   priorityFilters,
   reach,
   related,
   searchHits,
+  severityTabs,
   sortRows,
+  sourceUrl,
   statusFilters,
   stepHit,
+  storableHash,
   tableRows,
   truncate,
   wrapLabel,
@@ -1351,4 +1362,290 @@ test("視野より大きいノードは中心が見えていれば十分", () =>
 
   const offCenter = box(300, -50, 600, 400); // 中心 x=600 は右端の外
   assert.equal(isNodeVisible(EXTENT, offCenter), false);
+});
+
+// --- 詳細ペインのエッジ一覧 --------------------------------------------------
+
+test("エッジ一覧は相手の id と本文を持つ", () => {
+  const view = viewOf();
+  const { out, in: incoming } = edgeItems(view, "FR-1");
+
+  assert.deepEqual(
+    out.map((item) => [item.arrow, item.id, item.text]),
+    [
+      ["--has_source-->", "SRC-1", "申請者となる一般社員"],
+      ["--satisfies-->", "N-1", "領収書を撮影するだけで申請したい"],
+    ],
+  );
+  assert.deepEqual(
+    incoming.map((item) => [item.arrow, item.id, item.type]),
+    [["<--qualifies--", "QR-1", "QualityRequirement"]],
+  );
+});
+
+test("絞り込みで消えたエッジは一覧にも出ない", () => {
+  const data = fixture();
+  const edges = new Set(data.edge_names);
+  edges.delete("has_source");
+  const view = createView(data, { ...allOn(data), edges });
+
+  assert.deepEqual(
+    edgeItems(view, "FR-1").out.map((item) => item.id),
+    ["N-1"],
+  );
+});
+
+// --- 出所のリンク (GitHub の blob URL) ---------------------------------------
+
+const withRepo = (repo) => fixture({ repo });
+
+test("repo が渡っていれば出所は blob URL + 行番号になる", () => {
+  const data = withRepo({ url: "https://github.com/owner/repo", ref: "main" });
+
+  assert.equal(
+    sourceUrl(data, "examples/sample.py:42"),
+    "https://github.com/owner/repo/blob/main/examples/sample.py#L42",
+  );
+});
+
+test("行番号が無い出所はファイルまでのリンクになる", () => {
+  const data = withRepo({ url: "https://github.com/owner/repo/", ref: "abc123" });
+
+  assert.equal(
+    sourceUrl(data, "examples/sample.py"),
+    "https://github.com/owner/repo/blob/abc123/examples/sample.py",
+  );
+});
+
+test("repo が無ければリンクにしない", () => {
+  assert.equal(sourceUrl(fixture(), "examples/sample.py:42"), null);
+  assert.equal(sourceUrl(withRepo({ url: "" }), "examples/sample.py:42"), null);
+});
+
+test("リポジトリ内の位置が決まらない出所はリンクにしない", () => {
+  const data = withRepo({ url: "https://github.com/owner/repo", ref: "main" });
+
+  assert.equal(sourceUrl(data, "/tmp/sample.py:42"), null);
+  assert.equal(sourceUrl(data, "../外/sample.py:42"), null);
+  assert.equal(sourceUrl(data, "C:\\work\\sample.py:42"), null);
+  assert.equal(sourceUrl(data, ""), null);
+});
+
+test("パスと参照はエスケープする", () => {
+  const data = withRepo({ url: "https://github.com/owner/repo", ref: "feature/x y" });
+
+  assert.equal(
+    sourceUrl(data, "./要求 定義/a.py:7"),
+    "https://github.com/owner/repo/blob/feature%2Fx%20y/%E8%A6%81%E6%B1%82%20%E5%AE%9A%E7%BE%A9/a.py#L7",
+  );
+});
+
+// --- 指摘一覧 (重大度タブ / コード別のまとめ) --------------------------------
+
+const FINDING_LIST = [
+  { code: "structure.edge_type", severity: "error", layer: 2, message: "型違反", node_id: "FR-1" },
+  { code: "structure.orphan_fr", severity: "warning", layer: 2, message: "孤立", node_id: "FR-1" },
+  { code: "structure.orphan_fr", severity: "warning", layer: 2, message: "孤立", node_id: "FR-2" },
+  { code: "structure.unused_source", severity: "info", layer: 2, message: "未使用", node_id: "SRC-1" },
+];
+
+test("重大度タブは件数のあるものだけ (すべては常に出る)", () => {
+  assert.deepEqual(
+    severityTabs(FINDING_LIST).map((tab) => [tab.key, tab.count]),
+    [
+      [ALL_SEVERITIES, 4],
+      ["error", 1],
+      ["warning", 2],
+      ["info", 1],
+    ],
+  );
+  assert.deepEqual(
+    severityTabs([]).map((tab) => [tab.key, tab.count]),
+    [[ALL_SEVERITIES, 0]],
+  );
+});
+
+test("指摘はコードごとにまとまり、重い群から並ぶ", () => {
+  assert.deepEqual(
+    groupFindings(FINDING_LIST).map((group) => [group.code, group.severity, group.items.length]),
+    [
+      ["structure.edge_type", "error", 1],
+      ["structure.orphan_fr", "warning", 2],
+      ["structure.unused_source", "info", 1],
+    ],
+  );
+});
+
+test("重大度で絞ると、その重大度の群だけが残る", () => {
+  assert.deepEqual(
+    groupFindings(FINDING_LIST, "warning").map((group) => group.code),
+    ["structure.orphan_fr"],
+  );
+  assert.deepEqual(groupFindings(FINDING_LIST, "severe"), []);
+});
+
+// --- テーマ ------------------------------------------------------------------
+
+test("テーマは 自動 → 明 → 暗 で回る", () => {
+  assert.equal(nextTheme("auto"), "light");
+  assert.equal(nextTheme("light"), "dark");
+  assert.equal(nextTheme("dark"), "auto");
+});
+
+test("知らない保存値は自動として扱う", () => {
+  assert.equal(normalizeTheme("sepia"), "auto");
+  assert.equal(normalizeTheme(null), "auto");
+  assert.equal(nextTheme("sepia"), "light");
+});
+
+// --- 次回訪問時の復元 --------------------------------------------------------
+
+test("保存するのは絞り込みと表示だけ。選択と検索語は持ち越さない", () => {
+  const data = fixture();
+  const state = { ...defaultState(data), selected: "FR-1", query: "領収書", direction: "LR" };
+
+  assert.equal(storableHash(state, data), "#dir=LR");
+  assert.equal(encodeHash(state, data).includes("node=FR-1"), true);
+});
+
+test("URL のハッシュが保存より優先される", () => {
+  assert.equal(initialHash("#node=FR-1", "#dir=LR"), "#node=FR-1");
+  assert.equal(initialHash("", "#dir=LR"), "#dir=LR");
+  assert.equal(initialHash("#", "#dir=LR"), "#dir=LR");
+  assert.equal(initialHash("", null), "");
+});
+
+// --- 書き出し (Mermaid) ------------------------------------------------------
+//
+// `render_mermaid()` と一字一句同じであることは tests/test_site_js.py が
+// examples/sample.py で突き合わせる。ここでは絞り込みの効き方を見る。
+
+test("Mermaid は見えているノードとエッジだけを出す", () => {
+  const data = fixture();
+  const types = new Set(data.types);
+  types.delete("Source");
+  const text = mermaidText(createView(data, { ...allOn(data), types }));
+
+  //: 識別子は描く順の連番 (G-1, N-1, FR-1, QR-1 の 4 件)。
+  assert.ok(text.startsWith("flowchart TD\n"));
+  assert.ok(text.includes('n1("<b>G-1</b> [Goal]<br/>経費精算を速くする")'));
+  assert.ok(!text.includes("SRC-1"));
+  assert.ok(!text.includes("has_source"));
+  assert.ok(text.includes("    n1 -->|motivates| n2"));
+  //: classDef は全型ぶん出す (絞り込みで並びが変わらない)。
+  assert.ok(text.includes("    classDef Source fill:#fff,stroke:#000"));
+  assert.ok(!/ {4}class n\d+ Source$/m.test(text));
+});
+
+test("Mermaid のラベルは空白を潰して切り詰め、記号を逃がす", () => {
+  const data = fixture();
+  data.nodes[0].text = 'A  B <c> "d" \\e';
+  data.nodes[1].text = "長".repeat(60);
+  const [, first, second] = mermaidText(createView(data, allOn(data))).split("\n");
+
+  assert.ok(first.includes("A B #lt;c#gt; #quot;d#quot; ＼e"));
+  //: 本文は 40 文字で切る (末尾は …)。id と型の行は数に入れない。
+  const body = second.split("<br/>")[1].replace('")', "");
+  assert.equal([...body].length, 40);
+  assert.ok(body.endsWith("…"));
+});
+
+test("破線にするエッジ種別は meta が決める", () => {
+  const view = viewOf();
+  const text = mermaidText(view);
+
+  //: G-1 = n1, N-1 = n2, FR-1 = n3, QR-1 = n4, SRC-1 = n5。
+  assert.ok(text.includes("n1 -.->|has_source| n5"));
+  assert.ok(text.includes("n3 -->|satisfies| n2"));
+});
+
+test("記号だけが異なる id でもノードは融合しない", () => {
+  const data = fixture();
+  //: `FR-1` の記号違い。元の id から識別子を作ると両者が同じになる。
+  data.nodes.push({ ...data.nodes[2], id: "FR_1", text: "金額を表示すること" });
+  data.edges.push({ source: "FR_1", name: "satisfies", target: "N-1" });
+  const text = mermaidText(createView(data, allOn(data)));
+
+  const declared = [...text.matchAll(/^ {4}(\w+)\("<b>(.+?)<\/b>/gm)];
+  assert.equal(declared.length, 6);
+  assert.equal(new Set(declared.map(([, id]) => id)).size, 6);
+  //: 2 つの FR が別々の端点から N-1 を指す。
+  const [, dash] = declared.find(([, , nodeId]) => nodeId === "FR-1");
+  const [, under] = declared.find(([, , nodeId]) => nodeId === "FR_1");
+  assert.notEqual(dash, under);
+  assert.ok(text.includes(`    ${dash} -->|satisfies| `));
+  assert.ok(text.includes(`    ${under} -->|satisfies| `));
+});
+
+// --- 書き出し (SVG) ----------------------------------------------------------
+
+const scene = (overrides = {}) => ({
+  nodes: [
+    {
+      id: "G-1",
+      type: "Goal",
+      status: "approved",
+      priorityClass: "high",
+      label: "G-1\n経費精算",
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 40,
+    },
+    {
+      id: "N-1",
+      type: "Need",
+      status: "proposed",
+      priorityClass: "none",
+      label: "N-1\n撮影するだけ",
+      x: 0,
+      y: 120,
+      w: 100,
+      h: 40,
+    },
+  ],
+  edges: [{ name: "motivates", dashed: false, x1: 0, y1: 20, x2: 0, y2: 100 }],
+  bands: [],
+  meta: fixture().meta,
+  palette: { fg: "#000", bg: "#fff", border: "#ccc", muted: "#666" },
+  title: "テスト",
+  ...overrides,
+});
+
+test("SVG は図の全体が収まる viewBox を持つ", () => {
+  const svg = graphSvg(scene());
+
+  assert.ok(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"'));
+  //: 余白 (SVG_PADDING = 24) のぶんだけ外に広がる。
+  assert.ok(svg.includes('viewBox="-74 -44 148 208"'));
+  assert.ok(svg.trimEnd().endsWith("</svg>"));
+});
+
+test("SVG にはノードのラベル・配色・エッジ名が入る", () => {
+  const svg = graphSvg(scene());
+
+  assert.ok(svg.includes(">経費精算</tspan>"));
+  assert.ok(svg.includes(">motivates</text>"));
+  //: 型の配色 (meta.types) と status の線種 (meta.statuses) が効く。
+  assert.equal(svg.match(/fill="#fff"/g).length >= 2, true);
+  assert.ok(svg.includes('stroke-dasharray="1 3"')); // proposed = 点線
+  //: 高優先度は輪 (もう 1 つ大きい同じ形) で示す。
+  assert.equal(svg.match(/<ellipse /g).length, 3);
+  assert.ok(svg.includes('stroke="#f9ab00"'));
+});
+
+test("ノードが 1 つも無くても SVG は壊れない", () => {
+  const svg = graphSvg({ ...scene(), nodes: [], edges: [], bands: [] });
+
+  assert.ok(svg.startsWith("<svg "));
+  assert.ok(svg.includes('viewBox="-24 -24 48 48"'));
+});
+
+test("SVG に入る文字列はエスケープされる", () => {
+  const nodes = [{ ...scene().nodes[0], label: '<script>&"' }];
+  const svg = graphSvg({ ...scene(), nodes, title: "<b>題</b>" });
+
+  assert.ok(!svg.includes("<script>"));
+  assert.ok(svg.includes("&lt;script&gt;&amp;"));
+  assert.ok(svg.includes("<title>&lt;b&gt;題&lt;/b&gt;</title>"));
 });

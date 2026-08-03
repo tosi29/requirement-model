@@ -224,7 +224,6 @@ def render() -> str:
             id="G-1",
             text="物流業務全体の処理時間を 30% 削減する",
             status="approved",
-            priority=1,
             has_source=["SRC-1"],
         )
     )
@@ -236,7 +235,6 @@ def render() -> str:
                 id=f"G-{number}",
                 text=f"{area(index)}業務の手戻りを 20% 減らす",
                 status="approved",
-                priority=2,
                 has_source=[source_of(index)],
                 refines=["G-1"],
             )
@@ -250,7 +248,6 @@ def render() -> str:
                 id=f"G-{number}",
                 text=f"{area(index + GOALS_MID)}の入力と確認にかかる工数を減らす",
                 status="approved",
-                priority=None if index % 3 else 2,
                 has_source=[source_of(index + 1)],
                 refines=[f"G-{parent}"],
                 motivates=[
@@ -272,7 +269,6 @@ def render() -> str:
                 id=f"N-{number}",
                 text=f"{role}は、{area(index)}の{thing(index)}を{WANTS[index % len(WANTS)]}",
                 status="approved" if index % 3 else "implemented",
-                priority=index % 4 + 1,
                 has_source=[source_of(index), source_of(index + 3)],
             )
         )
@@ -291,7 +287,6 @@ def render() -> str:
                 id=f"FR-{number}",
                 text=f"{area(index)}の{thing(index)}を{FR_VERBS[index % len(FR_VERBS)]}",
                 status=status,
-                priority=index % 5 + 1 if index % 3 == 0 else None,
                 has_source=[source_of(index)],
                 satisfies=[] if refines_parent else [f"N-{index % NEEDS + 1}"],
                 refines=[f"FR-{number - 1}"] if refines_parent else [],
@@ -321,7 +316,6 @@ def render() -> str:
                 id=f"QR-{number}",
                 text=text,
                 status=status,
-                priority=2 if on_system else None,
                 has_source=[source_of(index + 2)],
                 qualifies=[target],
                 evidence=evidence_for(status, index),

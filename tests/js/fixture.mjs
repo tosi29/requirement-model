@@ -55,7 +55,6 @@ export function fixture(overrides = {}) {
       id: "G-1",
       text: "経費精算を速くする",
       status: "approved",
-      priority: 1,
       has_source: ["SRC-1"],
       decomposition: "AND",
       refines: [],
@@ -66,7 +65,6 @@ export function fixture(overrides = {}) {
       id: "N-1",
       text: "領収書を撮影するだけで申請したい",
       status: "approved",
-      priority: null,
       has_source: ["SRC-1"],
     },
     {
@@ -74,7 +72,6 @@ export function fixture(overrides = {}) {
       id: "FR-1",
       text: "領収書画像から金額を抽出すること",
       status: "proposed",
-      priority: 2,
       has_source: ["SRC-1"],
       evidence: ["受入テスト第 1 回で正解率 96% だった"],
       acceptance_criteria: ["正解率が 95% 以上である"],
@@ -86,7 +83,6 @@ export function fixture(overrides = {}) {
       id: "QR-1",
       text: "抽出は 3 秒以内に終わること",
       status: "proposed",
-      priority: null,
       has_source: [],
       evidence: [],
       acceptance_criteria: [],
@@ -97,7 +93,6 @@ export function fixture(overrides = {}) {
       id: "SRC-1",
       text: "申請者となる一般社員",
       status: "proposed",
-      priority: null,
       kind: "stakeholder",
     },
   ];
@@ -153,7 +148,6 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
       id,
       text: `ゴール ${i}`,
       status: "approved",
-      priority: i <= 2 ? 1 : null,
       decomposition: "AND",
     });
     //: 二分木にして、Goal を何段かの refines で積む。
@@ -163,7 +157,7 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
 
   for (let i = 1; i <= needs; i++) {
     const id = `N-${i}`;
-    nodes.push({ type: "Need", id, text: `ニーズ ${i} を満たしたい`, status: "approved", priority: null });
+    nodes.push({ type: "Need", id, text: `ニーズ ${i} を満たしたい`, status: "approved" });
     //: 葉に近い Goal (後半) から動機づける。
     link(`G-${goals - (i % Math.max(1, Math.floor(goals / 2)))}`, "motivates", id);
     link(id, "has_source", `SRC-${pick(i, sources)}`);
@@ -176,7 +170,6 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
       id,
       text: `機能 ${i} を提供すること`,
       status: i % 3 === 0 ? "implemented" : "approved",
-      priority: i % 11 === 0 ? 1 : null,
       evidence: [`機能 ${i} の受入テスト結果`],
       acceptance_criteria: [`機能 ${i} の受け入れ基準`],
     });
@@ -193,7 +186,6 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
       id,
       text: `品質 ${i} を保つこと`,
       status: "proposed",
-      priority: null,
       evidence: [`品質 ${i} の計測結果`],
       acceptance_criteria: [`品質 ${i} の受け入れ基準`],
     });
@@ -207,7 +199,6 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
       id: `SRC-${i}`,
       text: `源泉 ${i}`,
       status: "approved",
-      priority: null,
       kind: "stakeholder",
     });
   }
@@ -249,7 +240,6 @@ export const META = {
     implemented: { border_style: "solid", border_width: 2 },
     verified: { border_style: "double", border_width: 4 },
   },
-  priority: { threshold: 2, outline: "#f9ab00" },
   bands: [
     { type: "Goal", label: "Goal (最上位)" },
     { type: "Need", label: "Need (上位)" },
@@ -270,7 +260,6 @@ export function allOn(data) {
     types: new Set(data.types),
     edges: new Set(data.edge_names),
     statuses: new Set(Object.keys(data.meta.statuses)),
-    priorities: new Set(["high", "normal", "none"]),
   };
 }
 

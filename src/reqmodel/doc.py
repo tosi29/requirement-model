@@ -110,8 +110,6 @@ def _ref(graph: RequirementGraph, node_id: str, with_text: bool = False) -> str:
 
 def _attr_line(graph: RequirementGraph, node: Node) -> str:
     parts = [f"種別: {type(node).__name__}", f"状態: {node.status}"]
-    if node.priority is not None:
-        parts.append(f"優先度: {node.priority}")
     if isinstance(node, Source):
         parts.append(f"分類: {node.kind}")
         if node.locator is not None:

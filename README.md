@@ -93,6 +93,11 @@ $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (
 
 この規約自体を `ast` による静的検査で機械的に担保する (`validate` の層0)。
 
+ノード参照用の変数名には、意味に基づく `UPPER_SNAKE_CASE` を使う
+(`SRC_EMPLOYEE`, `NEED_PHOTO_ONLY`, `FR_OCR` など)。これらは再代入されない
+グラフ上のシンボルであるため、通常の処理用変数と見分けやすくするための命名規約である。
+ただし、この命名は AST 検査では強制しない。
+
 その帰結として、**本ツールは定義ファイルを一切実行しない**。ノード集合は AST から直接復元する。
 Python ファイルの diff とグラフの diff が一対一対応し、コード実行リスクなしに解析できる
 (環境変数・現在時刻・乱数・ネットワークが入り込む余地がそもそも無い)。
@@ -100,20 +105,20 @@ Python ファイルの diff とグラフの diff が一対一対応し、コー�
 ```python
 from reqmodel import Goal, Need, FunctionalRequirement, Source
 
-src_employee = Source(id="SRC-EMP", text="申請者となる一般社員", kind="stakeholder")
+SRC_EMPLOYEE = Source(id="SRC-EMP", text="申請者となる一般社員", kind="stakeholder")
 
-need_photo_only = Need(
+NEED_PHOTO_ONLY = Need(
     id="N-1",
     text="申請者は、領収書を撮影するだけで経費を申請したい",
     status="approved",
-    has_source=[src_employee],
+    has_source=[SRC_EMPLOYEE],
 )
 
-fr_ocr = FunctionalRequirement(
+FR_OCR = FunctionalRequirement(
     id="FR-1",
     text="領収書画像から金額と日付を抽出し、申請フォームの初期値として表示すること",
-    satisfies=[need_photo_only],
-    has_source=[src_employee],
+    satisfies=[NEED_PHOTO_ONLY],
+    has_source=[SRC_EMPLOYEE],
     acceptance_criteria=["金額の抽出正解率が 95% 以上である"],
 )
 ```
@@ -143,20 +148,20 @@ import 文は実行されないが、mypy と IDE 補完のために必ず書く
 「2026-03-12 第3回ヒアリング」) を書く。
 
 ```python
-src_policy = Source(id="SRC-POLICY", text="経費精算規程 第4版", kind="document")
+SRC_POLICY = Source(id="SRC-POLICY", text="経費精算規程 第4版", kind="document")
 
-src_policy_receipt = Source(
+SRC_POLICY_RECEIPT = Source(
     id="SRC-POLICY-A12-3",
     text="1万円を超える支出には領収書の添付を要する",
     kind="document",
     locator="第12条第3項",
-    part_of=[src_policy],
+    part_of=[SRC_POLICY],
 )
 ```
 
 引用が id を持つので**同じ条文を複数の要求が根拠にできる**。これにより「この規程のどこが、
 どの要求に効いているか」を引用単位で集約でき、`req doc` の源泉節がこの入れ子をそのまま出す。
-引用を書かず `has_source=[src_policy]` と文書ごと指してもよい。粒度は書き手が選ぶ
+引用を書かず `has_source=[SRC_POLICY]` と文書ごと指してもよい。粒度は書き手が選ぶ
 ([なぜノードにするか](docs/design/model.md#引用を-source-のノードにする))。
 
 FR と QR は型を分ける (qualifies を出せるのは QR のみ、孤立検出の規則が異なる)。
@@ -285,10 +290,10 @@ FR / QR には検証に関わる 2 つの欄が加わる。
 そのコードの指摘だけが消える。
 
 ```python
-constraint_vpn = Constraint(
+CONSTRAINT_VPN = Constraint(
     id="C-9",
     text="社内 VPN の外からは接続させないこと",
-    constrains=[fr_ocr],
+    constrains=[FR_OCR],
     suppress=[("structure.missing_source", "情報システム部との口頭合意。文書化は次版")],
 )
 ```

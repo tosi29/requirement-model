@@ -1272,7 +1272,7 @@ export function graphElements(data, measure = estimateTextWidth) {
 
 /**
  * スタイル定義。形状・配色・線種は `render_meta()` から来た meta が唯一の出典で、
- * テーマ依存の色 (fg / bg / border / muted) だけ palette で受け取る。
+ * テーマ依存の色 (fg / bg / panel / border / muted) だけ palette で受け取る。
  *
  * Cytoscape のスタイルは **並び順で解決される** (後に置いた規則が勝つ) ので、
  * 5 段に重ねる。この順序が「どの表現がどれを上書きするか」の決定そのもの:
@@ -1385,8 +1385,8 @@ export function graphStyle(meta, palette) {
       width: "data(w)",
       height: "data(h)",
       padding: "0px",
-      "background-color": palette.bg,
-      "background-opacity": 0.15,
+      "background-color": palette.panel,
+      "background-opacity": 1,
       "border-color": palette.border,
       "border-width": 1,
       "border-style": "solid",

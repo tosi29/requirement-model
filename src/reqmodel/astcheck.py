@@ -19,6 +19,9 @@ from pathlib import Path
 from typing import Any
 
 from .core.metamodel import NODE_TYPES
+from .presentation.view import RequirementGroup
+
+DECLARATION_TYPES = {**NODE_TYPES, "RequirementGroup": RequirementGroup}
 
 __all__ = ["RawNode", "ExtractResult", "extract_source", "extract_file", "ALLOWED_IMPORT_ROOTS"]
 
@@ -232,7 +235,7 @@ class _Extractor:
             return None
 
         type_name = call.func.id
-        if type_name not in NODE_TYPES:
+        if type_name not in DECLARATION_TYPES:
             self._violation(f"未知の型 {type_name} は呼び出せない", call)
             return None
         if type_name not in self.imported:

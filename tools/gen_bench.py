@@ -153,6 +153,7 @@ from reqmodel import (
     Goal,
     Need,
     QualityRequirement,
+    RequirementGroup,
     Source,
 )
 '''
@@ -326,6 +327,24 @@ def render() -> str:
                 status="approved" if index % 2 else "proposed",
                 has_source=[source_of(index + 4)],
                 constrains=[f"FR-{index * 17 % FRS + 1}"],
+            )
+        )
+
+    # 表示グループ ----------------------------------------------------------
+    parts.append(section("表示グループ"))
+    for group_index, label in enumerate(["受注", "配送", "請求", "倉庫"], start=1):
+        start = (group_index - 1) * (FRS // 4) + 1
+        end = group_index * (FRS // 4) if group_index < 4 else FRS
+        members = [f"FR-{number}" for number in range(start, end + 1)]
+        members += [f"QR-{number}" for number in range(group_index, QRS + 1, 4)]
+        members += [f"Constraint-{number}" for number in range(group_index, CONSTRAINTS + 1, 4)]
+        parts.append(
+            node(
+                "RequirementGroup",
+                id=f"group-{group_index}",
+                label=label,
+                order=group_index * 10,
+                members=members,
             )
         )
 

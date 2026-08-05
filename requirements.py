@@ -20,6 +20,7 @@ from reqmodel import (
     Goal,
     Need,
     QualityRequirement,
+    RequirementGroup,
     Source,
 )
 
@@ -561,3 +562,51 @@ CONSTRAINT_NO_LLM_CALL = Constraint(
     has_source=[SRC_SPEC],
 )
 
+
+
+# --- 表示グループ -----------------------------------------------------------
+
+GROUP_VALIDATION = RequirementGroup(
+    id="validation",
+    label="検証",
+    order=10,
+    members=[
+        FR_AST_ONLY,
+        FR_SYNTAX,
+        FR_EDGE_RULES,
+        FR_ORPHAN,
+        FR_LEXICON,
+        FR_WAIVER,
+        FR_EXIT_CODE,
+        CONSTRAINT_NO_EXEC,
+    ],
+)
+GROUP_ANALYSIS = RequirementGroup(
+    id="analysis",
+    label="影響分析・LLM連携",
+    order=20,
+    members=[FR_IMPACT, FR_EXPLAIN, FR_PLAN, CONSTRAINT_GIT_ONLY, CONSTRAINT_NO_LLM_CALL],
+)
+GROUP_PRESENTATION = RequirementGroup(
+    id="presentation",
+    label="出力と閲覧",
+    order=30,
+    members=[
+        FR_DOC,
+        FR_SITE,
+        FR_FIT_WHOLE,
+        FR_TABLE,
+        FR_PERMALINK,
+        FR_STATS,
+        FR_MCP,
+        FR_SVG,
+        FR_ID_COLLISION,
+        FR_SOURCE_AS_ATTRIBUTE,
+        FR_FOCUS,
+        QR_READABLE_ZOOM,
+        QR_SITE_CLI_PARITY,
+        QR_KEYBOARD,
+        CONSTRAINT_PYDANTIC_ONLY,
+        CONSTRAINT_OFFLINE_SITE,
+    ],
+)

@@ -17,6 +17,7 @@ from ..findings import Finding, FindingList
 from ..core.graph import RequirementGraph
 from ..core.metamodel import NODE_TYPES
 from ..definition import Node
+from ..presentation.view import RequirementGroup
 
 __all__ = ["LoadResult", "load_paths", "load_sources", "discover_paths", "DEFAULT_PATHS"]
 
@@ -31,6 +32,7 @@ class LoadResult:
     graph: RequirementGraph
     findings: FindingList = field(default_factory=FindingList)
     paths: list[Path] = field(default_factory=list)
+    requirement_groups: list[RequirementGroup] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -84,6 +86,8 @@ def load_sources(sources: Iterable[tuple[str, str]]) -> LoadResult:
 def _build(extracts: list[ExtractResult]) -> LoadResult:
     findings = FindingList()
     nodes: list[Node] = []
+    groups: list[RequirementGroup] = []
+    seen_group_ids: dict[str, str] = {}
     locations: dict[str, str] = {}
     seen_ids: dict[str, str] = {}
 
@@ -106,6 +110,13 @@ def _build(extracts: list[ExtractResult]) -> LoadResult:
             node = _instantiate(raw, location, findings)
             if node is None:
                 continue
+            if isinstance(node, RequirementGroup):
+                if node.id in seen_group_ids:
+                    findings.add(Finding(severity="error", code="syntax.duplicate_id", layer=1, message=f"RequirementGroup id が重複している (既出: {seen_group_ids[node.id]})", node_id=node.id, location=location))
+                    continue
+                seen_group_ids[node.id] = location
+                groups.append(node)
+                continue
             if node.id in seen_ids:
                 findings.add(
                     Finding(
@@ -122,11 +133,11 @@ def _build(extracts: list[ExtractResult]) -> LoadResult:
             locations[node.id] = location
             nodes.append(node)
 
-    return LoadResult(graph=RequirementGraph(nodes, locations), findings=findings)
+    return LoadResult(graph=RequirementGraph(nodes, locations), findings=findings, requirement_groups=sorted(groups, key=lambda g: (g.order, g.id)))
 
 
-def _instantiate(raw: RawNode, location: str, findings: FindingList) -> Node | None:
-    node_type = NODE_TYPES[raw.type_name]
+def _instantiate(raw: RawNode, location: str, findings: FindingList) -> Node | RequirementGroup | None:
+    node_type = RequirementGroup if raw.type_name == "RequirementGroup" else NODE_TYPES[raw.type_name]
     try:
         return node_type(**raw.kwargs)
     except ValidationError as exc:

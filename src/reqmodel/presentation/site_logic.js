@@ -1141,15 +1141,59 @@ export function nodeContext(view, id, scope = null) {
 //
 // 生成するのはただのオブジェクトなので、ライブラリを読み込まなくてもテストできる。
 
-/** 帯 (枠) の定義。meta に無ければ空。 */
+/** Requirements 段に入る型。 */
+const REQUIREMENT_TYPES = new Set([
+  "FunctionalRequirement",
+  "QualityRequirement",
+  "Constraint",
+]);
+
+/** 帯 (枠) の定義。Goal / Need は型ごと、Requirements は表示用グループごとに作る。 */
 export function bandDefs(data) {
-  return ((data.meta || {}).bands || []).filter((band) =>
-    data.nodes.some((node) => node.type === band.type),
+  const top = ((data.meta || {}).bands || [])
+    .filter((band) => data.nodes.some((node) => node.type === band.type))
+    .map((band) => ({ ...band, key: band.type }));
+
+  if (!Object.prototype.hasOwnProperty.call(data, "requirement_groups")) return top;
+
+  const groups = [...(data.requirement_groups || [])].sort(
+    (a, b) => (a.order || 0) - (b.order || 0) || compare(a.id, b.id),
   );
+  const assigned = new Set();
+  const requirementIds = new Set(
+    data.nodes.filter((node) => REQUIREMENT_TYPES.has(node.type)).map((node) => node.id),
+  );
+  const requirementBands = [];
+  for (const group of groups) {
+    const members = [];
+    for (const id of group.members || []) {
+      if (!requirementIds.has(id) || assigned.has(id)) continue;
+      assigned.add(id);
+      members.push(id);
+    }
+    if (members.length) {
+      requirementBands.push({
+        key: `group:${group.id}`,
+        label: group.label,
+        groupId: group.id,
+        members,
+      });
+    }
+  }
+  const unclassified = [...requirementIds].filter((id) => !assigned.has(id));
+  if (unclassified.length) {
+    requirementBands.push({
+      key: "group:__unclassified__",
+      label: "未分類",
+      groupId: "__unclassified__",
+      members: unclassified,
+    });
+  }
+  return [...top, ...requirementBands];
 }
 
 /** 帯枠ノードの id。ノード id と衝突しない接頭辞を付ける。 */
-export const bandId = (type) => `band:${type}`;
+export const bandId = (key) => `band:${key}`;
 
 /**
  * 図の要素定義。ノードとエッジの全件を一度だけ作る。
@@ -1197,9 +1241,9 @@ export function graphElements(data, measure = estimateTextWidth) {
     ...bands.map((band) => ({
       //: w / h は applyBanding が実測で入れ直すまでの仮の値。
       data: {
-        id: bandId(band.type),
+        id: bandId(band.key),
         band: true,
-        bandType: band.type,
+        bandType: band.type || "RequirementGroup",
         label: band.label,
         w: 10,
         h: 10,
@@ -1317,6 +1361,30 @@ export function graphStyle(meta, palette) {
       },
     });
   }
+
+
+  style.push({
+    selector: 'node.band[bandType = "RequirementGroup"]',
+    style: {
+      shape: "round-rectangle",
+      width: "data(w)",
+      height: "data(h)",
+      padding: "0px",
+      "background-color": palette.bg,
+      "background-opacity": 0.15,
+      "border-color": palette.border,
+      "border-width": 1,
+      "border-style": "solid",
+      "text-valign": "top",
+      "text-halign": "center",
+      "text-margin-y": -2,
+      "font-size": 11,
+      "font-weight": "bold",
+      color: palette.muted,
+      "z-compound-depth": "bottom",
+      events: "no",
+    },
+  });
 
   // 3. status
   for (const [status, statusMeta] of Object.entries(meta.statuses || {})) {
@@ -1539,9 +1607,10 @@ function bandRows(members, edges) {
 export function bandedLayout(bands, placed, edges, direction) {
   const positions = new Map();
   const frames = new Map();
-  const membersOf = bands.map((band) =>
-    placed.filter((node) => node.type === band.type),
-  );
+  const membersOf = bands.map((band) => {
+    const ids = band.members ? new Set(band.members) : null;
+    return placed.filter((node) => (ids ? ids.has(node.id) : node.type === band.type));
+  });
   if (!membersOf.some((members) => members.length)) return { positions, frames };
 
   //: TD では y が主軸 (帯の積み方向)・x が副軸。LR では逆になる。
@@ -1625,7 +1694,7 @@ export function bandedLayout(bands, placed, edges, direction) {
     }
     const span = spans.get(index);
     const framePriSize = span.to - span.from + BAND_FRAME_PAD * 2;
-    frames.set(bands[index].type, {
+    frames.set(bands[index].type || bands[index].key, {
       ...at(secMiddle, (span.from + span.to) / 2),
       w: vertical ? frameSecSize : framePriSize,
       h: vertical ? framePriSize : frameSecSize,

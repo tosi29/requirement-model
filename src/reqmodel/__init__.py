@@ -15,6 +15,7 @@ from __future__ import annotations
 from .findings import Finding, FindingList, Severity
 from .core.graph import Edge, RequirementGraph
 from .application.loader import LoadResult, load_paths, load_sources
+from .presentation.view import RequirementGroup
 from .definition import (
     FR,
     QR,
@@ -47,6 +48,7 @@ __all__ = [
     "Source",
     "FR",
     "QR",
+    "RequirementGroup",
     # 基底・補助型
     "Node",
     "Sourced",

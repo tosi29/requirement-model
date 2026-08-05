@@ -24,6 +24,7 @@ from ..core.projection import SOURCE_EDGE_NAMES
 from ..definition import Source
 from ..definition.nodes import STATUS_RANK
 from .render import render_dot, render_meta, render_mermaid
+from .view import RequirementGroup
 
 __all__ = [
     "build_site",
@@ -100,6 +101,7 @@ def site_data(
     sources: Sequence[str],
     suppressed: int = 0,
     repo: RepoLink | None = None,
+    requirement_groups: Sequence[RequirementGroup] = (),
 ) -> dict[str, Any]:
     """ページに埋め込むデータ一式。
 
@@ -132,6 +134,7 @@ def site_data(
             node_type.__name__: list(edge_specs_for(node_type))
             for node_type in TYPE_ORDER
         },
+        "requirement_groups": [group.model_dump(mode="json") for group in requirement_groups],
         "nodes": graph.to_json_obj()["nodes"],
         "edges": [
             {"source": edge.source, "name": edge.name, "target": edge.target}
@@ -186,13 +189,14 @@ def build_site(
     scripts: Sequence[str] | None = None,
     suppressed: int = 0,
     repo: RepoLink | None = None,
+    requirement_groups: Sequence[RequirementGroup] = (),
 ) -> Path:
     """out_dir に index.html と生データを書き出し、index.html のパスを返す。
 
     scripts に相対パス (``asset_srcs(local=True)``) を渡し、同じディレクトリへ
     その UMD ビルドを置けば、外部への通信が無い自己完結のサイトになる。
     """
-    data = site_data(graph, findings, title, sources, suppressed, repo)
+    data = site_data(graph, findings, title, sources, suppressed, repo, requirement_groups)
     payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
     tags = "\n".join(
         f'<script src="{escape(src, quote=True)}"></script>'

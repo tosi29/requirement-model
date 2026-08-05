@@ -13,6 +13,7 @@ from reqmodel import (
     Goal,
     Need,
     QualityRequirement,
+    RequirementGroup,
     Source,
 )
 
@@ -219,3 +220,25 @@ CONSTRAINT_REGION = Constraint(
     has_source=[SRC_POLICY_DOMESTIC],
 )
 
+
+
+# --- 表示グループ -----------------------------------------------------------
+
+GROUP_CAPTURE = RequirementGroup(
+    id="capture",
+    label="領収書入力",
+    order=10,
+    members=[FR_OCR, FR_SHORT_FORM, FR_AUTOFILL, QR_OCR_LATENCY, CONSTRAINT_REGION],
+)
+GROUP_APPROVAL = RequirementGroup(
+    id="approval",
+    label="承認通知",
+    order=20,
+    members=[FR_NOTIFY, FR_REMIND],
+)
+GROUP_POLICY = RequirementGroup(
+    id="policy",
+    label="規程照合",
+    order=30,
+    members=[FR_RULE_CHECK],
+)

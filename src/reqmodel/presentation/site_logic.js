@@ -1572,18 +1572,6 @@ const BAND_SIBLING_GAP = 26;
 const BAND_GAP = 96;
 //: ノードの外接矩形から枠までの余白。
 const BAND_FRAME_PAD = 14;
-//: Requirements 段全体の既定最大幅。表示領域から上書きできる。
-const REQUIREMENTS_MAX_WIDTH = 1400;
-//: RequirementGroup 1 枠の既定最大幅。
-const REQUIREMENT_GROUP_MAX_WIDTH = 600;
-//: RequirementGroup 同士の左右間隔。
-const REQUIREMENT_GROUP_GAP = 48;
-//: RequirementGroup の折り返し行同士の間隔。
-const REQUIREMENT_GROUP_ROW_GAP = 48;
-//: RequirementGroup 内のノード間隔。
-const REQUIREMENT_NODE_GAP = 26;
-//: RequirementGroup 内でノードを折り返したときの行間。
-const REQUIREMENT_NODE_ROW_GAP = 30;
 
 /**
  * 帯の中の行分け。refines (子 → 親) で親を上の行に置く。
@@ -1631,68 +1619,7 @@ function bandRows(members, edges) {
  * なり、「上に積んだ層」に見えない。等幅・同位置の枠が縦に並ぶ形にし、中身は
  * その中央に寄せる (帯の中の相対位置は変えない)。
  */
-function bandedLayoutOptions(options = {}) {
-  return {
-    requirementsMaxWidth: Math.max(1, options.requirementsMaxWidth || REQUIREMENTS_MAX_WIDTH),
-    groupMaxWidth: Math.max(1, options.groupMaxWidth || REQUIREMENT_GROUP_MAX_WIDTH),
-    groupGap: Math.max(0, options.groupGap ?? REQUIREMENT_GROUP_GAP),
-    groupRowGap: Math.max(0, options.groupRowGap ?? REQUIREMENT_GROUP_ROW_GAP),
-    nodeGap: Math.max(0, options.nodeGap ?? REQUIREMENT_NODE_GAP),
-    nodeRowGap: Math.max(0, options.nodeRowGap ?? REQUIREMENT_NODE_ROW_GAP),
-  };
-}
-
-function packRequirementGroup(members, edges, groupLeft, sectionTop, axis, options) {
-  const { positions, at, priSize, secSize, sec } = axis;
-  let groupWidth = 0;
-  let groupHeight = 0;
-  for (const hierarchyRow of bandRows(members, edges)) {
-    hierarchyRow.sort((a, b) => sec(a) - sec(b));
-    let lineWidth = 0;
-    let lineHeight = 0;
-    const lines = [[]];
-    for (const node of hierarchyRow) {
-      const width = secSize(node);
-      const needed = lineWidth ? lineWidth + options.nodeGap + width : width;
-      if (lineWidth && needed > options.groupMaxWidth) {
-        groupWidth = Math.max(groupWidth, lineWidth);
-        groupHeight += lineHeight + options.nodeRowGap;
-        lines.push([]);
-        lineWidth = 0;
-        lineHeight = 0;
-      }
-      lines[lines.length - 1].push(node);
-      lineWidth = lineWidth ? lineWidth + options.nodeGap + width : width;
-      lineHeight = Math.max(lineHeight, priSize(node));
-    }
-    groupWidth = Math.max(groupWidth, lineWidth);
-    let top = sectionTop + groupHeight;
-    for (const line of lines) {
-      const height = Math.max(...line.map(priSize));
-      let left = groupLeft;
-      for (const node of line) {
-        const centerSec = left + secSize(node) / 2;
-        const centerPri = top + height / 2;
-        positions.set(node.id, at(centerSec, centerPri));
-        left += secSize(node) + options.nodeGap;
-      }
-      top += height + options.nodeRowGap;
-    }
-    groupHeight = top - sectionTop;
-  }
-  if (groupHeight) groupHeight -= options.nodeRowGap;
-  return {
-    width: groupWidth,
-    height: groupHeight,
-    secMin: groupLeft,
-    secMax: groupLeft + groupWidth,
-    from: sectionTop,
-    to: sectionTop + groupHeight,
-  };
-}
-
-/** dagre の結果を帯に並べ直した位置と、帯を囲む枠。 */
-export function bandedLayout(bands, placed, edges, direction, layoutLimits = {}) {
+export function bandedLayout(bands, placed, edges, direction) {
   const positions = new Map();
   const frames = new Map();
   const membersOf = bands.map((band) => {
@@ -1714,8 +1641,6 @@ export function bandedLayout(bands, placed, edges, direction, layoutLimits = {})
     return vertical ? position.x : position.y;
   };
   const topOf = (nodes) => Math.min(...nodes.map((node) => pri(node) - priSize(node) / 2));
-  const limits = bandedLayoutOptions(layoutLimits);
-  const axis = { positions, at, priSize, secSize, sec };
 
   // 1. 型帯は縦に積み、RequirementGroup は同じ Requirements 段の中で横に並べる。
   const banded = new Set();
@@ -1725,40 +1650,45 @@ export function bandedLayout(bands, placed, edges, direction, layoutLimits = {})
   while (index < bands.length) {
     if (bands[index].members) {
       const sectionFrom = cursor;
-      const sectionLeft = Math.min(...placed.map((node) => sec(node) - secSize(node) / 2));
-      let rowTop = sectionFrom;
-      let rowLeft = sectionLeft;
-      let rowHeight = 0;
       let sectionTo = sectionFrom;
+      let groupCursor = Math.min(
+        ...placed.map((node) => sec(node) - secSize(node) / 2),
+      );
+      const sectionBandIndexes = [];
       while (index < bands.length && bands[index].members) {
         const members = membersOf[index];
         if (!members.length) {
           index += 1;
           continue;
         }
+        sectionBandIndexes.push(index);
         for (const node of members) banded.add(node.id);
 
-        const estimatedWidth = Math.max(
-          ...members.map(secSize),
-          Math.min(
-            limits.groupMaxWidth,
-            members.reduce((sum, node) => sum + secSize(node), 0) +
-              limits.nodeGap * Math.max(0, members.length - 1),
-          ),
-        );
-        const usedInRow = rowLeft - sectionLeft;
-        if (rowHeight && usedInRow + limits.groupGap + estimatedWidth > limits.requirementsMaxWidth) {
-          rowTop += rowHeight + limits.groupRowGap;
-          rowLeft = sectionLeft;
-          rowHeight = 0;
+        let groupTo = sectionFrom;
+        let groupMin = Infinity;
+        let groupMax = -Infinity;
+        for (const row of bandRows(members, edges)) {
+          const height = Math.max(...row.map(priSize));
+          row.sort((a, b) => sec(a) - sec(b));
+          let occupied = groupCursor;
+          for (const node of row) {
+            const half = secSize(node) / 2;
+            const center = Math.max(sec(node), occupied + BAND_SIBLING_GAP + half);
+            positions.set(node.id, at(center, groupTo + height / 2));
+            occupied = center + half;
+            groupMin = Math.min(groupMin, center - half);
+            groupMax = Math.max(groupMax, center + half);
+          }
+          groupTo += height + BAND_ROW_GAP;
         }
-
-        const span = packRequirementGroup(members, edges, rowLeft, rowTop, axis, limits);
-        spans.set(index, span);
-        rowHeight = Math.max(rowHeight, span.height);
-        sectionTo = Math.max(sectionTo, rowTop + rowHeight);
-        rowLeft = span.secMax + limits.groupGap;
+        const to = groupTo - BAND_ROW_GAP;
+        spans.set(index, { from: sectionFrom, to, secMin: groupMin, secMax: groupMax });
+        sectionTo = Math.max(sectionTo, to);
+        groupCursor = groupMax + BAND_GAP;
         index += 1;
+      }
+      for (const bandIndex of sectionBandIndexes) {
+        spans.get(bandIndex).to = sectionTo;
       }
       cursor = sectionTo + BAND_GAP;
       continue;

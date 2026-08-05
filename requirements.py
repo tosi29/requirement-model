@@ -302,7 +302,6 @@ FR_SITE = FunctionalRequirement(
     acceptance_criteria=[
         "生成物を静的ファイルとして配るだけでブラウザから閲覧できる",
         "ノードを選ぶと影響範囲が色分けされ、指摘の一覧から該当ノードへ飛べる",
-        "RequirementGroup とグループ内ノードは、表示幅に合わせて折り返される",
     ],
 )
 FR_FIT_WHOLE = FunctionalRequirement(

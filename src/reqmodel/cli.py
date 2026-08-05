@@ -495,6 +495,7 @@ def cmd_site(args: argparse.Namespace) -> int:
         scripts=asset_srcs(local=args.assets == "local"),
         suppressed=waived.count,
         repo=RepoLink(args.repo_url, args.repo_ref) if args.repo_url else None,
+        requirement_groups=result.requirement_groups,
     )
     print(
         f"生成した: {index} ({len(result.graph)} ノード / {waived.summary()})",

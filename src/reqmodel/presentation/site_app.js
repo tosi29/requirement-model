@@ -230,8 +230,8 @@ function applyBanding() {
   const { positions, frames } = bandedLayout(bands, placed, view.edges, state.direction);
   cy.batch(() => {
     for (const [id, position] of positions) cy.getElementById(id).position(position);
-    for (const [type, frame] of frames) {
-      const element = cy.getElementById(bandId(type));
+    for (const [key, frame] of frames) {
+      const element = cy.getElementById(bandId(key));
       if (element.empty()) continue;
       element.data({ w: frame.w, h: frame.h });
       element.position({ x: frame.x, y: frame.y });

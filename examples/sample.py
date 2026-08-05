@@ -4,7 +4,7 @@
 (層0 の AST 検査で機械的に弾かれる)。
 
 参照はただの変数参照なので、参照されるノードを先に書く。前方参照したいときは
-変数の代わりに id 文字列 ("N-1" など) を書いてもよい。
+変数の代わりに id 文字列 ("Need-1" など) を書いてもよい。
 """
 
 from reqmodel import (
@@ -76,19 +76,19 @@ SRC_CFO_BACKLOG = Source(
 # --- ニーズ -----------------------------------------------------------------
 
 NEED_PHOTO_ONLY = Need(
-    id="N-1",
+    id="Need-1",
     text="申請者は、領収書を撮影するだけで経費を申請したい",
     status="approved",
     has_source=[SRC_EMPLOYEE],
 )
 NEED_EARLY_VIOLATION = Need(
-    id="N-2",
+    id="Need-2",
     text="経理担当者は、規程に反する申請を差し戻す前に検知したい",
     status="approved",
     has_source=[SRC_FINANCE_HEAD, SRC_POLICY_RECEIPT],
 )
 NEED_NOTICE_PENDING = Need(
-    id="N-3",
+    id="Need-3",
     text="承認者は、自分が承認すべき申請にその日のうちに気づきたい",
     status="approved",
     has_source=[SRC_CFO_BACKLOG, SRC_LEGACY],
@@ -97,14 +97,14 @@ NEED_NOTICE_PENDING = Need(
 # --- ゴール -----------------------------------------------------------------
 
 GOAL_HALVE_EFFORT = Goal(
-    id="G-1",
+    id="Goal-1",
     text="経費精算にかかる全社の工数を半減する",
     status="approved",
     decomposition="AND",
     has_source=[SRC_FINANCE_HEAD],
 )
 GOAL_LESS_INPUT = Goal(
-    id="G-2",
+    id="Goal-2",
     text="申請 1 件あたりの入力の手間を減らす",
     status="approved",
     refines=[GOAL_HALVE_EFFORT],
@@ -112,7 +112,7 @@ GOAL_LESS_INPUT = Goal(
     has_source=[SRC_FINANCE_HEAD],
 )
 GOAL_LESS_WAITING = Goal(
-    id="G-3",
+    id="Goal-3",
     text="承認待ちによる滞留を減らす",
     status="approved",
     refines=[GOAL_HALVE_EFFORT],
@@ -212,7 +212,7 @@ QR_OCR_LATENCY = QualityRequirement(
 # --- 制約 -------------------------------------------------------------------
 
 CONSTRAINT_REGION = Constraint(
-    id="C-1",
+    id="Constraint-1",
     text="領収書画像は国内リージョンのストレージにのみ保存すること",
     status="approved",
     constrains=[FR_OCR, QR_OCR_LATENCY],

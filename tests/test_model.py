@@ -50,8 +50,8 @@ def test_unknown_field_is_rejected():
 
 def test_reference_accepts_node_or_id_string():
     s = source("S-1")
-    assert need("N-1", has_source=[s]).has_source == ["S-1"]
-    assert need("N-2", has_source=["S-1"]).has_source == ["S-1"]
+    assert need("Need-1", has_source=[s]).has_source == ["S-1"]
+    assert need("Need-2", has_source=["S-1"]).has_source == ["S-1"]
 
 
 def test_status_default_is_proposed():

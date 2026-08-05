@@ -65,49 +65,49 @@ SRC_BENCH = Source(
 # --- ニーズ -----------------------------------------------------------------
 
 NEED_SELF_CHECK = Need(
-    id="N-1",
+    id="Need-1",
     text="要求を書く人は、書き方の誤りをレビュー会の前に自分で見つけたい",
     status="approved",
     has_source=[SRC_OWNER, SRC_LEGACY],
 )
 NEED_NO_DANGLING = Need(
-    id="N-2",
+    id="Need-2",
     text="要求をレビューする人は、どこにも繋がっていない要求が残っていないかを知りたい",
     status="approved",
     has_source=[SRC_OWNER, SRC_IREB],
 )
 NEED_IMPACT = Need(
-    id="N-3",
+    id="Need-3",
     text="要求を変更する人は、その変更がどこまで波及するのかを変更前に把握したい",
     status="approved",
     has_source=[SRC_OWNER, SRC_LEGACY],
 )
 NEED_REVIEW_DIFF = Need(
-    id="N-4",
+    id="Need-4",
     text="変更を審査する人は、差分から要求グラフの何が変わったのかを読み取りたい",
     status="approved",
     has_source=[SRC_OWNER],
 )
 NEED_LLM_CONTEXT = Need(
-    id="N-5",
+    id="Need-5",
     text="要求の判断を LLM に委ねる人は、判断に要る文脈を欠けなく渡したい",
     status="approved",
     has_source=[SRC_SPEC, SRC_OWNER],
 )
 NEED_READABLE = Need(
-    id="N-6",
+    id="Need-6",
     text="要求を読む関係者は、ツールを入れずに要求の全体像と個々のトレースを見たい",
     status="approved",
     has_source=[SRC_LEGACY],
 )
 NEED_METRICS = Need(
-    id="N-7",
+    id="Need-7",
     text="要求を管理する人は、モデル全体の充足率と成熟度の分布を数値で把握したい",
     status="approved",
     has_source=[SRC_OWNER],
 )
 NEED_CI = Need(
-    id="N-8",
+    id="Need-8",
     text="CI を回す人は、既知で意図的な指摘を残したまま、新しい指摘だけで失敗させたい",
     status="approved",
     has_source=[SRC_OWNER],
@@ -116,21 +116,21 @@ NEED_CI = Need(
 # --- ゴール -----------------------------------------------------------------
 
 GOAL_LESS_REWORK = Goal(
-    id="G-1",
+    id="Goal-1",
     text="要求の不備が後工程で見つかることによる手戻りを減らす",
     status="approved",
     motivates=[NEED_SELF_CHECK, NEED_NO_DANGLING, NEED_CI],
     has_source=[SRC_SPEC, SRC_OWNER, SRC_LEGACY],
 )
 GOAL_LESS_SURVEY = Goal(
-    id="G-2",
+    id="Goal-2",
     text="要求を変えるたびに繰り返される影響調査の負荷を減らす",
     status="approved",
     motivates=[NEED_IMPACT, NEED_REVIEW_DIFF],
     has_source=[SRC_SPEC, SRC_LEGACY],
 )
 GOAL_SHARED_UNDERSTANDING = Goal(
-    id="G-3",
+    id="Goal-3",
     text="要求の理解が書き手に依存する度合いを下げる",
     status="approved",
     motivates=[NEED_LLM_CONTEXT, NEED_READABLE, NEED_METRICS],
@@ -526,35 +526,35 @@ QR_KEYBOARD = QualityRequirement(
 # --- 制約 -------------------------------------------------------------------
 
 CONSTRAINT_NO_EXEC = Constraint(
-    id="C-1",
+    id="Constraint-1",
     text="定義ファイルを実行しないこと",
     status="approved",
     constrains=[FR_AST_ONLY, FR_PLAN],
     has_source=[SRC_SPEC],
 )
 CONSTRAINT_PYDANTIC_ONLY = Constraint(
-    id="C-2",
+    id="Constraint-2",
     text="実行時の依存を pydantic だけに保つこと",
     status="approved",
     constrains=[FR_MCP, FR_SVG],
     has_source=[SRC_SPEC],
 )
 CONSTRAINT_GIT_ONLY = Constraint(
-    id="C-3",
+    id="Constraint-3",
     text="履歴とレビューの基盤を Git に置き、RDB と外部ストレージを持たないこと",
     status="approved",
     constrains=[FR_PLAN],
     has_source=[SRC_SPEC],
 )
 CONSTRAINT_OFFLINE_SITE = Constraint(
-    id="C-4",
+    id="Constraint-4",
     text="公開する閲覧用サイトを、外部への通信なしで表示できるようにすること",
     status="approved",
     constrains=[FR_SITE],
     has_source=[SRC_OWNER],
 )
 CONSTRAINT_NO_LLM_CALL = Constraint(
-    id="C-5",
+    id="Constraint-5",
     text="LLM API を直接呼ばず、LLM に渡す文脈の生成までに留めること",
     status="approved",
     constrains=[FR_EXPLAIN, FR_MCP],

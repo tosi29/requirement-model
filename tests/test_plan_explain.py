@@ -17,8 +17,8 @@ HEADER = "from reqmodel import Goal, Need, FunctionalRequirement, Source\n"
 
 def chain():
     s = source("S-1")
-    n = need("N-1", has_source=[s])
-    g = goal("G-1", motivates=[n], has_source=[s])
+    n = need("Need-1", has_source=[s])
+    g = goal("Goal-1", motivates=[n], has_source=[s])
     f = fr("FR-1", satisfies=[n], has_source=[s])
     return build(s, n, g, f)
 
@@ -27,23 +27,23 @@ def chain():
 
 
 def test_diff_detects_added_removed_and_changed():
-    before = build(need("N-1"), need("N-2"))
-    after = build(need("N-1", text="もっと早く精算したい"), need("N-3"))
+    before = build(need("Need-1"), need("Need-2"))
+    after = build(need("Need-1", text="もっと早く精算したい"), need("Need-3"))
 
     diff = diff_graphs(before, after)
-    assert diff.added == ["N-3"]
-    assert diff.removed == ["N-2"]
-    assert list(diff.changed) == ["N-1"]
-    assert diff.changed["N-1"][0].field == "text"
-    assert diff.touched == ["N-1", "N-2", "N-3"]
+    assert diff.added == ["Need-3"]
+    assert diff.removed == ["Need-2"]
+    assert list(diff.changed) == ["Need-1"]
+    assert diff.changed["Need-1"][0].field == "text"
+    assert diff.touched == ["Need-1", "Need-2", "Need-3"]
 
 
 def test_diff_detects_edge_changes():
-    before = build(need("N-1"), fr("FR-1"))
-    after = build(need("N-1"), fr("FR-1", satisfies=["N-1"]))
+    before = build(need("Need-1"), fr("FR-1"))
+    after = build(need("Need-1"), fr("FR-1", satisfies=["Need-1"]))
     changes = diff_graphs(before, after).changed["FR-1"]
     assert [c.field for c in changes] == ["satisfies"]
-    assert changes[0].after == ["N-1"]
+    assert changes[0].after == ["Need-1"]
 
 
 def test_diff_detects_type_change():
@@ -65,16 +65,16 @@ def test_plan_output_lists_impact():
     before = chain()
     after = build(
         source("S-1"),
-        need("N-1", has_source=["S-1"]),
-        goal("G-1", motivates=["N-1"], has_source=["S-1"]),
-        fr("FR-1", satisfies=["N-1"], has_source=["S-1"], status="approved"),
+        need("Need-1", has_source=["S-1"]),
+        goal("Goal-1", motivates=["Need-1"], has_source=["S-1"]),
+        fr("FR-1", satisfies=["Need-1"], has_source=["S-1"], status="approved"),
     )
     diff = diff_graphs(before, after)
     text = format_plan(before, after, diff, "HEAD")
     assert "~ [FunctionalRequirement] FR-1" in text
     assert "status: proposed → approved" in text
     assert "## 影響範囲" in text
-    assert "N-1" in text.split("## 影響範囲")[1]
+    assert "Need-1" in text.split("## 影響範囲")[1]
 
 
 def test_load_revision_reads_the_previous_version(tmp_path: Path):
@@ -86,15 +86,15 @@ def test_load_revision_reads_the_previous_version(tmp_path: Path):
     git("config", "user.name", "t")
     definition = tmp_path / "requirements.py"
     definition.write_text(
-        HEADER + 'n = Need(id="N-1", text="早く精算したい")\n', encoding="utf-8"
+        HEADER + 'n = Need(id="Need-1", text="早く精算したい")\n', encoding="utf-8"
     )
     git("add", "requirements.py")
     git("commit", "-m", "first")
 
     definition.write_text(
         HEADER
-        + 'n = Need(id="N-1", text="もっと早く精算したい")\n'
-        + 'n2 = Need(id="N-2", text="紙をなくしたい")\n',
+        + 'n = Need(id="Need-1", text="もっと早く精算したい")\n'
+        + 'n2 = Need(id="Need-2", text="紙をなくしたい")\n',
         encoding="utf-8",
     )
 
@@ -103,8 +103,8 @@ def test_load_revision_reads_the_previous_version(tmp_path: Path):
     assert previous.ok and current.ok
 
     diff = diff_graphs(previous.graph, current.graph)
-    assert diff.added == ["N-2"]
-    assert diff.changed["N-1"][0].before == "早く精算したい"
+    assert diff.added == ["Need-2"]
+    assert diff.changed["Need-1"][0].before == "早く精算したい"
 
 
 def test_moving_a_definition_to_another_line_is_not_a_change(tmp_path: Path):
@@ -119,8 +119,8 @@ def test_moving_a_definition_to_another_line_is_not_a_change(tmp_path: Path):
     definition = tmp_path / "requirements.py"
     definition.write_text(
         HEADER
-        + 'n = Need(id="N-1", text="早く精算したい")\n'
-        + 'n2 = Need(id="N-2", text="紙をなくしたい")\n',
+        + 'n = Need(id="Need-1", text="早く精算したい")\n'
+        + 'n2 = Need(id="Need-2", text="紙をなくしたい")\n',
         encoding="utf-8",
     )
     git("add", "requirements.py")
@@ -130,15 +130,15 @@ def test_moving_a_definition_to_another_line_is_not_a_change(tmp_path: Path):
     definition.write_text(
         HEADER
         + "\n"
-        + 'n2 = Need(id="N-2", text="紙をなくしたい")\n'
+        + 'n2 = Need(id="Need-2", text="紙をなくしたい")\n'
         + "\n"
-        + 'n = Need(id="N-1", text="早く精算したい")\n',
+        + 'n = Need(id="Need-1", text="早く精算したい")\n',
         encoding="utf-8",
     )
 
     previous = load_revision([definition], "HEAD", repo=tmp_path)
     current = load_paths([definition])
-    assert previous.graph.location_of("N-1") != current.graph.location_of("N-1")
+    assert previous.graph.location_of("Need-1") != current.graph.location_of("Need-1")
 
     diff = diff_graphs(previous.graph, current.graph)
     assert diff.empty
@@ -160,14 +160,14 @@ def test_load_revision_tolerates_files_absent_in_the_revision(tmp_path: Path):
 def test_impact_set_splits_upstream_and_downstream():
     ancestors, descendants, whole = impact_set(chain(), ["FR-1"])
     #: 源泉エッジは既定で辿らないので S-1 は入らない。
-    assert descendants == {"N-1"}
+    assert descendants == {"Need-1"}
     assert ancestors == set()
     assert "FR-1" in whole
 
 
 def test_impact_set_reaches_sources_only_when_asked():
     _, descendants, _ = impact_set(chain(), ["FR-1"], include_sources=True)
-    assert descendants == {"N-1", "S-1"}
+    assert descendants == {"Need-1", "S-1"}
 
 
 def test_explain_text_contains_natural_language_and_edges():
@@ -175,14 +175,14 @@ def test_explain_text_contains_natural_language_and_edges():
     assert "# 影響部分グラフ: FR-1" in text
     assert "領収書を読み取ること" in text
     assert "受け入れ基準:" in text
-    assert "FR-1 --satisfies--> N-1" in text
+    assert "FR-1 --satisfies--> Need-1" in text
 
 
 def test_explain_text_carries_the_evidence():
     """LLM に渡る文脈で最も具体的なのは、何をもって満たしたと判断したかの側。"""
     s = source("S-1")
-    n = need("N-1", has_source=[s])
-    g = goal("G-1", motivates=[n], has_source=[s])
+    n = need("Need-1", has_source=[s])
+    g = goal("Goal-1", motivates=[n], has_source=[s])
     f = fr(
         "FR-1",
         satisfies=[n],
@@ -197,8 +197,8 @@ def test_explain_text_carries_the_evidence():
 def test_explain_undirected_reaches_the_goal():
     directed = explain_text(chain(), ["FR-1"])
     undirected = explain_text(chain(), ["FR-1"], undirected=True)
-    assert "G-1" not in directed
-    assert "G-1" in undirected
+    assert "Goal-1" not in directed
+    assert "Goal-1" in undirected
 
 
 def test_explain_reports_unknown_node():
@@ -295,7 +295,7 @@ def test_dot_leaves_out_sources_by_default():
 
 def test_mermaid_output_is_well_formed():
     text = render_mermaid(chain())
-    #: 識別子は ordered_nodes() の索引 (型順 → id 順) なので G-1 → N-1 → FR-1 → S-1。
+    #: 識別子は ordered_nodes() の索引 (型順 → id 順) なので Goal-1 → Need-1 → FR-1 → S-1。
     assert text.startswith("flowchart TD")
     assert 'n3["<b>FR-1</b> [FunctionalRequirement]' in text
     assert "n3 -->|satisfies| n2" in text
@@ -336,7 +336,7 @@ def test_quality_requirement_output_uses_requirement_shape():
 def collide():
     """記号だけが異なる id を持つノードの組。"""
     s = source("S-1")
-    n_dash = need("N-1", has_source=[s])
+    n_dash = need("Need-1", has_source=[s])
     n_under = need("N_1", has_source=[s])
     f_dash = fr("FR-1", satisfies=[n_dash], has_source=[s])
     f_dot = fr("FR.1", text="金額を表示すること", satisfies=[n_under], has_source=[s])
@@ -353,7 +353,7 @@ def test_ids_differing_only_in_punctuation_stay_separate_nodes():
         )
     )
 
-    assert set(declared) == {"N-1", "N_1", "FR-1", "FR.1", "S-1"}
+    assert set(declared) == {"Need-1", "N_1", "FR-1", "FR.1", "S-1"}
     #: 5 ノードに 5 つの識別子。1 つでも重なればノードが融合している。
     assert len(set(declared.values())) == 5
 
@@ -364,9 +364,9 @@ def test_edges_between_colliding_ids_keep_their_own_endpoints():
     dot = render_dot(graph)
     ids = {node.id: f"n{i}" for i, node in enumerate(graph.ordered_nodes(), 1)}
 
-    assert f"    {ids['FR-1']} -->|satisfies| {ids['N-1']}" in mermaid
+    assert f"    {ids['FR-1']} -->|satisfies| {ids['Need-1']}" in mermaid
     assert f"    {ids['FR.1']} -->|satisfies| {ids['N_1']}" in mermaid
-    assert f'{ids["FR-1"]} -> {ids["N-1"]} [label="satisfies"]' in dot
+    assert f'{ids["FR-1"]} -> {ids["Need-1"]} [label="satisfies"]' in dot
     assert f'{ids["FR.1"]} -> {ids["N_1"]} [label="satisfies"]' in dot
     #: 融合していれば同じ端点の行が 2 本出る (どちらも satisfies)。
     assert mermaid.count("-->|satisfies|") == 2

@@ -12,7 +12,7 @@ def test_counts_nodes_by_type_and_status():
         build(
             goal(),
             need(status="approved"),
-            fr(satisfies=["N-1"]),
+            fr(satisfies=["Need-1"]),
             qr(qualifies=["FR-1"], status="verified"),
             source(),
         )
@@ -35,7 +35,7 @@ def test_counts_edges_by_name():
         build(
             source(),
             need(has_source=["S-1"]),
-            fr(satisfies=["N-1"], has_source=["S-1"]),
+            fr(satisfies=["Need-1"], has_source=["S-1"]),
         )
     )
 
@@ -47,14 +47,14 @@ def test_counts_edges_by_name():
 
 def test_need_satisfaction_ratio_lists_the_uncovered():
     stats = collect_stats(
-        build(need("N-1"), need("N-2"), fr(satisfies=["N-1"]))
+        build(need("Need-1"), need("Need-2"), fr(satisfies=["Need-1"]))
     )
 
     ratio = stats.ratio("need_satisfied")
     assert ratio is not None
     assert (ratio.covered, ratio.total) == (1, 2)
     assert ratio.rate == 0.5
-    assert ratio.missing == ("N-2",)
+    assert ratio.missing == ("Need-2",)
 
 
 def test_evidence_ratios_are_split_by_type():
@@ -84,7 +84,7 @@ def test_source_trace_ratio_covers_the_same_types_as_missing_source():
 
     ratio = stats.ratio("source_traced")
     assert ratio.total == 5
-    assert ratio.missing == ("QR-1", "C-1")
+    assert ratio.missing == ("QR-1", "Constraint-1")
 
 
 def test_ratio_without_population_has_no_rate():
@@ -95,7 +95,7 @@ def test_ratio_without_population_has_no_rate():
 
 
 def test_ambiguity_density_counts_lexicon_findings():
-    stats = collect_stats(build(need(text="適切に精算したい"), need("N-2"), source()))
+    stats = collect_stats(build(need(text="適切に精算したい"), need("Need-2"), source()))
 
     assert stats.ambiguity is not None
     assert stats.ambiguity.findings == 1
@@ -122,7 +122,7 @@ def test_suppressed_findings_are_still_counted():
 
 def test_render_text_summary():
     text = render_stats(
-        collect_stats(build(goal(), need("N-1"), fr(satisfies=["N-1"]))),
+        collect_stats(build(goal(), need("Need-1"), fr(satisfies=["Need-1"]))),
         ["requirements.py"],
     )
 
@@ -132,17 +132,17 @@ def test_render_text_summary():
     assert "| Goal | 1 | 0 | 0 | 0 | 1 |" in text
     assert "| 計 | 3 | 0 | 0 | 0 | 3 |" in text
     assert "- Need の充足率 (satisfies されている): 100.0% (1/1)" in text
-    assert "- 源泉トレース率 (has_source を持つ要求): 0.0% (0/3) 未達: G-1, N-1, FR-1" in text
+    assert "- 源泉トレース率 (has_source を持つ要求): 0.0% (0/3) 未達: Goal-1, Need-1, FR-1" in text
 
 
 def test_render_truncates_a_long_list_of_uncovered_nodes():
-    text = render_stats(collect_stats(build(*[need(f"N-{i}") for i in range(1, 9)])))
+    text = render_stats(collect_stats(build(*[need(f"Need-{i}") for i in range(1, 9)])))
 
-    assert "未達: N-1, N-2, N-3, N-4, N-5, ほか 3 件" in text
+    assert "未達: Need-1, Need-2, Need-3, Need-4, Need-5, ほか 3 件" in text
 
 
 def test_json_shape():
-    payload = collect_stats(build(need("N-1"), fr(satisfies=["N-1"]))).to_json_obj()
+    payload = collect_stats(build(need("Need-1"), fr(satisfies=["Need-1"]))).to_json_obj()
 
     assert payload["totals"] == {"nodes": 2, "edges": 1}
     assert payload["nodes"]["by_type"]["Need"] == 1

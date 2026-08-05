@@ -43,24 +43,24 @@ export const HIDDEN_BY_DEFAULT = {
 };
 
 /**
- * G-1 --motivates--> N-1 <--satisfies-- FR-1 <--qualifies-- QR-1
+ * Goal-1 --motivates--> Need-1 <--satisfies-- FR-1 <--qualifies-- QR-1
  * 全ノードが SRC-1 を has_source で参照する。
  */
 export function fixture(overrides = {}) {
   const nodes = [
     {
       type: "Goal",
-      id: "G-1",
+      id: "Goal-1",
       text: "経費精算を速くする",
       status: "approved",
       has_source: ["SRC-1"],
       decomposition: "AND",
       refines: [],
-      motivates: ["N-1"],
+      motivates: ["Need-1"],
     },
     {
       type: "Need",
-      id: "N-1",
+      id: "Need-1",
       text: "領収書を撮影するだけで申請したい",
       status: "approved",
       has_source: ["SRC-1"],
@@ -73,7 +73,7 @@ export function fixture(overrides = {}) {
       has_source: ["SRC-1"],
       evidence: ["受入テスト第 1 回で正解率 96% だった"],
       acceptance_criteria: ["正解率が 95% 以上である"],
-      satisfies: ["N-1"],
+      satisfies: ["Need-1"],
       refines: [],
     },
     {
@@ -96,11 +96,11 @@ export function fixture(overrides = {}) {
   ];
 
   const edges = [
-    { source: "G-1", name: "has_source", target: "SRC-1" },
-    { source: "G-1", name: "motivates", target: "N-1" },
-    { source: "N-1", name: "has_source", target: "SRC-1" },
+    { source: "Goal-1", name: "has_source", target: "SRC-1" },
+    { source: "Goal-1", name: "motivates", target: "Need-1" },
+    { source: "Need-1", name: "has_source", target: "SRC-1" },
     { source: "FR-1", name: "has_source", target: "SRC-1" },
-    { source: "FR-1", name: "satisfies", target: "N-1" },
+    { source: "FR-1", name: "satisfies", target: "Need-1" },
     { source: "QR-1", name: "qualifies", target: "FR-1" },
   ];
 

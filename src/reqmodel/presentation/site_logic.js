@@ -1654,12 +1654,14 @@ export function bandedLayout(bands, placed, edges, direction) {
       let groupCursor = Math.min(
         ...placed.map((node) => sec(node) - secSize(node) / 2),
       );
+      const sectionBandIndexes = [];
       while (index < bands.length && bands[index].members) {
         const members = membersOf[index];
         if (!members.length) {
           index += 1;
           continue;
         }
+        sectionBandIndexes.push(index);
         for (const node of members) banded.add(node.id);
 
         let groupTo = sectionFrom;
@@ -1684,6 +1686,9 @@ export function bandedLayout(bands, placed, edges, direction) {
         sectionTo = Math.max(sectionTo, to);
         groupCursor = groupMax + BAND_GAP;
         index += 1;
+      }
+      for (const bandIndex of sectionBandIndexes) {
+        spans.get(bandIndex).to = sectionTo;
       }
       cursor = sectionTo + BAND_GAP;
       continue;

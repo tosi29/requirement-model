@@ -1,5 +1,5 @@
 /**
- * 静的サイトの表示層。DOM と Cytoscape.js に触るのはこのファイルだけ。
+ * 静的サイトの表示層。DOM と SVG に触るのはこのファイルだけ。
  *
  * 計算は `site_logic.js` の純関数に任せ、ここは「受け取った値を貼る」「イベントを
  * 繋ぐ」に徹する。`site.py` が両者をインライン化して 1 枚の HTML にする
@@ -24,10 +24,10 @@ import {
   encodeHash,
   escapeAttr,
   escapeHtml,
+  estimateTextWidth,
   explainCommand,
   focusSet,
   graphElements,
-  graphStyle,
   graphSvg,
   groupFindings,
   impactSets,
@@ -54,7 +54,8 @@ import {
   visibleBandKeys,
 } from "./site_logic.js";
 
-const cytoscape = window.cytoscape;
+const dagre = window.dagre;
+const SVG_NS = "http://www.w3.org/2000/svg";
 
 const DATA = JSON.parse(document.getElementById("model-data").textContent);
 
@@ -93,9 +94,9 @@ let state = decodeHash(initialHash(location.hash, readStore(VIEW_STORAGE_KEY)), 
 /** 絞り込みを反映した現在のグラフ。refresh() で作り直す。 */
 let view = createView(DATA, state);
 
-// --- Cytoscape.js -----------------------------------------------------------
+// --- SVG DOM ---------------------------------------------------------------
 //
-// グラフは 1 度だけ構築し、以後は要素の見せ消し (display) とクラスの付け替えだけを
+// グラフは <svg> 配下の DOM として 1 度だけ構築し、以後は属性と class の更新だけを
 // 行う。フィルタや選択でレイアウトを回さないので、ノードの位置が動かない。
 
 const graphEl = document.getElementById("graph");
@@ -110,67 +111,188 @@ const palette = () => ({
   muted: cssVar("--muted"),
 });
 
-let cy = null;
+let svg = null;
+let viewport = null;
+let graphLayer = null;
+let defs = null;
+let graph = null;
+let zoom = 1;
+let pan = { x: 0, y: 0 };
+const nodeItems = new Map();
+const edgeItemsByKey = new Map();
+const bandItems = new Map();
 
-/**
- * ラベル 1 行の実測幅 (px) を返す関数。ノードの外形を決めるのに使う。
- *
- * Cytoscape と同じ字体で canvas に測らせる (`LABEL_FONT` が両者の唯一の出典)。
- * canvas が使えない環境では undefined を返し、ロジック側の概算に任せる。
- * 同じ文字列を何度も測るので結果は覚えておく (152 ノードで数百回になる)。
- */
+function svgEl(name, attrs = {}) {
+  const element = document.createElementNS(SVG_NS, name);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value !== undefined && value !== null && value !== "") element.setAttribute(key, String(value));
+  }
+  return element;
+}
+
+function setAttrs(element, attrs) {
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value === undefined || value === null || value === "") element.removeAttribute(key);
+    else element.setAttribute(key, String(value));
+  }
+}
+
+function setTransform() {
+  if (graphLayer) graphLayer.setAttribute("transform", `translate(${pan.x} ${pan.y}) scale(${zoom})`);
+}
+
+function classed(element, name, enabled) {
+  element.classList.toggle(name, Boolean(enabled));
+}
+
+
 function labelMeasurer() {
   const context = document.createElement("canvas").getContext("2d");
-  if (!context) return undefined;
+  if (!context) return estimateTextWidth;
   context.font = `${LABEL_FONT.size}px ${LABEL_FONT.family}`;
-  const cache = new Map();
-  return (text) => {
-    let width = cache.get(text);
-    if (width === undefined) {
-      width = context.measureText(text).width;
-      cache.set(text, width);
-    }
-    return width;
-  };
+  return (text) => context.measureText(String(text)).width;
+}
+
+function renderLabel(parent, label, x, y, size = LABEL_FONT.size, weight = null) {
+  const lines = String(label).split("\n");
+  const step = size * LABEL_FONT.lineHeight;
+  const top = y - ((lines.length - 1) * step) / 2 + size * 0.35;
+  parent.replaceChildren();
+  for (const [index, line] of lines.entries()) {
+    const tspan = svgEl("tspan", { x, y: top + index * step });
+    tspan.textContent = line;
+    parent.append(tspan);
+  }
+  setAttrs(parent, {
+    "text-anchor": "middle",
+    "font-family": LABEL_FONT.family,
+    "font-size": size,
+    "font-weight": weight,
+  });
+}
+
+function shapeEl(shape) {
+  if (shape === "ellipse") return svgEl("ellipse");
+  if (["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape)) return svgEl("polygon");
+  return svgEl("rect");
+}
+
+const polygonPoints = (shape, w, h) => {
+  const points = {
+    hexagon: [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1],
+    rhomboid: [-1, -1, 0.333, -1, 1, 1, -0.333, 1],
+    diamond: [0, -1, 1, 0, 0, 1, -1, 0],
+    tag: [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1],
+  }[shape] || (() => { const c = Math.min(w, h) * 0.16; return [-1+c/(w/2),-1,1-c/(w/2),-1,1,-1+c/(h/2),1,1-c/(h/2),1-c/(w/2),1,-1+c/(w/2),1,-1,1-c/(h/2),-1,-1+c/(h/2)]; })();
+  return points.map((v, i) => (i % 2 ? (v * h) / 2 : (v * w) / 2)).join(" ");
+};
+
+function updateShape(element, shape, box) {
+  const { w, h } = box;
+  if (element.tagName === "ellipse") setAttrs(element, { cx: 0, cy: 0, rx: w / 2, ry: h / 2 });
+  else if (element.tagName === "polygon") setAttrs(element, { points: polygonPoints(shape, w, h) });
+  else setAttrs(element, { x: -w / 2, y: -h / 2, width: w, height: h, rx: shape === "round-rectangle" ? 8 : Math.min(w, h) * 0.3 });
 }
 
 function initGraph() {
-  try {
-    //: 初期レイアウトはコンストラクタに任せる (要素の計測が済んでから走る)。
-    //: 帯枠もこの dagre に混ざるが、孤立した小さなノードなので邪魔にならず、
-    //: 直後の applyBanding() が正しい位置と大きさに直す。
-    cy = cytoscape({
-      container: graphEl,
-      elements: graphElements(DATA, labelMeasurer()),
-      style: graphStyle(DATA.meta, palette()),
-      layout: layoutOptions(state.direction),
-      wheelSensitivity: 0.25,
-      minZoom: 0.1,
-      maxZoom: 3,
-    });
-  } catch (error) {
-    graphEl.innerHTML =
-      '<p class="empty">描画ライブラリ (Cytoscape.js / dagre) を読み込めなかった。図の元データは <a href="graph.mmd">graph.mmd</a> / <a href="graph.dot">graph.dot</a> にある。</p>';
+  if (!dagre) {
+    graphEl.innerHTML = '<p class="empty">描画ライブラリ (dagre) を読み込めなかった。図の元データは <a href="graph.mmd">graph.mmd</a> / <a href="graph.dot">graph.dot</a> にある。</p>';
     return;
   }
-  for (const name of DATA.meta.dashed_edges) {
-    cy.edges(`[name = "${name}"]`).addClass("dashed");
-  }
-  //: 帯枠は events: "no" なのでノードの tap は飛んでこない (クリックは素通り)。
-  cy.on("tap", "node", (event) => selectNode(event.target.id()));
-  cy.on("tap", (event) => {
-    if (event.target === cy && state.selected) selectNode(state.selected);
-  });
-  applyBanding();
-  fitInitial();
+  graph = graphElements(DATA, labelMeasurer());
+  graphEl.replaceChildren();
+  svg = svgEl("svg", { class: "req-graph", tabindex: 0, role: "img", "aria-label": DATA.title });
+  defs = svgEl("defs");
+  viewport = svgEl("rect", { class: "graph-bg", x: -100000, y: -100000, width: 200000, height: 200000 });
+  graphLayer = svgEl("g");
+  svg.append(defs, viewport, graphLayer);
+  graphEl.append(svg);
+  buildGraphDom();
+  bindPanZoom();
+  runLayout();
 }
 
-/**
- * いま表示している要素。絞り込みの状態はこちらが管理する `.hidden` クラスが
- * 唯一の出典なので、それを見る。`:visible` はスタイル計算が終わるまで
- * 一部の要素しか返さないことがあり (初期化直後)、レイアウト対象には使えない。
- */
-const shownElements = () => cy.elements().not(".hidden");
+function buildGraphDom() {
+  const pal = palette();
+  const arrow = svgEl("marker", { id: "req-arrow", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: "auto" });
+  arrow.append(svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: pal.border }));
+  defs.replaceChildren(arrow);
+
+  const edgeLayer = svgEl("g", { class: "edges" });
+  const bandLayer = svgEl("g", { class: "bands" });
+  const nodeLayer = svgEl("g", { class: "nodes" });
+  graphLayer.replaceChildren(bandLayer, edgeLayer, nodeLayer);
+
+  const dashedEdges = new Set(DATA.meta.dashed_edges || []);
+  for (const item of graph.filter((element) => element.data.source)) {
+    const line = svgEl("line", { class: "edge-line", "marker-end": "url(#req-arrow)" });
+    const label = svgEl("text", { class: "edge-label", "text-anchor": "middle" });
+    label.textContent = item.data.name;
+    const group = svgEl("g", { class: `edge ${dashedEdges.has(item.data.name) ? "dashed" : ""}`.trim(), "data-id": item.data.id });
+    group.append(line, label);
+    edgeLayer.append(group);
+    edgeItemsByKey.set(item.data.id, { ...item.data, group, line, label });
+  }
+
+  const types = DATA.meta.types || {};
+  const statuses = DATA.meta.statuses || {};
+  const impact = DATA.meta.impact_colors || {};
+  graphEl.style.setProperty("--impact-selected", impact.selected || pal.fg);
+  graphEl.style.setProperty("--impact-upstream", impact.upstream || pal.fg);
+  graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
+  graphEl.style.setProperty("--impact-related", impact.related || pal.fg);
+  graphEl.style.setProperty("--search-hit", (DATA.meta.search || {}).hit || pal.fg);
+  for (const item of graph.filter((element) => element.classes === "band")) {
+    const group = svgEl("g", { class: "node band", "data-id": item.data.id });
+    const shape = svgEl("rect", { class: "node-shape", rx: 8 });
+    const label = svgEl("text", { class: "node-label band-label" });
+    renderLabel(label, item.data.label, 0, -11, 11, "bold");
+    group.append(shape, label);
+    bandLayer.append(group);
+    bandItems.set(item.data.id, { ...item.data, x: 0, y: 0, w: 10, h: 10, group, shape, label });
+  }
+  for (const item of graph.filter((element) => !element.classes && !element.data.source)) {
+    const typeMeta = types[item.data.type] || {};
+    const statusMeta = statuses[item.data.status] || {};
+    const group = svgEl("g", { class: "node", "data-id": item.data.id, tabindex: 0 });
+    const shape = shapeEl(typeMeta.shape);
+    shape.classList.add("node-shape");
+    const label = svgEl("text", { class: "node-label" });
+    renderLabel(label, item.data.label, 0, 0);
+    group.append(shape, label);
+    group.addEventListener("click", () => selectNode(item.data.id));
+    group.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      chooseNode(item.data.id);
+    });
+    nodeLayer.append(group);
+    nodeItems.set(item.data.id, { ...item.data, shapeName: typeMeta.shape, statusMeta, x: 0, y: 0, group, shape, label });
+  }
+  restyleGraph();
+}
+
+function bindPanZoom() {
+  svg.addEventListener("click", (event) => {
+    if (event.target === svg || event.target === viewport) selectNode(state.selected);
+  });
+  let drag = null;
+  svg.addEventListener("pointerdown", (event) => {
+    if (event.target.closest(".node:not(.band)")) return;
+    drag = { x: event.clientX, y: event.clientY, pan: { ...pan } };
+    svg.setPointerCapture(event.pointerId);
+  });
+  svg.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    pan = { x: drag.pan.x + event.clientX - drag.x, y: drag.pan.y + event.clientY - drag.y };
+    setTransform();
+  });
+  svg.addEventListener("pointerup", () => (drag = null));
+  svg.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    zoomBy(event.deltaY < 0 ? 1.12 : 1 / 1.12);
+  }, { passive: false });
+}
 
 // --- フォーカス (近傍だけを描く) --------------------------------------------
 //
@@ -212,132 +334,135 @@ function syncFocusLayout() {
  * dagre の副軸方向の並びは保つので、「整列」のたびに図の形が大きく変わる
  * ことは無い。
  */
+function shownNodeItems() {
+  return [...nodeItems.values()].filter((item) => !item.group.classList.contains("hidden"));
+}
+
+function shownEdgeItems() {
+  return [...edgeItemsByKey.values()].filter((item) => !item.group.classList.contains("hidden"));
+}
+
+function shownBandItems() {
+  return [...bandItems.values()].filter((item) => !item.group.classList.contains("hidden"));
+}
+
+function moveItem(item, x, y) {
+  item.x = x;
+  item.y = y;
+  item.group.setAttribute("transform", `translate(${x} ${y})`);
+}
+
+function edgeEndpoint(from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (!dx && !dy) return { x: from.x, y: from.y };
+  const scale = Math.min(Math.abs((from.w / 2) / (dx || 1e-9)), Math.abs((from.h / 2) / (dy || 1e-9)));
+  return { x: from.x + dx * scale, y: from.y + dy * scale };
+}
+
+function updateEdges() {
+  for (const edge of edgeItemsByKey.values()) {
+    const source = nodeItems.get(edge.source);
+    const target = nodeItems.get(edge.target);
+    if (!source || !target) continue;
+    const from = edgeEndpoint(source, target);
+    const to = edgeEndpoint(target, source);
+    setAttrs(edge.line, { x1: from.x, y1: from.y, x2: to.x, y2: to.y });
+    setAttrs(edge.label, { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 });
+    edge.x1 = from.x; edge.y1 = from.y; edge.x2 = to.x; edge.y2 = to.y;
+  }
+}
+
+/** Goal / Need の帯を図の上 (LR なら左) に並べ直し、枠を掛け直す。 */
 function applyBanding() {
-  if (!cy) return;
+  if (!svg) return;
   const bands = bandDefs(DATA);
   if (!bands.length) return;
-  const placed = [];
-  shownElements().nodes().not(".band").forEach((element) => {
-    const position = element.position();
-    placed.push({
-      id: element.id(),
-      type: element.data("type"),
-      x: position.x,
-      y: position.y,
-      w: element.outerWidth(),
-      h: element.outerHeight(),
-    });
-  });
+  const placed = shownNodeItems().map((item) => ({
+    id: item.id, type: item.type, x: item.x, y: item.y, w: item.w, h: item.h,
+  }));
   if (!placed.length) return;
   const { positions, frames } = bandedLayout(bands, placed, view.edges, state.direction);
-  cy.batch(() => {
-    for (const [id, position] of positions) cy.getElementById(id).position(position);
-    for (const [key, frame] of frames) {
-      const element = cy.getElementById(bandId(key));
-      if (element.empty()) continue;
-      element.data({ w: frame.w, h: frame.h });
-      element.position({ x: frame.x, y: frame.y });
-    }
-  });
+  for (const [id, position] of positions) {
+    const item = nodeItems.get(id);
+    if (item) moveItem(item, position.x, position.y);
+  }
+  for (const [key, frame] of frames) {
+    const item = bandItems.get(bandId(key));
+    if (!item) continue;
+    item.w = frame.w; item.h = frame.h;
+    updateShape(item.shape, "round-rectangle", item);
+    moveItem(item, frame.x, frame.y);
+    setAttrs(item.label, { y: -item.h / 2 - 6 });
+  }
+  updateEdges();
 }
 
 /** dagre → 帯の並べ直し → 倍率合わせ。初期表示・「整列」・向きの変更が通る。 */
 function runLayout() {
-  if (!cy) return;
-  shownElements().not(".band").layout(layoutOptions(state.direction)).run();
+  if (!svg) return;
+  const g = new dagre.graphlib.Graph();
+  const opts = layoutOptions(state.direction);
+  g.setGraph({ rankdir: opts.rankDir, nodesep: opts.nodeSep, ranksep: opts.rankSep, edgesep: opts.edgeSep });
+  g.setDefaultEdgeLabel(() => ({}));
+  const nodes = new Set(shownNodeItems().map((item) => item.id));
+  for (const item of shownNodeItems()) g.setNode(item.id, { width: item.w, height: item.h });
+  for (const edge of view.edges) if (nodes.has(edge.source) && nodes.has(edge.target)) g.setEdge(edge.source, edge.target);
+  dagre.layout(g);
+  for (const id of g.nodes()) {
+    const pos = g.node(id);
+    const item = nodeItems.get(id);
+    if (item) moveItem(item, pos.x, pos.y);
+  }
   applyBanding();
   fitInitial();
 }
 
 /** 絞り込みの反映。再レイアウトはせず、表示・非表示だけを切り替える。 */
 function applyVisibility() {
-  if (!cy) return;
+  if (!svg) return;
   const focused = focusedIds();
   const shown = focused ? view.nodes.filter((node) => focused.has(node.id)) : view.nodes;
   const nodes = new Set(shown.map((node) => node.id));
-  //: 端点が描かれないエッジは描かない (絞り込みでの扱いと同じ)。
-  const edges = new Set(
-    view.edges.filter((edge) => nodes.has(edge.source) && nodes.has(edge.target)),
-  );
+  const edges = new Set(view.edges.filter((edge) => nodes.has(edge.source) && nodes.has(edge.target)));
   const visibleBands = visibleBandKeys(DATA, shown);
-  cy.batch(() => {
-    cy.nodes().not(".band").forEach((element) => {
-      element.toggleClass("hidden", !nodes.has(element.id()));
-    });
-    //: 帯枠は、その帯に属する表示中ノードが 1 つも無いときだけ隠す。
-    cy.nodes(".band").forEach((element) => {
-      element.toggleClass("hidden", !visibleBands.has(element.data("bandKey")));
-    });
-    cy.edges().forEach((element) => {
-      element.toggleClass("hidden", !edges.has(DATA.edges[element.data("index")]));
-    });
-  });
+  for (const item of nodeItems.values()) classed(item.group, "hidden", !nodes.has(item.id));
+  for (const item of bandItems.values()) classed(item.group, "hidden", !visibleBands.has(item.bandKey));
+  for (const item of edgeItemsByKey.values()) classed(item.group, "hidden", !edges.has(DATA.edges[item.index]));
   applyBanding();
 }
 
-/**
- * 影響範囲の色分け。クラスの付け替えだけで済む。
- *
- * 範囲は state の深さ・向きの設定 (`impactSets()`) で決まる。設定を変えても
- * 描く要素は変わらないので、再レイアウトは走らない。
- */
 function applyHighlight() {
-  if (!cy) return;
-  cy.batch(() => {
-    cy.elements().removeClass("sel up down rel dim on-path");
-    if (!state.selected || !view.byId.has(state.selected)) return;
-    const { upstream, downstream, whole, undirected } = impactSets(view, state.selected);
-    //: 帯枠は減光の対象にしない (子の強調が読めるよう、枠は常に薄いまま)。
-    cy.nodes().not(".band").forEach((element) => {
-      const id = element.id();
-      if (id === state.selected) element.addClass("sel");
-      //: 無向のときは上流/下流を分けない (CLI と同じく 1 つの「関連」)。
-      else if (undirected) element.addClass(downstream.has(id) ? "rel" : "dim");
-      else if (upstream.has(id)) element.addClass("up");
-      else if (downstream.has(id)) element.addClass("down");
-      else element.addClass("dim");
-    });
-    cy.edges().forEach((element) => {
-      const linked =
-        whole.has(element.data("source")) && whole.has(element.data("target"));
-      element.addClass(linked ? "on-path" : "dim");
-    });
-  });
+  if (!svg) return;
+  for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()]) item.group.classList.remove("sel", "up", "down", "rel", "dim", "on-path");
+  if (!state.selected || !view.byId.has(state.selected)) return;
+  const { upstream, downstream, whole, undirected } = impactSets(view, state.selected);
+  for (const item of nodeItems.values()) {
+    if (item.id === state.selected) item.group.classList.add("sel");
+    else if (undirected) item.group.classList.add(downstream.has(item.id) ? "rel" : "dim");
+    else if (upstream.has(item.id)) item.group.classList.add("up");
+    else if (downstream.has(item.id)) item.group.classList.add("down");
+    else item.group.classList.add("dim");
+  }
+  for (const item of edgeItemsByKey.values()) {
+    const linked = whole.has(item.source) && whole.has(item.target);
+    item.group.classList.add(linked ? "on-path" : "dim");
+  }
 }
 
 // --- 検索のグラフ連動 -------------------------------------------------------
-//
-// 検索は左の一覧を絞るだけでは足りない。ヒットしたノードが図のどこにあるかが
-// 分からないと、1 件ずつ選んで確かめることになる。図の上でも暈し (underlay) で
-// 示し、↑↓ で候補を送れるようにする。
-//
-// 暈しは影響範囲の色分け (枠線) とは別の視覚チャンネルなので、両方が同時に
-// 点いても読み分けられる。
-
-//: ↑↓ で送っている最中の候補。URL には載せない (選択とは別で、履歴に残す
-//: ほどの状態ではない)。検索語が変わると先頭に戻る。
 let cursor = null;
-
-/** いまの検索語にヒットするノードの id (一覧と同じ並び)。 */
 const hits = () => searchHits(view, state.query);
 
-/** 検索ヒットの暈し。影響範囲のクラスとは独立に付け外しする。 */
 function applySearchHits() {
-  if (!cy) return;
+  if (!svg) return;
   const matched = new Set(hits());
-  cy.batch(() => {
-    cy.nodes().not(".band").forEach((element) => {
-      const id = element.id();
-      element.toggleClass("hit", matched.has(id));
-      element.toggleClass("hit-current", id === cursor);
-    });
-  });
+  for (const item of nodeItems.values()) {
+    classed(item.group, "hit", matched.has(item.id));
+    classed(item.group, "hit-current", item.id === cursor);
+  }
 }
 
-/**
- * ↑↓ で候補を送る。図では現在の候補を強く出し、画面外ならそこまでパンする。
- * 選択 (state.selected) は動かさない。決めるのは Enter。
- */
 function moveCursor(delta) {
   const next = stepHit(hits(), cursor, delta);
   if (next === null) return;
@@ -349,60 +474,65 @@ function moveCursor(delta) {
   if (active) active.scrollIntoView({ block: "nearest" });
 }
 
-/** 表示中のノードだけで並べ直す。方向を変えたときと「整列」ボタンから呼ぶ。 */
-function relayout() {
-  runLayout();
+function relayout() { runLayout(); }
+
+function graphBox() {
+  const boxes = [...shownNodeItems(), ...shownBandItems()];
+  if (!boxes.length) return { x1: 0, y1: 0, x2: 1, y2: 1 };
+  return {
+    x1: Math.min(...boxes.map((box) => box.x - box.w / 2)),
+    y1: Math.min(...boxes.map((box) => box.y - box.h / 2)),
+    x2: Math.max(...boxes.map((box) => box.x + box.w / 2)),
+    y2: Math.max(...boxes.map((box) => box.y + box.h / 2)),
+  };
 }
 
 function fitToView() {
-  if (cy) cy.fit(shownElements(), 18);
+  if (!svg) return;
+  const box = graphBox();
+  const width = graphEl.clientWidth || 800;
+  const height = graphEl.clientHeight || 480;
+  zoom = Math.min((width - 36) / (box.x2 - box.x1 || 1), (height - 36) / (box.y2 - box.y1 || 1));
+  pan = { x: 18 - box.x1 * zoom, y: 18 - box.y1 * zoom };
+  setTransform();
 }
 
-//: これ以上縮めると文字が読めなくなる倍率。
 const MIN_READABLE_ZOOM = 0.45;
-
-/** 全体表示。ただし極端に横長のグラフでは縮めすぎず、左上から見せる。 */
 function fitInitial() {
-  if (!cy) return;
   fitToView();
-  if (cy.zoom() >= MIN_READABLE_ZOOM) return;
-  const box = shownElements().boundingBox();
-  cy.zoom(MIN_READABLE_ZOOM);
-  cy.pan({ x: 18 - box.x1 * MIN_READABLE_ZOOM, y: 18 - box.y1 * MIN_READABLE_ZOOM });
+  if (zoom >= MIN_READABLE_ZOOM) return;
+  const box = graphBox();
+  zoom = MIN_READABLE_ZOOM;
+  pan = { x: 18 - box.x1 * zoom, y: 18 - box.y1 * zoom };
+  setTransform();
 }
 
-//: 選択ノードの周りに最低限空けておきたい余白 (画面 px)。端に半分掛かっている
-//: 状態を「見えている」と扱わないための遊び。
 const REVEAL_MARGIN_PX = 40;
-
-//: パン先が分かる程度に短いアニメーション。
-const REVEAL_DURATION_MS = 180;
-
-/**
- * 指定ノードが表示範囲の外にあるときだけ、そこまでパンする。
- * 倍率は変えない。既に見えているノードなら動かない
- * (グラフ上のノードを直接クリックしたときはこちらに来る)。
- */
 function revealNode(id) {
-  if (!cy || state.mode !== "graph") return;
-  if (!id || !view.byId.has(id)) return;
-  const node = cy.getElementById(id);
-  if (node.empty() || node.hasClass("hidden")) return;
-  if (isNodeVisible(cy.extent(), node.boundingBox(), REVEAL_MARGIN_PX / cy.zoom())) return;
-  cy.stop();
-  cy.animate({ center: { eles: node } }, { duration: REVEAL_DURATION_MS });
+  if (!svg || state.mode !== "graph") return;
+  const item = nodeItems.get(id);
+  if (!item || item.group.classList.contains("hidden")) return;
+  const extent = { x1: -pan.x / zoom, y1: -pan.y / zoom, x2: (graphEl.clientWidth - pan.x) / zoom, y2: (graphEl.clientHeight - pan.y) / zoom };
+  const box = { x1: item.x - item.w / 2, y1: item.y - item.h / 2, x2: item.x + item.w / 2, y2: item.y + item.h / 2 };
+  if (isNodeVisible(extent, box, REVEAL_MARGIN_PX / zoom)) return;
+  pan = { x: graphEl.clientWidth / 2 - item.x * zoom, y: graphEl.clientHeight / 2 - item.y * zoom };
+  setTransform();
 }
-
-/** 選択ノードを表示範囲に入れる。選択が変わったときの追従。 */
 const revealSelected = () => revealNode(state.selected);
 
 function zoomBy(factor) {
-  if (!cy) return;
-  cy.zoom({
-    level: cy.zoom() * factor,
-    renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 },
-  });
+  if (!svg) return;
+  const next = Math.max(0.1, Math.min(3, zoom * factor));
+  const cx = (graphEl.clientWidth || 800) / 2;
+  const cy = (graphEl.clientHeight || 480) / 2;
+  const mx = (cx - pan.x) / zoom;
+  const my = (cy - pan.y) / zoom;
+  zoom = next;
+  pan = { x: cx - mx * zoom, y: cy - my * zoom };
+  setTransform();
 }
+
+// --- 詳細パネル ------------------------------------------------------------
 
 // --- 詳細パネル ------------------------------------------------------------
 
@@ -900,7 +1030,6 @@ function setMode(mode) {
     return;
   }
   // 隠している間にコンテナの大きさが変わっているので、測り直してから追従する。
-  if (cy) cy.resize();
   revealSelected();
 }
 
@@ -1049,7 +1178,7 @@ document.getElementById("relayout").addEventListener("click", relayout);
 document.getElementById("zoom-in").addEventListener("click", () => zoomBy(1.2));
 document.getElementById("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
 document.getElementById("zoom-reset").addEventListener("click", () => {
-  if (cy) cy.zoom(1);
+  if (svg) { zoom = 1; pan = { x: 0, y: 0 }; setTransform(); }
 });
 document.getElementById("zoom-fit").addEventListener("click", fitToView);
 
@@ -1070,9 +1199,33 @@ function applyTheme() {
   restyleGraph();
 }
 
-/** テーマ依存の色を Cytoscape に入れ直す。 */
+/** テーマ依存の色を SVG に入れ直す。 */
 function restyleGraph() {
-  if (cy) cy.style(graphStyle(DATA.meta, palette()));
+  if (!svg) return;
+  const pal = palette();
+  graphEl.style.setProperty("--graph-fg", pal.fg);
+  graphEl.style.setProperty("--graph-bg", pal.bg);
+  graphEl.style.setProperty("--graph-panel", pal.panel);
+  graphEl.style.setProperty("--graph-border", pal.border);
+  graphEl.style.setProperty("--graph-muted", pal.muted);
+  const arrow = defs?.querySelector("#req-arrow path");
+  if (arrow) arrow.setAttribute("fill", pal.border);
+  const types = DATA.meta.types || {};
+  const statuses = DATA.meta.statuses || {};
+  const impact = DATA.meta.impact_colors || {};
+  graphEl.style.setProperty("--impact-selected", impact.selected || pal.fg);
+  graphEl.style.setProperty("--impact-upstream", impact.upstream || pal.fg);
+  graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
+  graphEl.style.setProperty("--impact-related", impact.related || pal.fg);
+  graphEl.style.setProperty("--search-hit", (DATA.meta.search || {}).hit || pal.fg);
+  for (const item of nodeItems.values()) {
+    const typeMeta = types[item.type] || {};
+    const statusMeta = statuses[item.status] || {};
+    item.shapeName = typeMeta.shape;
+    updateShape(item.shape, item.shapeName, item);
+    setAttrs(item.shape, { fill: typeMeta.fill, stroke: typeMeta.stroke, "stroke-width": statusMeta.border_width || 1.5, "stroke-dasharray": statusMeta.border_style === "dashed" ? "6 4" : statusMeta.border_style === "dotted" ? "1 3" : "" });
+  }
+  for (const item of bandItems.values()) setAttrs(item.shape, { fill: item.bandType === "RequirementGroup" ? pal.panel : (types[item.bandType] || {}).fill, stroke: (types[item.bandType] || {}).stroke || pal.border });
 }
 
 themeButton.addEventListener("click", () => {
@@ -1099,49 +1252,21 @@ function download(name, text, type) {
 }
 
 /**
- * SVG に写すための実測値。位置・大きさ・折り返し済みのラベルは Cytoscape が
+ * SVG に写すための実測値。位置・大きさ・折り返し済みのラベルは表示層が
  * 持っているので、ここで集めて `graphSvg()` に渡す (組み立てはロジック層)。
  */
 function currentScene() {
-  if (!cy) return null;
-  const nodes = [];
-  const bands = [];
-  shownElements().nodes().forEach((element) => {
-    const position = element.position();
-    const box = {
-      x: position.x,
-      y: position.y,
-      w: element.outerWidth(),
-      h: element.outerHeight(),
-    };
-    if (element.hasClass("band")) {
-      bands.push({ ...box, type: element.data("bandType"), label: element.data("label") });
-    } else {
-      nodes.push({
-        ...box,
-        id: element.id(),
-        type: element.data("type"),
-        status: element.data("status"),
-        label: element.data("label"),
-      });
-    }
-  });
+  if (!svg) return null;
+  const nodes = shownNodeItems().map((item) => ({
+    id: item.id, type: item.type, status: item.status, label: item.label, x: item.x, y: item.y, w: item.w, h: item.h,
+  }));
+  const bands = shownBandItems().map((item) => ({
+    type: item.bandType, label: item.label, x: item.x, y: item.y, w: item.w, h: item.h,
+  }));
   const dashed = new Set(DATA.meta.dashed_edges);
-  const edges = shownElements()
-    .edges()
-    .map((element) => {
-      //: 端点はノードの縁の座標 (Cytoscape が矢印を描いている位置)。
-      const from = element.sourceEndpoint();
-      const to = element.targetEndpoint();
-      return {
-        name: element.data("name"),
-        dashed: dashed.has(element.data("name")),
-        x1: from.x,
-        y1: from.y,
-        x2: to.x,
-        y2: to.y,
-      };
-    });
+  const edges = shownEdgeItems().map((item) => ({
+    name: item.name, dashed: dashed.has(item.name), x1: item.x1, y1: item.y1, x2: item.x2, y2: item.y2,
+  }));
   return { nodes, edges, bands, meta: DATA.meta, palette: palette(), title: DATA.title };
 }
 
@@ -1213,7 +1338,7 @@ window.addEventListener("hashchange", applyHash);
 applyTheme();
 initGraph();
 //: 描画ライブラリを読めなかったときは、写す図が無い。
-exportSvg.disabled = !cy;
+exportSvg.disabled = !svg;
 renderFilters();
 renderFocusOptions();
 renderImpactControls();

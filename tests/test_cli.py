@@ -323,3 +323,16 @@ def test_missing_definition_file_is_reported(tmp_path: Path, capsys, monkeypatch
     monkeypatch.chdir(tmp_path)
     assert main(["validate"]) == 2
     assert "定義ファイルが見つからない" in capsys.readouterr().err
+
+
+def test_graph_uses_requirement_groups_from_definition(tmp_path: Path, capsys):
+    definition = tmp_path / "requirements.py"
+    definition.write_text(
+        "from reqmodel import FunctionalRequirement, RequirementGroup\n"
+        'FR = FunctionalRequirement(id="FR-1", text="金額を表示すること")\n'
+        'GROUP = RequirementGroup(id="input", label="入力", members=[FR])\n',
+        encoding="utf-8",
+    )
+
+    assert main(["graph", str(definition)]) == 0
+    assert "subgraph group_input[入力]" in capsys.readouterr().out

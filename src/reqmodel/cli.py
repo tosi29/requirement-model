@@ -1,13 +1,13 @@
 """`req` コマンド。
 
-    req validate           # 層0〜層2 の全チェック
-    req plan               # git 上の前版との構造 diff → 影響範囲
-    req graph [--format mermaid|dot]
-    req explain <ID...>    # 影響部分グラフをテキスト化 (LLM コンテキスト用)
-    req doc                # 仕様書 / トレーサビリティ表の生成
-    req stats              # モデルの健全性メトリクス
-    req export             # 正規化 JSON の出力
-    req site               # 閲覧用の静的サイト生成 (GitHub Pages 用)
+req validate           # 層0〜層2 の全チェック
+req plan               # git 上の前版との構造 diff → 影響範囲
+req graph [--format mermaid|dot]
+req explain <ID...>    # 影響部分グラフをテキスト化 (LLM コンテキスト用)
+req doc                # 仕様書 / トレーサビリティ表の生成
+req stats              # モデルの健全性メトリクス
+req export             # 正規化 JSON の出力
+req site               # 閲覧用の静的サイト生成 (GitHub Pages 用)
 """
 
 from __future__ import annotations
@@ -367,6 +367,7 @@ def cmd_graph(args: argparse.Namespace) -> int:
             args.max_label,
             highlight,
             args.with_sources,
+            result.requirement_groups,
         ),
         args.output,
     )

@@ -23,9 +23,15 @@ __all__ = ["render_mermaid", "render_dot", "render_meta", "FORMATS"]
 FORMATS = ("mermaid", "dot")
 
 from .styles import (
-    _DOT_SHAPE, _EDGE_STYLE_MERMAID, _MERMAID_CLASSDEF, _MERMAID_SHAPE,
-    _mermaid_shape_of_type, render_meta,
+    _DOT_SHAPE,
+    _EDGE_STYLE_MERMAID,
+    _MERMAID_CLASSDEF,
+    _MERMAID_SHAPE,
+    _mermaid_shape_of_type,
+    render_meta,
 )
+from .view import RequirementGroup
+
 
 def _truncate(text: str, limit: int) -> str:
     text = " ".join(text.split())
@@ -91,17 +97,46 @@ def _mermaid_escape(text: str) -> str:
     )
 
 
+def _requirement_group_members(
+    nodes: Iterable[Node], requirement_groups: Iterable[RequirementGroup]
+) -> tuple[list[tuple[str, str, list[str]]], list[str]]:
+    """表示用グループごとの主所属と未分類要求。
+
+    同じ要求が複数グループに書かれても、描くのは最初のグループだけにする。
+    """
+    requirement_ids = {
+        node.id
+        for node in nodes
+        if isinstance(node, (FunctionalRequirement, QualityRequirement, Constraint))
+    }
+    assigned: set[str] = set()
+    groups: list[tuple[str, str, list[str]]] = []
+    for group in sorted(requirement_groups, key=lambda item: (item.order, item.id)):
+        members: list[str] = []
+        for member in group.members:
+            node_id = str(member)
+            if node_id not in requirement_ids or node_id in assigned:
+                continue
+            assigned.add(node_id)
+            members.append(node_id)
+        if members:
+            groups.append((group.id, group.label, members))
+    return groups, sorted(requirement_ids - assigned)
+
+
 def render_mermaid(
     graph: RequirementGraph,
     max_label: int = 40,
     highlight: Iterable[str] | None = None,
     include_sources: bool = False,
+    requirement_groups: Iterable[RequirementGroup] = (),
 ) -> str:
     lines = ["flowchart TD"]
     highlighted = set(highlight or ())
     nodes, drawn_edges = _drawn(graph, include_sources)
     ids = _ids(nodes)
 
+    node_lines: dict[str, str] = {}
     for node in nodes:
         open_shape, close_shape = _mermaid_shape(node)
         type_name = type(node).__name__
@@ -111,18 +146,60 @@ def render_mermaid(
                 _mermaid_escape(_truncate(node.text, max_label)),
             ]
         )
-        lines.append(
-            f'    {ids[node.id]}{open_shape}"{label}"{close_shape}'
+        node_lines[node.id] = f'{ids[node.id]}{open_shape}"{label}"{close_shape}'
+
+    declared_groups = tuple(requirement_groups)
+    groups, unclassified = _requirement_group_members(nodes, declared_groups)
+    use_group_layout = bool(declared_groups)
+    grouped = (
+        (
+            {node_id for _, _, members in groups for node_id in members}
+            | set(unclassified)
         )
+        if use_group_layout
+        else set()
+    )
+    bands = [
+        ("Goal", "Goal", [node.id for node in nodes if isinstance(node, Goal)]),
+        ("Need", "Need", [node.id for node in nodes if isinstance(node, Need)]),
+    ]
+    if use_group_layout:
+        for key, label, members in bands:
+            if not members:
+                continue
+            lines.append(f"    subgraph band_{key}[{label}]")
+            lines.append("        direction LR")
+            for node_id in members:
+                lines.append(f"        {node_lines[node_id]}")
+            lines.append("    end")
+    if use_group_layout:
+        lines.append("    subgraph band_Requirements[Requirements]")
+        lines.append("        direction LR")
+        for group_id, label, members in groups:
+            lines.append(f"        subgraph group_{group_id}[{_mermaid_escape(label)}]")
+            lines.append("            direction TB")
+            for node_id in members:
+                lines.append(f"            {node_lines[node_id]}")
+            lines.append("        end")
+        if unclassified:
+            lines.append("        subgraph group___unclassified__[未分類]")
+            lines.append("            direction TB")
+            for node_id in unclassified:
+                lines.append(f"            {node_lines[node_id]}")
+            lines.append("        end")
+        lines.append("    end")
+    for node in nodes:
+        if not use_group_layout or (
+            node.id not in grouped and not isinstance(node, (Goal, Need))
+        ):
+            lines.append(f"    {node_lines[node.id]}")
 
     lines.append("")
     for edge in drawn_edges:
         if edge.source not in ids or edge.target not in ids:
             continue
         arrow = _EDGE_STYLE_MERMAID.get(edge.name, "-->")
-        lines.append(
-            f"    {ids[edge.source]} {arrow}|{edge.name}| {ids[edge.target]}"
-        )
+        lines.append(f"    {ids[edge.source]} {arrow}|{edge.name}| {ids[edge.target]}")
 
     lines.append("")
     for type_name, style in _MERMAID_CLASSDEF.items():
@@ -148,6 +225,7 @@ def render_dot(
     max_label: int = 40,
     highlight: Iterable[str] | None = None,
     include_sources: bool = False,
+    requirement_groups: Iterable[RequirementGroup] = (),
 ) -> str:
     highlighted = set(highlight or ())
     lines = [
@@ -158,6 +236,7 @@ def render_dot(
     ]
     nodes, drawn_edges = _drawn(graph, include_sources)
     ids = _ids(nodes)
+    node_lines: dict[str, str] = {}
     for node in nodes:
         shape = _dot_shape_of(node)
         label = _dot_escape(
@@ -166,7 +245,55 @@ def render_dot(
         node_attrs = f'shape={shape}, label="{label}"'
         if node.id in highlighted:
             node_attrs += ', color="#d93025", penwidth=2'
-        lines.append(f"    {ids[node.id]} [{node_attrs}];")
+        node_lines[node.id] = f"{ids[node.id]} [{node_attrs}];"
+
+    declared_groups = tuple(requirement_groups)
+    groups, unclassified = _requirement_group_members(nodes, declared_groups)
+    use_group_layout = bool(declared_groups)
+    grouped = (
+        (
+            {node_id for _, _, members in groups for node_id in members}
+            | set(unclassified)
+        )
+        if use_group_layout
+        else set()
+    )
+    if use_group_layout:
+        for name, label, members in [
+            ("Goal", "Goal", [node.id for node in nodes if isinstance(node, Goal)]),
+            ("Need", "Need", [node.id for node in nodes if isinstance(node, Need)]),
+        ]:
+            if not members:
+                continue
+            lines.append(f"    subgraph cluster_{name} {{")
+            lines.append(f'        label="{label}";')
+            lines.append("        rank=same;")
+            for node_id in members:
+                lines.append(f"        {node_lines[node_id]}")
+            lines.append("    }")
+    if use_group_layout:
+        lines.append("    subgraph cluster_Requirements {")
+        lines.append('        label="Requirements";')
+        for group_id, label, members in groups:
+            lines.append(f"        subgraph cluster_group_{group_id} {{")
+            lines.append(f'            label="{_dot_escape(label)}";')
+            lines.append("            rank=same;")
+            for node_id in members:
+                lines.append(f"            {node_lines[node_id]}")
+            lines.append("        }")
+        if unclassified:
+            lines.append("        subgraph cluster_group___unclassified__ {")
+            lines.append('            label="未分類";')
+            lines.append("            rank=same;")
+            for node_id in unclassified:
+                lines.append(f"            {node_lines[node_id]}")
+            lines.append("        }")
+        lines.append("    }")
+    for node in nodes:
+        if not use_group_layout or (
+            node.id not in grouped and not isinstance(node, (Goal, Need))
+        ):
+            lines.append(f"    {node_lines[node.id]}")
 
     for edge in drawn_edges:
         if edge.source not in ids or edge.target not in ids:
@@ -188,9 +315,14 @@ def render(
     max_label: int = 40,
     highlight: Iterable[str] | None = None,
     include_sources: bool = False,
+    requirement_groups: Iterable[RequirementGroup] = (),
 ) -> str:
     if fmt == "mermaid":
-        return render_mermaid(graph, max_label, highlight, include_sources)
+        return render_mermaid(
+            graph, max_label, highlight, include_sources, requirement_groups
+        )
     if fmt == "dot":
-        return render_dot(graph, max_label, highlight, include_sources)
+        return render_dot(
+            graph, max_label, highlight, include_sources, requirement_groups
+        )
     raise ValueError(f"未対応の形式: {fmt}")

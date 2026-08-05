@@ -23,8 +23,8 @@ _PALETTE: dict[str, tuple[str, str]] = {
     "Goal": ("#e8f0fe", "#3b6fd4"),
     "Need": ("#e9f7ef", "#2f9e5f"),
     "FunctionalRequirement": ("#fff8e1", "#c9971c"),
-    "QualityRequirement": ("#fdeef4", "#c2557f"),
-    "Constraint": ("#f2f2f2", "#777777"),
+    "QualityRequirement": ("#f3e8ff", "#7e57c2"),
+    "Constraint": ("#fdecea", "#b94a48"),
     "Source": ("#ffffff", "#999999"),
 }
 

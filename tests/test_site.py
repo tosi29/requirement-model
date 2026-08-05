@@ -29,8 +29,8 @@ SAMPLE = str(Path(__file__).resolve().parents[1] / "examples" / "sample.py")
 
 def chain():
     s = source("S-1")
-    n = need("N-1", has_source=[s])
-    g = goal("G-1", motivates=[n], has_source=[s])
+    n = need("Need-1", has_source=[s])
+    g = goal("Goal-1", motivates=[n], has_source=[s])
     f = fr("FR-1", satisfies=[n], has_source=[s])
     return build(s, n, g, f)
 
@@ -49,8 +49,8 @@ def test_site_data_contains_graph_findings_and_render_meta():
 
     assert data["title"] == "題名"
     assert data["generated_from"] == ["a.py"]
-    assert {n["id"] for n in data["nodes"]} == {"S-1", "N-1", "G-1", "FR-1"}
-    assert {"source": "FR-1", "name": "satisfies", "target": "N-1"} in data["edges"]
+    assert {n["id"] for n in data["nodes"]} == {"S-1", "Need-1", "Goal-1", "FR-1"}
+    assert {"source": "FR-1", "name": "satisfies", "target": "Need-1"} in data["edges"]
     assert data["stats"]["nodes"] == 4
     assert data["meta"]["types"]["Goal"]["shape"] == "hexagon"
     assert data["meta"]["types"]["Goal"]["fill"].startswith("#")
@@ -165,13 +165,13 @@ def test_site_data_carries_status_of_every_node():
     """status フィルタの材料はノードにそのまま入っている。"""
     graph = build(
         source("S-1"),
-        need("N-1", status="approved", has_source=[source("S-1")]),
+        need("Need-1", status="approved", has_source=[source("S-1")]),
         fr("FR-1", status="verified", has_source=[source("S-1")]),
     )
     data = site_data(graph, FindingList(), "題名", ["a.py"])
     by_id = {node["id"]: node for node in data["nodes"]}
 
-    assert by_id["N-1"]["status"] == "approved"
+    assert by_id["Need-1"]["status"] == "approved"
     assert by_id["FR-1"]["status"] == "verified"
     assert data["meta"]["statuses"]["verified"]["border_style"] == "double"
 

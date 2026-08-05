@@ -66,281 +66,281 @@ Source(
 # --- ゴール -----------------------------------------------------------------------
 
 Goal(
-    id="G-1",
+    id="Goal-1",
     text="物流業務全体の処理時間を 30% 削減する",
     status="approved",
     has_source=["SRC-1"],
 )
 
 Goal(
-    id="G-2",
+    id="Goal-2",
     text="受注業務の手戻りを 20% 減らす",
     status="approved",
     has_source=["SRC-1"],
-    refines=["G-1"],
+    refines=["Goal-1"],
 )
 
 Goal(
-    id="G-3",
+    id="Goal-3",
     text="在庫業務の手戻りを 20% 減らす",
     status="approved",
     has_source=["SRC-2"],
-    refines=["G-1"],
+    refines=["Goal-1"],
 )
 
 Goal(
-    id="G-4",
+    id="Goal-4",
     text="出荷業務の手戻りを 20% 減らす",
     status="approved",
     has_source=["SRC-3"],
-    refines=["G-1"],
+    refines=["Goal-1"],
 )
 
 Goal(
-    id="G-5",
+    id="Goal-5",
     text="配送業務の手戻りを 20% 減らす",
     status="approved",
     has_source=["SRC-4"],
-    refines=["G-1"],
+    refines=["Goal-1"],
 )
 
 Goal(
-    id="G-6",
+    id="Goal-6",
     text="請求の入力と確認にかかる工数を減らす",
     status="approved",
     has_source=["SRC-2"],
-    refines=["G-2"],
-    motivates=["N-1", "N-2", "N-3"],
+    refines=["Goal-2"],
+    motivates=["Need-1", "Need-2", "Need-3"],
 )
 
 Goal(
-    id="G-7",
+    id="Goal-7",
     text="返品の入力と確認にかかる工数を減らす",
     status="approved",
     has_source=["SRC-3"],
-    refines=["G-2"],
-    motivates=["N-4", "N-5", "N-6"],
+    refines=["Goal-2"],
+    motivates=["Need-4", "Need-5", "Need-6"],
 )
 
 Goal(
-    id="G-8",
+    id="Goal-8",
     text="与信の入力と確認にかかる工数を減らす",
     status="approved",
     has_source=["SRC-4"],
-    refines=["G-3"],
-    motivates=["N-7", "N-8", "N-9"],
+    refines=["Goal-3"],
+    motivates=["Need-7", "Need-8", "Need-9"],
 )
 
 Goal(
-    id="G-9",
+    id="Goal-9",
     text="倉庫の入力と確認にかかる工数を減らす",
     status="approved",
     has_source=["SRC-5"],
-    refines=["G-3"],
-    motivates=["N-10", "N-11", "N-12"],
+    refines=["Goal-3"],
+    motivates=["Need-10", "Need-11", "Need-12"],
 )
 
 Goal(
-    id="G-10",
+    id="Goal-10",
     text="車両の入力と確認にかかる工数を減らす",
     status="approved",
     has_source=["SRC-6"],
-    refines=["G-4"],
-    motivates=["N-13", "N-14", "N-15"],
+    refines=["Goal-4"],
+    motivates=["Need-13", "Need-14", "Need-15"],
 )
 
 Goal(
-    id="G-11",
+    id="Goal-11",
     text="積載の入力と確認にかかる工数を減らす",
     status="approved",
     has_source=["SRC-1"],
-    refines=["G-4"],
-    motivates=["N-16", "N-17", "N-18"],
+    refines=["Goal-4"],
+    motivates=["Need-16", "Need-17", "Need-18"],
 )
 
 Goal(
-    id="G-12",
+    id="Goal-12",
     text="通関の入力と確認にかかる工数を減らす",
     status="approved",
     has_source=["SRC-2"],
-    refines=["G-5"],
-    motivates=["N-19", "N-20", "N-21"],
+    refines=["Goal-5"],
+    motivates=["Need-19", "Need-20", "Need-21"],
 )
 
 Goal(
-    id="G-13",
+    id="Goal-13",
     text="検品の入力と確認にかかる工数を減らす",
     status="approved",
     has_source=["SRC-3"],
-    refines=["G-5"],
-    motivates=["N-22", "N-23", "N-24"],
+    refines=["Goal-5"],
+    motivates=["Need-22", "Need-23", "Need-24"],
 )
 
 # --- ニーズ -----------------------------------------------------------------------
 
 Need(
-    id="N-1",
+    id="Need-1",
     text="受注担当者は、受注の登録内容を確認したい",
     status="implemented",
     has_source=["SRC-1", "SRC-4"],
 )
 
 Need(
-    id="N-2",
+    id="Need-2",
     text="倉庫管理者は、在庫の引当状況を把握したい",
     status="approved",
     has_source=["SRC-2", "SRC-5"],
 )
 
 Need(
-    id="N-3",
+    id="Need-3",
     text="配送計画者は、出荷の進捗を記録したい",
     status="approved",
     has_source=["SRC-3", "SRC-6"],
 )
 
 Need(
-    id="N-4",
+    id="Need-4",
     text="請求担当者は、配送の履歴を受け取りたい",
     status="implemented",
     has_source=["SRC-4", "SRC-1"],
 )
 
 Need(
-    id="N-5",
+    id="Need-5",
     text="与信審査者は、請求の実績を見直したい",
     status="approved",
     has_source=["SRC-5", "SRC-2"],
 )
 
 Need(
-    id="N-6",
+    id="Need-6",
     text="運行管理者は、返品の予定を引き継ぎたい",
     status="approved",
     has_source=["SRC-6", "SRC-3"],
 )
 
 Need(
-    id="N-7",
+    id="Need-7",
     text="受注担当者は、与信の明細を確認したい",
     status="implemented",
     has_source=["SRC-1", "SRC-4"],
 )
 
 Need(
-    id="N-8",
+    id="Need-8",
     text="倉庫管理者は、倉庫の残高を把握したい",
     status="approved",
     has_source=["SRC-2", "SRC-5"],
 )
 
 Need(
-    id="N-9",
+    id="Need-9",
     text="配送計画者は、車両の区分を記録したい",
     status="approved",
     has_source=["SRC-3", "SRC-6"],
 )
 
 Need(
-    id="N-10",
+    id="Need-10",
     text="請求担当者は、積載の担当割当を受け取りたい",
     status="implemented",
     has_source=["SRC-4", "SRC-1"],
 )
 
 Need(
-    id="N-11",
+    id="Need-11",
     text="与信審査者は、通関の登録内容を見直したい",
     status="approved",
     has_source=["SRC-5", "SRC-2"],
 )
 
 Need(
-    id="N-12",
+    id="Need-12",
     text="運行管理者は、検品の引当状況を引き継ぎたい",
     status="approved",
     has_source=["SRC-6", "SRC-3"],
 )
 
 Need(
-    id="N-13",
+    id="Need-13",
     text="受注担当者は、受注の進捗を確認したい",
     status="implemented",
     has_source=["SRC-1", "SRC-4"],
 )
 
 Need(
-    id="N-14",
+    id="Need-14",
     text="倉庫管理者は、在庫の履歴を把握したい",
     status="approved",
     has_source=["SRC-2", "SRC-5"],
 )
 
 Need(
-    id="N-15",
+    id="Need-15",
     text="配送計画者は、出荷の実績を記録したい",
     status="approved",
     has_source=["SRC-3", "SRC-6"],
 )
 
 Need(
-    id="N-16",
+    id="Need-16",
     text="請求担当者は、配送の予定を受け取りたい",
     status="implemented",
     has_source=["SRC-4", "SRC-1"],
 )
 
 Need(
-    id="N-17",
+    id="Need-17",
     text="与信審査者は、請求の明細を見直したい",
     status="approved",
     has_source=["SRC-5", "SRC-2"],
 )
 
 Need(
-    id="N-18",
+    id="Need-18",
     text="運行管理者は、返品の残高を引き継ぎたい",
     status="approved",
     has_source=["SRC-6", "SRC-3"],
 )
 
 Need(
-    id="N-19",
+    id="Need-19",
     text="受注担当者は、与信の区分を確認したい",
     status="implemented",
     has_source=["SRC-1", "SRC-4"],
 )
 
 Need(
-    id="N-20",
+    id="Need-20",
     text="倉庫管理者は、倉庫の担当割当を把握したい",
     status="approved",
     has_source=["SRC-2", "SRC-5"],
 )
 
 Need(
-    id="N-21",
+    id="Need-21",
     text="配送計画者は、車両の登録内容を記録したい",
     status="approved",
     has_source=["SRC-3", "SRC-6"],
 )
 
 Need(
-    id="N-22",
+    id="Need-22",
     text="請求担当者は、積載の引当状況を受け取りたい",
     status="implemented",
     has_source=["SRC-4", "SRC-1"],
 )
 
 Need(
-    id="N-23",
+    id="Need-23",
     text="与信審査者は、通関の進捗を見直したい",
     status="approved",
     has_source=["SRC-5", "SRC-2"],
 )
 
 Need(
-    id="N-24",
+    id="Need-24",
     text="運行管理者は、検品の履歴を引き継ぎたい",
     status="approved",
     has_source=["SRC-6", "SRC-3"],
@@ -353,7 +353,7 @@ FunctionalRequirement(
     text="受注の登録内容を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-1"],
+    satisfies=["Need-1"],
     acceptance_criteria=["受注の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -362,7 +362,7 @@ FunctionalRequirement(
     text="在庫の引当状況を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-2"],
+    satisfies=["Need-2"],
     acceptance_criteria=["在庫の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -371,7 +371,7 @@ FunctionalRequirement(
     text="出荷の進捗を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-3"],
+    satisfies=["Need-3"],
     evidence=["出荷の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["出荷の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -381,7 +381,7 @@ FunctionalRequirement(
     text="配送の履歴をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-4"],
+    satisfies=["Need-4"],
     acceptance_criteria=["配送の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -390,7 +390,7 @@ FunctionalRequirement(
     text="請求の実績を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-5"],
+    satisfies=["Need-5"],
     acceptance_criteria=["請求の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -399,7 +399,7 @@ FunctionalRequirement(
     text="返品の予定を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-6"],
+    satisfies=["Need-6"],
     evidence=["返品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["返品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -418,7 +418,7 @@ FunctionalRequirement(
     text="倉庫の残高を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-8"],
+    satisfies=["Need-8"],
     acceptance_criteria=["倉庫の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -427,7 +427,7 @@ FunctionalRequirement(
     text="車両の区分を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-9"],
+    satisfies=["Need-9"],
     evidence=["車両の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["車両の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -437,7 +437,7 @@ FunctionalRequirement(
     text="積載の担当割当をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-10"],
+    satisfies=["Need-10"],
     acceptance_criteria=["積載の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -446,7 +446,7 @@ FunctionalRequirement(
     text="通関の登録内容を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-11"],
+    satisfies=["Need-11"],
     acceptance_criteria=["通関の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -455,7 +455,7 @@ FunctionalRequirement(
     text="検品の引当状況を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-12"],
+    satisfies=["Need-12"],
     evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["検品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -465,7 +465,7 @@ FunctionalRequirement(
     text="受注の進捗を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-13"],
+    satisfies=["Need-13"],
     acceptance_criteria=["受注の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -483,7 +483,7 @@ FunctionalRequirement(
     text="出荷の実績を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-15"],
+    satisfies=["Need-15"],
     evidence=["出荷の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["出荷の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -493,7 +493,7 @@ FunctionalRequirement(
     text="配送の予定をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-16"],
+    satisfies=["Need-16"],
     acceptance_criteria=["配送の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -502,7 +502,7 @@ FunctionalRequirement(
     text="請求の明細を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-17"],
+    satisfies=["Need-17"],
     acceptance_criteria=["請求の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -511,7 +511,7 @@ FunctionalRequirement(
     text="返品の残高を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-18"],
+    satisfies=["Need-18"],
     evidence=["返品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["返品の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -521,7 +521,7 @@ FunctionalRequirement(
     text="与信の区分を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-19"],
+    satisfies=["Need-19"],
     acceptance_criteria=["与信の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -530,7 +530,7 @@ FunctionalRequirement(
     text="倉庫の担当割当を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-20"],
+    satisfies=["Need-20"],
     acceptance_criteria=["倉庫の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -549,7 +549,7 @@ FunctionalRequirement(
     text="積載の引当状況をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-22"],
+    satisfies=["Need-22"],
     acceptance_criteria=["積載の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -558,7 +558,7 @@ FunctionalRequirement(
     text="通関の進捗を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-23"],
+    satisfies=["Need-23"],
     acceptance_criteria=["通関の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -567,7 +567,7 @@ FunctionalRequirement(
     text="検品の履歴を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-24"],
+    satisfies=["Need-24"],
     evidence=["検品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["検品の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -577,7 +577,7 @@ FunctionalRequirement(
     text="受注の実績を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-1"],
+    satisfies=["Need-1"],
     acceptance_criteria=["受注の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -586,7 +586,7 @@ FunctionalRequirement(
     text="在庫の予定を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-2"],
+    satisfies=["Need-2"],
     acceptance_criteria=["在庫の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -595,7 +595,7 @@ FunctionalRequirement(
     text="出荷の明細を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-3"],
+    satisfies=["Need-3"],
     evidence=["出荷の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["出荷の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -614,7 +614,7 @@ FunctionalRequirement(
     text="請求の区分を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-5"],
+    satisfies=["Need-5"],
     acceptance_criteria=["請求の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -623,7 +623,7 @@ FunctionalRequirement(
     text="返品の担当割当を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-6"],
+    satisfies=["Need-6"],
     evidence=["返品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["返品の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -633,7 +633,7 @@ FunctionalRequirement(
     text="与信の登録内容を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-7"],
+    satisfies=["Need-7"],
     acceptance_criteria=["与信の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -642,7 +642,7 @@ FunctionalRequirement(
     text="倉庫の引当状況を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-8"],
+    satisfies=["Need-8"],
     acceptance_criteria=["倉庫の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -651,7 +651,7 @@ FunctionalRequirement(
     text="車両の進捗を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-9"],
+    satisfies=["Need-9"],
     evidence=["車両の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["車両の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -661,7 +661,7 @@ FunctionalRequirement(
     text="積載の履歴をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-10"],
+    satisfies=["Need-10"],
     acceptance_criteria=["積載の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -679,7 +679,7 @@ FunctionalRequirement(
     text="検品の予定を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-12"],
+    satisfies=["Need-12"],
     evidence=["検品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["検品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -689,7 +689,7 @@ FunctionalRequirement(
     text="受注の明細を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-13"],
+    satisfies=["Need-13"],
     acceptance_criteria=["受注の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -698,7 +698,7 @@ FunctionalRequirement(
     text="在庫の残高を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-14"],
+    satisfies=["Need-14"],
     acceptance_criteria=["在庫の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -707,7 +707,7 @@ FunctionalRequirement(
     text="出荷の区分を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-15"],
+    satisfies=["Need-15"],
     evidence=["出荷の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["出荷の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -717,7 +717,7 @@ FunctionalRequirement(
     text="配送の担当割当をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-16"],
+    satisfies=["Need-16"],
     acceptance_criteria=["配送の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -726,7 +726,7 @@ FunctionalRequirement(
     text="請求の登録内容を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-17"],
+    satisfies=["Need-17"],
     acceptance_criteria=["請求の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -745,7 +745,7 @@ FunctionalRequirement(
     text="与信の進捗を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-19"],
+    satisfies=["Need-19"],
     acceptance_criteria=["与信の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -754,7 +754,7 @@ FunctionalRequirement(
     text="倉庫の履歴を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-20"],
+    satisfies=["Need-20"],
     acceptance_criteria=["倉庫の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -763,7 +763,7 @@ FunctionalRequirement(
     text="車両の実績を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-21"],
+    satisfies=["Need-21"],
     evidence=["車両の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["車両の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -773,7 +773,7 @@ FunctionalRequirement(
     text="積載の予定をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-22"],
+    satisfies=["Need-22"],
     acceptance_criteria=["積載の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -782,7 +782,7 @@ FunctionalRequirement(
     text="通関の明細を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-23"],
+    satisfies=["Need-23"],
     acceptance_criteria=["通関の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -791,7 +791,7 @@ FunctionalRequirement(
     text="検品の残高を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-24"],
+    satisfies=["Need-24"],
     evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["検品の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -810,7 +810,7 @@ FunctionalRequirement(
     text="在庫の担当割当を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-2"],
+    satisfies=["Need-2"],
     acceptance_criteria=["在庫の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -819,7 +819,7 @@ FunctionalRequirement(
     text="出荷の登録内容を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-3"],
+    satisfies=["Need-3"],
     evidence=["出荷の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["出荷の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -829,7 +829,7 @@ FunctionalRequirement(
     text="配送の引当状況をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-4"],
+    satisfies=["Need-4"],
     acceptance_criteria=["配送の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -838,7 +838,7 @@ FunctionalRequirement(
     text="請求の進捗を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-5"],
+    satisfies=["Need-5"],
     acceptance_criteria=["請求の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -847,7 +847,7 @@ FunctionalRequirement(
     text="返品の履歴を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-6"],
+    satisfies=["Need-6"],
     evidence=["返品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["返品の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -857,7 +857,7 @@ FunctionalRequirement(
     text="与信の実績を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-7"],
+    satisfies=["Need-7"],
     acceptance_criteria=["与信の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -875,7 +875,7 @@ FunctionalRequirement(
     text="車両の明細を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-9"],
+    satisfies=["Need-9"],
     evidence=["車両の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["車両の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -885,7 +885,7 @@ FunctionalRequirement(
     text="積載の残高をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-10"],
+    satisfies=["Need-10"],
     acceptance_criteria=["積載の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -894,7 +894,7 @@ FunctionalRequirement(
     text="通関の区分を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-11"],
+    satisfies=["Need-11"],
     acceptance_criteria=["通関の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -903,7 +903,7 @@ FunctionalRequirement(
     text="検品の担当割当を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-12"],
+    satisfies=["Need-12"],
     evidence=["検品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["検品の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -913,7 +913,7 @@ FunctionalRequirement(
     text="受注の登録内容を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-13"],
+    satisfies=["Need-13"],
     acceptance_criteria=["受注の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -922,7 +922,7 @@ FunctionalRequirement(
     text="在庫の引当状況を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-14"],
+    satisfies=["Need-14"],
     acceptance_criteria=["在庫の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -941,7 +941,7 @@ FunctionalRequirement(
     text="配送の履歴をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-16"],
+    satisfies=["Need-16"],
     acceptance_criteria=["配送の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -950,7 +950,7 @@ FunctionalRequirement(
     text="請求の実績を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-17"],
+    satisfies=["Need-17"],
     acceptance_criteria=["請求の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -959,7 +959,7 @@ FunctionalRequirement(
     text="返品の予定を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-18"],
+    satisfies=["Need-18"],
     evidence=["返品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["返品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -969,7 +969,7 @@ FunctionalRequirement(
     text="与信の明細を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-19"],
+    satisfies=["Need-19"],
     acceptance_criteria=["与信の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -978,7 +978,7 @@ FunctionalRequirement(
     text="倉庫の残高を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-20"],
+    satisfies=["Need-20"],
     acceptance_criteria=["倉庫の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -987,7 +987,7 @@ FunctionalRequirement(
     text="車両の区分を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-21"],
+    satisfies=["Need-21"],
     evidence=["車両の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["車両の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1006,7 +1006,7 @@ FunctionalRequirement(
     text="通関の登録内容を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-23"],
+    satisfies=["Need-23"],
     acceptance_criteria=["通関の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1015,7 +1015,7 @@ FunctionalRequirement(
     text="検品の引当状況を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-24"],
+    satisfies=["Need-24"],
     evidence=["検品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["検品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1025,7 +1025,7 @@ FunctionalRequirement(
     text="受注の進捗を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-1"],
+    satisfies=["Need-1"],
     acceptance_criteria=["受注の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1034,7 +1034,7 @@ FunctionalRequirement(
     text="在庫の履歴を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-2"],
+    satisfies=["Need-2"],
     acceptance_criteria=["在庫の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1043,7 +1043,7 @@ FunctionalRequirement(
     text="出荷の実績を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-3"],
+    satisfies=["Need-3"],
     evidence=["出荷の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["出荷の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1053,7 +1053,7 @@ FunctionalRequirement(
     text="配送の予定をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-4"],
+    satisfies=["Need-4"],
     acceptance_criteria=["配送の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1071,7 +1071,7 @@ FunctionalRequirement(
     text="返品の残高を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-6"],
+    satisfies=["Need-6"],
     evidence=["返品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["返品の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1081,7 +1081,7 @@ FunctionalRequirement(
     text="与信の区分を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-7"],
+    satisfies=["Need-7"],
     acceptance_criteria=["与信の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1090,7 +1090,7 @@ FunctionalRequirement(
     text="倉庫の担当割当を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-8"],
+    satisfies=["Need-8"],
     acceptance_criteria=["倉庫の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1099,7 +1099,7 @@ FunctionalRequirement(
     text="車両の登録内容を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-9"],
+    satisfies=["Need-9"],
     evidence=["車両の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["車両の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1109,7 +1109,7 @@ FunctionalRequirement(
     text="積載の引当状況をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-10"],
+    satisfies=["Need-10"],
     acceptance_criteria=["積載の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1118,7 +1118,7 @@ FunctionalRequirement(
     text="通関の進捗を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-11"],
+    satisfies=["Need-11"],
     acceptance_criteria=["通関の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1137,7 +1137,7 @@ FunctionalRequirement(
     text="受注の実績を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-13"],
+    satisfies=["Need-13"],
     acceptance_criteria=["受注の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1146,7 +1146,7 @@ FunctionalRequirement(
     text="在庫の予定を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-14"],
+    satisfies=["Need-14"],
     acceptance_criteria=["在庫の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1155,7 +1155,7 @@ FunctionalRequirement(
     text="出荷の明細を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-15"],
+    satisfies=["Need-15"],
     evidence=["出荷の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["出荷の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1165,7 +1165,7 @@ FunctionalRequirement(
     text="配送の残高をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-16"],
+    satisfies=["Need-16"],
     acceptance_criteria=["配送の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1174,7 +1174,7 @@ FunctionalRequirement(
     text="請求の区分を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-17"],
+    satisfies=["Need-17"],
     acceptance_criteria=["請求の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1183,7 +1183,7 @@ FunctionalRequirement(
     text="返品の担当割当を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-18"],
+    satisfies=["Need-18"],
     evidence=["返品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["返品の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1202,7 +1202,7 @@ FunctionalRequirement(
     text="倉庫の引当状況を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-20"],
+    satisfies=["Need-20"],
     acceptance_criteria=["倉庫の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1211,7 +1211,7 @@ FunctionalRequirement(
     text="車両の進捗を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-21"],
+    satisfies=["Need-21"],
     evidence=["車両の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["車両の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1221,7 +1221,7 @@ FunctionalRequirement(
     text="積載の履歴をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-22"],
+    satisfies=["Need-22"],
     acceptance_criteria=["積載の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1230,7 +1230,7 @@ FunctionalRequirement(
     text="通関の実績を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-23"],
+    satisfies=["Need-23"],
     acceptance_criteria=["通関の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1239,7 +1239,7 @@ FunctionalRequirement(
     text="検品の予定を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-24"],
+    satisfies=["Need-24"],
     evidence=["検品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["検品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1249,7 +1249,7 @@ FunctionalRequirement(
     text="受注の明細を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-1"],
+    satisfies=["Need-1"],
     acceptance_criteria=["受注の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1267,7 +1267,7 @@ FunctionalRequirement(
     text="出荷の区分を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-3"],
+    satisfies=["Need-3"],
     evidence=["出荷の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["出荷の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1277,7 +1277,7 @@ FunctionalRequirement(
     text="配送の担当割当をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-4"],
+    satisfies=["Need-4"],
     acceptance_criteria=["配送の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1286,7 +1286,7 @@ FunctionalRequirement(
     text="請求の登録内容を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-5"],
+    satisfies=["Need-5"],
     acceptance_criteria=["請求の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1295,7 +1295,7 @@ FunctionalRequirement(
     text="返品の引当状況を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-6"],
+    satisfies=["Need-6"],
     evidence=["返品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["返品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1305,7 +1305,7 @@ FunctionalRequirement(
     text="与信の進捗を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-7"],
+    satisfies=["Need-7"],
     acceptance_criteria=["与信の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1314,7 +1314,7 @@ FunctionalRequirement(
     text="倉庫の履歴を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-8"],
+    satisfies=["Need-8"],
     acceptance_criteria=["倉庫の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1333,7 +1333,7 @@ FunctionalRequirement(
     text="積載の予定をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-10"],
+    satisfies=["Need-10"],
     acceptance_criteria=["積載の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1342,7 +1342,7 @@ FunctionalRequirement(
     text="通関の明細を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-11"],
+    satisfies=["Need-11"],
     acceptance_criteria=["通関の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1351,7 +1351,7 @@ FunctionalRequirement(
     text="検品の残高を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-12"],
+    satisfies=["Need-12"],
     evidence=["検品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["検品の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1361,7 +1361,7 @@ FunctionalRequirement(
     text="受注の区分を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-13"],
+    satisfies=["Need-13"],
     acceptance_criteria=["受注の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1370,7 +1370,7 @@ FunctionalRequirement(
     text="在庫の担当割当を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-14"],
+    satisfies=["Need-14"],
     acceptance_criteria=["在庫の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1379,7 +1379,7 @@ FunctionalRequirement(
     text="出荷の登録内容を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-15"],
+    satisfies=["Need-15"],
     evidence=["出荷の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["出荷の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1398,7 +1398,7 @@ FunctionalRequirement(
     text="請求の進捗を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-17"],
+    satisfies=["Need-17"],
     acceptance_criteria=["請求の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1407,7 +1407,7 @@ FunctionalRequirement(
     text="返品の履歴を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-18"],
+    satisfies=["Need-18"],
     evidence=["返品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["返品の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1417,7 +1417,7 @@ FunctionalRequirement(
     text="与信の実績を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-19"],
+    satisfies=["Need-19"],
     acceptance_criteria=["与信の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1426,7 +1426,7 @@ FunctionalRequirement(
     text="倉庫の予定を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-20"],
+    satisfies=["Need-20"],
     acceptance_criteria=["倉庫の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1435,7 +1435,7 @@ FunctionalRequirement(
     text="車両の明細を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-21"],
+    satisfies=["Need-21"],
     evidence=["車両の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["車両の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1445,7 +1445,7 @@ FunctionalRequirement(
     text="積載の残高をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-22"],
+    satisfies=["Need-22"],
     acceptance_criteria=["積載の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1463,7 +1463,7 @@ FunctionalRequirement(
     text="検品の担当割当を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-24"],
+    satisfies=["Need-24"],
     evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["検品の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1473,7 +1473,7 @@ FunctionalRequirement(
     text="受注の登録内容を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-1"],
+    satisfies=["Need-1"],
     acceptance_criteria=["受注の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1482,7 +1482,7 @@ FunctionalRequirement(
     text="在庫の引当状況を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-2"],
+    satisfies=["Need-2"],
     acceptance_criteria=["在庫の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1491,7 +1491,7 @@ FunctionalRequirement(
     text="出荷の進捗を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-3"],
+    satisfies=["Need-3"],
     evidence=["出荷の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["出荷の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1501,7 +1501,7 @@ FunctionalRequirement(
     text="配送の履歴をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-4"],
+    satisfies=["Need-4"],
     acceptance_criteria=["配送の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1510,7 +1510,7 @@ FunctionalRequirement(
     text="請求の実績を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-5"],
+    satisfies=["Need-5"],
     acceptance_criteria=["請求の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1529,7 +1529,7 @@ FunctionalRequirement(
     text="与信の明細を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-7"],
+    satisfies=["Need-7"],
     acceptance_criteria=["与信の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1538,7 +1538,7 @@ FunctionalRequirement(
     text="倉庫の残高を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-8"],
+    satisfies=["Need-8"],
     acceptance_criteria=["倉庫の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1547,7 +1547,7 @@ FunctionalRequirement(
     text="車両の区分を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-9"],
+    satisfies=["Need-9"],
     evidence=["車両の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["車両の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1557,7 +1557,7 @@ FunctionalRequirement(
     text="積載の担当割当をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-10"],
+    satisfies=["Need-10"],
     acceptance_criteria=["積載の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1566,7 +1566,7 @@ FunctionalRequirement(
     text="通関の登録内容を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-11"],
+    satisfies=["Need-11"],
     acceptance_criteria=["通関の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1575,7 +1575,7 @@ FunctionalRequirement(
     text="検品の引当状況を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-12"],
+    satisfies=["Need-12"],
     evidence=["検品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["検品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1594,7 +1594,7 @@ FunctionalRequirement(
     text="在庫の履歴を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-14"],
+    satisfies=["Need-14"],
     acceptance_criteria=["在庫の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1603,7 +1603,7 @@ FunctionalRequirement(
     text="出荷の実績を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-15"],
+    satisfies=["Need-15"],
     evidence=["出荷の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["出荷の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1613,7 +1613,7 @@ FunctionalRequirement(
     text="配送の予定をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-16"],
+    satisfies=["Need-16"],
     acceptance_criteria=["配送の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1622,7 +1622,7 @@ FunctionalRequirement(
     text="請求の明細を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-17"],
+    satisfies=["Need-17"],
     acceptance_criteria=["請求の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1631,7 +1631,7 @@ FunctionalRequirement(
     text="返品の残高を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-18"],
+    satisfies=["Need-18"],
     evidence=["返品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["返品の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1641,7 +1641,7 @@ FunctionalRequirement(
     text="与信の区分を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-19"],
+    satisfies=["Need-19"],
     acceptance_criteria=["与信の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1659,7 +1659,7 @@ FunctionalRequirement(
     text="車両の登録内容を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-21"],
+    satisfies=["Need-21"],
     evidence=["車両の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["車両の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1669,7 +1669,7 @@ FunctionalRequirement(
     text="積載の引当状況をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-22"],
+    satisfies=["Need-22"],
     acceptance_criteria=["積載の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1678,7 +1678,7 @@ FunctionalRequirement(
     text="通関の進捗を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-23"],
+    satisfies=["Need-23"],
     acceptance_criteria=["通関の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1687,7 +1687,7 @@ FunctionalRequirement(
     text="検品の履歴を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-24"],
+    satisfies=["Need-24"],
     evidence=["検品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["検品の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1697,7 +1697,7 @@ FunctionalRequirement(
     text="受注の実績を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-1"],
+    satisfies=["Need-1"],
     acceptance_criteria=["受注の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1706,7 +1706,7 @@ FunctionalRequirement(
     text="在庫の予定を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-2"],
+    satisfies=["Need-2"],
     acceptance_criteria=["在庫の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1725,7 +1725,7 @@ FunctionalRequirement(
     text="配送の残高をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-4"],
+    satisfies=["Need-4"],
     acceptance_criteria=["配送の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1734,7 +1734,7 @@ FunctionalRequirement(
     text="請求の区分を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-5"],
+    satisfies=["Need-5"],
     acceptance_criteria=["請求の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1743,7 +1743,7 @@ FunctionalRequirement(
     text="返品の担当割当を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-6"],
+    satisfies=["Need-6"],
     evidence=["返品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["返品の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1753,7 +1753,7 @@ FunctionalRequirement(
     text="与信の登録内容を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-7"],
+    satisfies=["Need-7"],
     acceptance_criteria=["与信の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1762,7 +1762,7 @@ FunctionalRequirement(
     text="倉庫の引当状況を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-8"],
+    satisfies=["Need-8"],
     acceptance_criteria=["倉庫の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1771,7 +1771,7 @@ FunctionalRequirement(
     text="車両の進捗を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-9"],
+    satisfies=["Need-9"],
     evidence=["車両の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["車両の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1790,7 +1790,7 @@ FunctionalRequirement(
     text="通関の実績を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-11"],
+    satisfies=["Need-11"],
     acceptance_criteria=["通関の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1799,7 +1799,7 @@ FunctionalRequirement(
     text="検品の予定を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-12"],
+    satisfies=["Need-12"],
     evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["検品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1809,7 +1809,7 @@ FunctionalRequirement(
     text="受注の明細を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-13"],
+    satisfies=["Need-13"],
     acceptance_criteria=["受注の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1818,7 +1818,7 @@ FunctionalRequirement(
     text="在庫の残高を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-14"],
+    satisfies=["Need-14"],
     acceptance_criteria=["在庫の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1827,7 +1827,7 @@ FunctionalRequirement(
     text="出荷の区分を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-15"],
+    satisfies=["Need-15"],
     evidence=["出荷の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["出荷の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1837,7 +1837,7 @@ FunctionalRequirement(
     text="配送の担当割当をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-16"],
+    satisfies=["Need-16"],
     acceptance_criteria=["配送の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1855,7 +1855,7 @@ FunctionalRequirement(
     text="返品の引当状況を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-18"],
+    satisfies=["Need-18"],
     evidence=["返品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["返品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1865,7 +1865,7 @@ FunctionalRequirement(
     text="与信の進捗を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-19"],
+    satisfies=["Need-19"],
     acceptance_criteria=["与信の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1874,7 +1874,7 @@ FunctionalRequirement(
     text="倉庫の履歴を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-20"],
+    satisfies=["Need-20"],
     acceptance_criteria=["倉庫の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1883,7 +1883,7 @@ FunctionalRequirement(
     text="車両の実績を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-21"],
+    satisfies=["Need-21"],
     evidence=["車両の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["車両の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1893,7 +1893,7 @@ FunctionalRequirement(
     text="積載の予定をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-22"],
+    satisfies=["Need-22"],
     acceptance_criteria=["積載の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1902,7 +1902,7 @@ FunctionalRequirement(
     text="通関の明細を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-23"],
+    satisfies=["Need-23"],
     acceptance_criteria=["通関の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1921,7 +1921,7 @@ FunctionalRequirement(
     text="受注の区分を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-1"],
+    satisfies=["Need-1"],
     acceptance_criteria=["受注の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1930,7 +1930,7 @@ FunctionalRequirement(
     text="在庫の担当割当を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-2"],
+    satisfies=["Need-2"],
     acceptance_criteria=["在庫の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1939,7 +1939,7 @@ FunctionalRequirement(
     text="出荷の登録内容を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-3"],
+    satisfies=["Need-3"],
     evidence=["出荷の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["出荷の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1949,7 +1949,7 @@ FunctionalRequirement(
     text="配送の引当状況をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-4"],
+    satisfies=["Need-4"],
     acceptance_criteria=["配送の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1958,7 +1958,7 @@ FunctionalRequirement(
     text="請求の進捗を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-5"],
+    satisfies=["Need-5"],
     acceptance_criteria=["請求の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1967,7 +1967,7 @@ FunctionalRequirement(
     text="返品の履歴を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-6"],
+    satisfies=["Need-6"],
     evidence=["返品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["返品の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -1986,7 +1986,7 @@ FunctionalRequirement(
     text="倉庫の予定を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-8"],
+    satisfies=["Need-8"],
     acceptance_criteria=["倉庫の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -1995,7 +1995,7 @@ FunctionalRequirement(
     text="車両の明細を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-9"],
+    satisfies=["Need-9"],
     evidence=["車両の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["車両の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -2005,7 +2005,7 @@ FunctionalRequirement(
     text="積載の残高をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-10"],
+    satisfies=["Need-10"],
     acceptance_criteria=["積載の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2014,7 +2014,7 @@ FunctionalRequirement(
     text="通関の区分を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-11"],
+    satisfies=["Need-11"],
     acceptance_criteria=["通関の区分が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2023,7 +2023,7 @@ FunctionalRequirement(
     text="検品の担当割当を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-12"],
+    satisfies=["Need-12"],
     evidence=["検品の受入テスト第 9 回で、全項目が合格している"],
     acceptance_criteria=["検品の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -2033,7 +2033,7 @@ FunctionalRequirement(
     text="受注の登録内容を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-13"],
+    satisfies=["Need-13"],
     acceptance_criteria=["受注の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2051,7 +2051,7 @@ FunctionalRequirement(
     text="出荷の進捗を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-15"],
+    satisfies=["Need-15"],
     evidence=["出荷の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["出荷の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -2061,7 +2061,7 @@ FunctionalRequirement(
     text="配送の履歴をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-16"],
+    satisfies=["Need-16"],
     acceptance_criteria=["配送の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2070,7 +2070,7 @@ FunctionalRequirement(
     text="請求の実績を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-17"],
+    satisfies=["Need-17"],
     acceptance_criteria=["請求の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2079,7 +2079,7 @@ FunctionalRequirement(
     text="返品の予定を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-18"],
+    satisfies=["Need-18"],
     evidence=["返品の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["返品の予定が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -2089,7 +2089,7 @@ FunctionalRequirement(
     text="与信の明細を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-19"],
+    satisfies=["Need-19"],
     acceptance_criteria=["与信の明細が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2098,7 +2098,7 @@ FunctionalRequirement(
     text="倉庫の残高を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-20"],
+    satisfies=["Need-20"],
     acceptance_criteria=["倉庫の残高が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2117,7 +2117,7 @@ FunctionalRequirement(
     text="積載の担当割当をCSV として出力すること",
     status="approved",
     has_source=["SRC-4"],
-    satisfies=["N-22"],
+    satisfies=["Need-22"],
     acceptance_criteria=["積載の担当割当が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2126,7 +2126,7 @@ FunctionalRequirement(
     text="通関の登録内容を変更履歴として残すこと",
     status="implemented",
     has_source=["SRC-5"],
-    satisfies=["N-23"],
+    satisfies=["Need-23"],
     acceptance_criteria=["通関の登録内容が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2135,7 +2135,7 @@ FunctionalRequirement(
     text="検品の引当状況を基幹システムへ連携すること",
     status="verified",
     has_source=["SRC-6"],
-    satisfies=["N-24"],
+    satisfies=["Need-24"],
     evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["検品の引当状況が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -2145,7 +2145,7 @@ FunctionalRequirement(
     text="受注の進捗を一覧画面に表示すること",
     status="approved",
     has_source=["SRC-1"],
-    satisfies=["N-1"],
+    satisfies=["Need-1"],
     acceptance_criteria=["受注の進捗が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2154,7 +2154,7 @@ FunctionalRequirement(
     text="在庫の履歴を日次で集計すること",
     status="implemented",
     has_source=["SRC-2"],
-    satisfies=["N-2"],
+    satisfies=["Need-2"],
     acceptance_criteria=["在庫の履歴が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
 
@@ -2163,7 +2163,7 @@ FunctionalRequirement(
     text="出荷の実績を担当者に通知すること",
     status="verified",
     has_source=["SRC-3"],
-    satisfies=["N-3"],
+    satisfies=["Need-3"],
     evidence=["出荷の受入テスト第 6 回で、全項目が合格している"],
     acceptance_criteria=["出荷の実績が 3 秒以内に画面へ出る", "実行した担当者と日時が操作ログに残る"],
 )
@@ -2653,7 +2653,7 @@ QualityRequirement(
 # --- 制約 ------------------------------------------------------------------------
 
 Constraint(
-    id="C-1",
+    id="Constraint-1",
     text="受注の操作は社内ネットワークからのみ受け付けること",
     status="proposed",
     has_source=["SRC-5"],
@@ -2661,7 +2661,7 @@ Constraint(
 )
 
 Constraint(
-    id="C-2",
+    id="Constraint-2",
     text="在庫の操作は社内ネットワークからのみ受け付けること",
     status="approved",
     has_source=["SRC-6"],
@@ -2669,7 +2669,7 @@ Constraint(
 )
 
 Constraint(
-    id="C-3",
+    id="Constraint-3",
     text="出荷の操作は社内ネットワークからのみ受け付けること",
     status="proposed",
     has_source=["SRC-1"],
@@ -2677,7 +2677,7 @@ Constraint(
 )
 
 Constraint(
-    id="C-4",
+    id="Constraint-4",
     text="配送の操作は社内ネットワークからのみ受け付けること",
     status="approved",
     has_source=["SRC-2"],
@@ -2685,7 +2685,7 @@ Constraint(
 )
 
 Constraint(
-    id="C-5",
+    id="Constraint-5",
     text="請求の操作は社内ネットワークからのみ受け付けること",
     status="proposed",
     has_source=["SRC-3"],
@@ -2693,7 +2693,7 @@ Constraint(
 )
 
 Constraint(
-    id="C-6",
+    id="Constraint-6",
     text="返品の操作は社内ネットワークからのみ受け付けること",
     status="approved",
     has_source=["SRC-4"],
@@ -2701,7 +2701,7 @@ Constraint(
 )
 
 Constraint(
-    id="C-7",
+    id="Constraint-7",
     text="与信の操作は社内ネットワークからのみ受け付けること",
     status="proposed",
     has_source=["SRC-5"],
@@ -2709,7 +2709,7 @@ Constraint(
 )
 
 Constraint(
-    id="C-8",
+    id="Constraint-8",
     text="倉庫の操作は社内ネットワークからのみ受け付けること",
     status="approved",
     has_source=["SRC-6"],
@@ -2717,7 +2717,7 @@ Constraint(
 )
 
 Constraint(
-    id="C-9",
+    id="Constraint-9",
     text="車両の操作は社内ネットワークからのみ受け付けること",
     status="proposed",
     has_source=["SRC-1"],
@@ -2725,7 +2725,7 @@ Constraint(
 )
 
 Constraint(
-    id="C-10",
+    id="Constraint-10",
     text="積載の操作は社内ネットワークからのみ受け付けること",
     status="approved",
     has_source=["SRC-2"],

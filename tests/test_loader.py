@@ -32,14 +32,14 @@ def test_node_locations_are_recorded():
     result = load(
         's = Source(id="S-1", text="経理部長", kind="stakeholder")\n'
         'n = Need(\n'
-        '    id="N-1",\n'
+        '    id="Need-1",\n'
         '    text="早く精算したい",\n'
         '    has_source=[s],\n'
         ')\n'
     )
     assert result.ok
     assert result.graph.location_of("S-1") == "<test>:2"
-    assert result.graph.location_of("N-1") == "<test>:3"
+    assert result.graph.location_of("Need-1") == "<test>:3"
 
 
 def test_node_location_points_at_the_file(tmp_path: Path):
@@ -62,12 +62,12 @@ def test_layer0_violation_becomes_a_finding():
 
 
 def test_layer1_violation_becomes_a_finding():
-    result = load('n = Need(id="N-1", text="早く精算する")\n')
+    result = load('n = Need(id="Need-1", text="早く精算する")\n')
     assert not result.ok
     finding = result.findings.items[0]
     assert finding.layer == 1
     assert finding.code == "syntax.invalid_field"
-    assert finding.node_id == "N-1"
+    assert finding.node_id == "Need-1"
     assert "願望形" in finding.message
 
 
@@ -84,21 +84,21 @@ def test_duplicate_id_is_reported():
 def test_variable_references_are_resolved_to_ids():
     result = load(
         's = Source(id="S-1", text="経理部長", kind="stakeholder")\n'
-        'n = Need(id="N-1", text="早く精算したい", has_source=[s])\n'
-        'g = Goal(id="G-1", text="工数を半減する", motivates=[n], has_source=[s])\n'
+        'n = Need(id="Need-1", text="早く精算したい", has_source=[s])\n'
+        'g = Goal(id="Goal-1", text="工数を半減する", motivates=[n], has_source=[s])\n'
     )
     assert result.ok
-    assert result.graph.nodes["G-1"].motivates == ["N-1"]
-    assert result.graph.nodes["N-1"].has_source == ["S-1"]
+    assert result.graph.nodes["Goal-1"].motivates == ["Need-1"]
+    assert result.graph.nodes["Need-1"].has_source == ["S-1"]
 
 
 def test_id_strings_may_be_used_for_forward_references():
     result = load(
-        'g = Goal(id="G-1", text="工数を半減する", motivates=["N-1"])\n'
-        'n = Need(id="N-1", text="早く精算したい")\n'
+        'g = Goal(id="Goal-1", text="工数を半減する", motivates=["Need-1"])\n'
+        'n = Need(id="Need-1", text="早く精算したい")\n'
     )
     assert result.ok
-    assert result.graph.nodes["G-1"].motivates == ["N-1"]
+    assert result.graph.nodes["Goal-1"].motivates == ["Need-1"]
 
 
 def test_multiple_files_are_merged(tmp_path: Path):
@@ -107,12 +107,12 @@ def test_multiple_files_are_merged(tmp_path: Path):
         encoding="utf-8",
     )
     (tmp_path / "b.py").write_text(
-        HEADER + 'n = Need(id="N-1", text="早く精算したい", has_source=["S-1"])\n',
+        HEADER + 'n = Need(id="Need-1", text="早く精算したい", has_source=["S-1"])\n',
         encoding="utf-8",
     )
     result = load_paths(discover_paths([str(tmp_path)]))
     assert result.ok
-    assert set(result.graph.nodes) == {"S-1", "N-1"}
+    assert set(result.graph.nodes) == {"S-1", "Need-1"}
 
 
 def test_discover_paths_defaults_to_requirements_py(tmp_path: Path, monkeypatch):

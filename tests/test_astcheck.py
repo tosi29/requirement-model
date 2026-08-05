@@ -18,7 +18,7 @@ def test_declaration_only_is_accepted():
         HEADER
         + """
 src = Source(id="S-1", text="経理部長", kind="stakeholder")
-need = Need(id="N-1", text="早く精算したい", has_source=[src])
+need = Need(id="Need-1", text="早く精算したい", has_source=[src])
 """
     )
     assert result.violations == []
@@ -82,26 +82,26 @@ def test_calls_other_than_node_types_are_rejected():
 def test_node_type_must_be_imported():
     messages = [
         v.message
-        for v in extract_source('n = Need(id="N-1", text="したい")\n').violations
+        for v in extract_source('n = Need(id="Need-1", text="したい")\n').violations
     ]
     assert messages and "import されていない" in messages[0]
 
 
 def test_positional_arguments_are_rejected():
-    assert any("キーワード引数のみ" in m for m in violations('n = Need("N-1")\n'))
+    assert any("キーワード引数のみ" in m for m in violations('n = Need("Need-1")\n'))
 
 
 def test_unknown_name_reference_is_rejected():
     assert any(
         "未定義の名前" in m
-        for m in violations('n = Need(id="N-1", text="したい", has_source=[nope])\n')
+        for m in violations('n = Need(id="Need-1", text="したい", has_source=[nope])\n')
     )
 
 
 def test_reassignment_is_rejected():
     source = """
-a = Need(id="N-1", text="したい")
-a = Need(id="N-2", text="したい")
+a = Need(id="Need-1", text="したい")
+a = Need(id="Need-2", text="したい")
 """
     assert any("再代入" in m for m in violations(source))
 

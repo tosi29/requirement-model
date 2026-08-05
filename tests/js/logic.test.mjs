@@ -79,7 +79,7 @@ test("ノード種別を外すと、その端点を持つエッジも消える",
 
   assert.deepEqual(
     view.nodes.map((n) => n.id),
-    ["G-1", "N-1", "FR-1", "QR-1"],
+    ["Goal-1", "Need-1", "FR-1", "QR-1"],
   );
   assert.ok(!view.edges.some((e) => e.name === "has_source"));
 });
@@ -91,7 +91,7 @@ test("status を外すと、そのノードとそこに繋がるエッジが消�
 
   assert.deepEqual(
     view.nodes.map((n) => n.id),
-    ["G-1", "N-1"],
+    ["Goal-1", "Need-1"],
   );
   assert.deepEqual(
     view.edges.map((e) => e.name),
@@ -102,7 +102,7 @@ test("status を外すと、そのノードとそこに繋がるエッジが消�
 test("status の絞り込みは影響範囲の計算にも効く", () => {
   const data = fixture();
   const all = createView(data, allOn(data));
-  assert.ok(reach(all, "QR-1", true).has("N-1")); // QR-1 → FR-1 → N-1
+  assert.ok(reach(all, "QR-1", true).has("Need-1")); // QR-1 → FR-1 → Need-1
 
   // 中継点の FR-1 (proposed) を落とすと、その先へは辿れなくなる。
   const statuses = new Set(["approved", "verified", "implemented"]);
@@ -149,9 +149,9 @@ test("絞り込み中は edge_names の並びで選択中の種別を返す", ()
 test("下流は辿れる先すべて、上流は辿り着ける元すべて", () => {
   const view = viewOf();
 
-  assert.deepEqual([...reach(view, "FR-1", true)].sort(), ["N-1", "SRC-1"]);
+  assert.deepEqual([...reach(view, "FR-1", true)].sort(), ["Need-1", "SRC-1"]);
   assert.deepEqual([...reach(view, "FR-1", false)].sort(), ["QR-1"]);
-  assert.deepEqual([...reach(view, "N-1", false)].sort(), ["FR-1", "G-1", "QR-1"]);
+  assert.deepEqual([...reach(view, "Need-1", false)].sort(), ["FR-1", "Goal-1", "QR-1"]);
 });
 
 test("始点は結果に含まれない", () => {
@@ -173,12 +173,12 @@ test("エッジの絞り込みは影響範囲の計算にも効く", () => {
 test("閉路があっても止まる", () => {
   const data = fixture();
   data.edges.push(
-    { source: "N-1", name: "has_source", target: "FR-1" },
-    { source: "FR-1", name: "satisfies", target: "N-1" },
+    { source: "Need-1", name: "has_source", target: "FR-1" },
+    { source: "FR-1", name: "satisfies", target: "Need-1" },
   );
   const view = createView(data, allOn(data));
 
-  assert.ok(reach(view, "FR-1", true).has("N-1"));
+  assert.ok(reach(view, "FR-1", true).has("Need-1"));
   assert.ok(!reach(view, "FR-1", true).has("FR-1"));
 });
 
@@ -194,9 +194,9 @@ test("知らない id からは何も辿れない", () => {
 test("深さを指定すると、そのホップ数までしか辿らない", () => {
   const view = viewOf();
 
-  // QR-1 → FR-1 → N-1 → (SRC-1)
+  // QR-1 → FR-1 → Need-1 → (SRC-1)
   assert.deepEqual([...reach(view, "QR-1", true, 1)], ["FR-1"]);
-  assert.deepEqual([...reach(view, "QR-1", true, 2)].sort(), ["FR-1", "N-1", "SRC-1"]);
+  assert.deepEqual([...reach(view, "QR-1", true, 2)].sort(), ["FR-1", "Need-1", "SRC-1"]);
   assert.deepEqual(
     [...reach(view, "QR-1", true, 5)].sort(),
     [...reach(view, "QR-1", true)].sort(),
@@ -206,15 +206,15 @@ test("深さを指定すると、そのホップ数までしか辿らない", ()
 test("深さ null は無制限 (既定)", () => {
   const view = viewOf();
 
-  assert.deepEqual([...reach(view, "QR-1", true, null)].sort(), ["FR-1", "N-1", "SRC-1"]);
+  assert.deepEqual([...reach(view, "QR-1", true, null)].sort(), ["FR-1", "Need-1", "SRC-1"]);
 });
 
 test("無向で辿ると向きを問わず集まる", () => {
   const view = viewOf();
 
   // 有向では FR-1 の上流は QR-1 だけだが、無向なら Goal 側の文脈まで届く。
-  assert.deepEqual([...related(view, "FR-1", 1)].sort(), ["N-1", "QR-1", "SRC-1"]);
-  assert.ok(related(view, "FR-1", 2).has("G-1"));
+  assert.deepEqual([...related(view, "FR-1", 1)].sort(), ["Need-1", "QR-1", "SRC-1"]);
+  assert.ok(related(view, "FR-1", 2).has("Goal-1"));
   assert.ok(!related(view, "FR-1").has("FR-1"));
 });
 
@@ -232,8 +232,8 @@ test("impactSets は上流・下流・全体を返す", () => {
   const impact = impactSets(view, "FR-1", { depth: null, undirected: false });
 
   assert.deepEqual([...impact.upstream], ["QR-1"]);
-  assert.deepEqual([...impact.downstream].sort(), ["N-1", "SRC-1"]);
-  assert.deepEqual([...impact.whole].sort(), ["FR-1", "N-1", "QR-1", "SRC-1"]);
+  assert.deepEqual([...impact.downstream].sort(), ["Need-1", "SRC-1"]);
+  assert.deepEqual([...impact.whole].sort(), ["FR-1", "Need-1", "QR-1", "SRC-1"]);
   assert.equal(impact.undirected, false);
 });
 
@@ -242,7 +242,7 @@ test("無向のときは全件を下流側に入れる (impact_set と同じ切�
   const impact = impactSets(view, "FR-1", { depth: 1, undirected: true });
 
   assert.equal(impact.upstream.size, 0);
-  assert.deepEqual([...impact.downstream].sort(), ["N-1", "QR-1", "SRC-1"]);
+  assert.deepEqual([...impact.downstream].sort(), ["Need-1", "QR-1", "SRC-1"]);
   assert.equal(impact.undirected, true);
 });
 
@@ -252,7 +252,7 @@ test("scope を省略すると view の state から取る", () => {
 
   assert.deepEqual(
     [...impactSets(view, "FR-1").downstream].sort(),
-    ["N-1", "QR-1", "SRC-1"],
+    ["Need-1", "QR-1", "SRC-1"],
   );
 });
 
@@ -274,7 +274,7 @@ test("深さ・向きの設定は絞り込みと重ねて効く", () => {
 
   // has_source を外したので、無向 1 ホップからも SRC-1 が消える。
   assert.deepEqual([...impactSets(view, "FR-1", { depth: 1, undirected: true }).downstream].sort(), [
-    "N-1",
+    "Need-1",
     "QR-1",
   ]);
 });
@@ -316,19 +316,19 @@ test("隣接マップの探索は、全エッジを走査する素朴な実装�
 test("深さ 1 の近傍は、自分と直接繋がる相手 (向きは問わない)", () => {
   const view = viewOf();
 
-  assert.deepEqual([...focusSet(view, "FR-1", 1)].sort(), ["FR-1", "N-1", "QR-1", "SRC-1"]);
+  assert.deepEqual([...focusSet(view, "FR-1", 1)].sort(), ["FR-1", "Need-1", "QR-1", "SRC-1"]);
 });
 
 test("深さを増やすと 1 ホップずつ広がる", () => {
   const view = viewOf();
 
-  //: FR-1 の 1 ホップ先 N-1 の隣に G-1 がいる。
-  assert.ok(!focusSet(view, "FR-1", 1).has("G-1"));
-  assert.ok(focusSet(view, "FR-1", 2).has("G-1"));
+  //: FR-1 の 1 ホップ先 Need-1 の隣に Goal-1 がいる。
+  assert.ok(!focusSet(view, "FR-1", 1).has("Goal-1"));
+  assert.ok(focusSet(view, "FR-1", 2).has("Goal-1"));
 });
 
 test("近傍は始点自身を含む", () => {
-  assert.ok(focusSet(viewOf(), "N-1", 1).has("N-1"));
+  assert.ok(focusSet(viewOf(), "Need-1", 1).has("Need-1"));
 });
 
 test("絞り込みで消えたノードは近傍にも出ない", () => {
@@ -337,7 +337,7 @@ test("絞り込みで消えたノードは近傍にも出ない", () => {
   types.delete("Source");
   const view = createView(data, { ...allOn(data), types });
 
-  assert.deepEqual([...focusSet(view, "FR-1", 1)].sort(), ["FR-1", "N-1", "QR-1"]);
+  assert.deepEqual([...focusSet(view, "FR-1", 1)].sort(), ["FR-1", "Need-1", "QR-1"]);
 });
 
 test("見えていないノードを始点にすると空になる", () => {
@@ -532,7 +532,7 @@ test("テーブルは絞り込み後のノードだけを出す", () => {
 
 test("検索語は id と本文の部分一致で効く", () => {
   assert.deepEqual(rowsOf({}, "fr-").rows.map((row) => row.id), ["FR-1"]);
-  assert.deepEqual(rowsOf({}, "領収書").rows.map((row) => row.id), ["N-1", "FR-1"]);
+  assert.deepEqual(rowsOf({}, "領収書").rows.map((row) => row.id), ["Need-1", "FR-1"]);
   assert.equal(rowsOf({}, "  ").rows.length, 5);
 });
 
@@ -546,7 +546,7 @@ test("matchesQuery は空の検索語をすべて通す", () => {
 // --- 検索ヒット (グラフのハイライトとキーボード選択) -------------------------
 
 test("searchHits は一覧と同じ並びでヒットした id を返す", () => {
-  assert.deepEqual(searchHits(viewOf(), "領収書"), ["N-1", "FR-1"]);
+  assert.deepEqual(searchHits(viewOf(), "領収書"), ["Need-1", "FR-1"]);
 });
 
 test("検索語が空ならヒット無し (全件ではない)", () => {
@@ -565,57 +565,57 @@ test("絞り込みで消えたノードはヒットに入らない", () => {
 });
 
 test("↑↓ は候補を送り、端で巻き戻す", () => {
-  const hits = ["N-1", "FR-1", "QR-1"];
+  const hits = ["Need-1", "FR-1", "QR-1"];
 
-  assert.equal(stepHit(hits, "N-1", 1), "FR-1");
-  assert.equal(stepHit(hits, "QR-1", 1), "N-1");
-  assert.equal(stepHit(hits, "N-1", -1), "QR-1");
+  assert.equal(stepHit(hits, "Need-1", 1), "FR-1");
+  assert.equal(stepHit(hits, "QR-1", 1), "Need-1");
+  assert.equal(stepHit(hits, "Need-1", -1), "QR-1");
 });
 
 test("位置が無いときは端から始める", () => {
-  const hits = ["N-1", "FR-1"];
+  const hits = ["Need-1", "FR-1"];
 
-  assert.equal(stepHit(hits, null, 1), "N-1");
+  assert.equal(stepHit(hits, null, 1), "Need-1");
   assert.equal(stepHit(hits, null, -1), "FR-1");
   //: 絞り込みで候補から外れた id も「位置が無い」扱い。
-  assert.equal(stepHit(hits, "SRC-1", 1), "N-1");
+  assert.equal(stepHit(hits, "SRC-1", 1), "Need-1");
   assert.equal(stepHit([], null, 1), null);
 });
 
 test("文字の列は素直に昇順・降順", () => {
-  assert.deepEqual(idsSortedBy("id", true), ["FR-1", "G-1", "N-1", "QR-1", "SRC-1"]);
-  assert.deepEqual(idsSortedBy("id", false), ["SRC-1", "QR-1", "N-1", "G-1", "FR-1"]);
+  assert.deepEqual(idsSortedBy("id", true), ["FR-1", "Goal-1", "Need-1", "QR-1", "SRC-1"]);
+  assert.deepEqual(idsSortedBy("id", false), ["SRC-1", "QR-1", "Need-1", "Goal-1", "FR-1"]);
 });
 
 test("type は種別の定義順に並ぶ (辞書順ではない)", () => {
-  assert.deepEqual(idsSortedBy("type", true), ["G-1", "N-1", "FR-1", "QR-1", "SRC-1"]);
+  assert.deepEqual(idsSortedBy("type", true), ["Goal-1", "Need-1", "FR-1", "QR-1", "SRC-1"]);
 });
 
 test("status は成熟度の順に並ぶ (辞書順ではない)", () => {
-  assert.deepEqual(idsSortedBy("status", true), ["FR-1", "QR-1", "SRC-1", "G-1", "N-1"]);
+  assert.deepEqual(idsSortedBy("status", true), ["FR-1", "QR-1", "SRC-1", "Goal-1", "Need-1"]);
 });
 
 test("値の無い行は向きに関わらず末尾に置く", () => {
   //: 成熟度 (status_rank) に無い status は「値が無い」扱い。
   //: statuses を渡さない (絞り込み無しの) state でないと、その行自体が消える。
   const data = fixture();
-  data.nodes.find((node) => node.id === "N-1").status = "unknown";
+  data.nodes.find((node) => node.id === "Need-1").status = "unknown";
   const view = createView(data, { ...allOn(data), statuses: null });
   const sorted = (asc) =>
     sortRows(view, tableRows(view), { key: "status", asc }).map((row) => row.id);
 
-  assert.deepEqual(sorted(true), ["FR-1", "QR-1", "SRC-1", "G-1", "N-1"]);
-  assert.deepEqual(sorted(false), ["G-1", "FR-1", "QR-1", "SRC-1", "N-1"]);
+  assert.deepEqual(sorted(true), ["FR-1", "QR-1", "SRC-1", "Goal-1", "Need-1"]);
+  assert.deepEqual(sorted(false), ["Goal-1", "FR-1", "QR-1", "SRC-1", "Need-1"]);
 });
 
 test("指摘の多い順に並べられる", () => {
-  assert.deepEqual(idsSortedBy("findings", false), ["QR-1", "FR-1", "G-1", "N-1", "SRC-1"]);
+  assert.deepEqual(idsSortedBy("findings", false), ["QR-1", "FR-1", "Goal-1", "Need-1", "SRC-1"]);
 });
 
 test("同値の行は正規化 JSON の並び (型順 → id 順) で決まる", () => {
   // 指摘 0 件の 3 行は、昇順でも降順でも常にこの並びになる。
   const ascending = idsSortedBy("findings", true).slice(0, 3);
-  assert.deepEqual(ascending, ["G-1", "N-1", "SRC-1"]);
+  assert.deepEqual(ascending, ["Goal-1", "Need-1", "SRC-1"]);
 });
 
 test("sortRows は渡された配列を書き換えない", () => {
@@ -821,16 +821,16 @@ test("nodeContext は対象・上流・下流・エッジを並べる", () => {
   assert.match(text, /    受け入れ基準: 正解率が 95% 以上である/);
   assert.match(text, /## 上流 \(この変更の理由・根拠になるノード\) \(1 件\)/);
   assert.match(text, /## 下流 \(この変更の影響を受けるノード\) \(2 件\)/);
-  assert.match(text, /- FR-1 --satisfies--> N-1/);
+  assert.match(text, /- FR-1 --satisfies--> Need-1/);
   assert.ok(text.endsWith("\n"));
 });
 
 test("nodeContext は kind / decomposition を属性行に出す", () => {
-  const text = nodeContext(viewOf(), "G-1");
+  const text = nodeContext(viewOf(), "Goal-1");
 
-  assert.match(text, /- \[Goal\] G-1: .*\n {4}\(status=approved\)/);
+  assert.match(text, /- \[Goal\] Goal-1: .*\n {4}\(status=approved\)/);
   assert.match(text, /- \[Source\] SRC-1: .*\n {4}\(status=proposed, kind=stakeholder\)/);
-  // G-1 は誰からも refines されていないので decomposition は出ない。
+  // Goal-1 は誰からも refines されていないので decomposition は出ない。
   assert.ok(!text.includes("decomposition="));
 });
 
@@ -838,18 +838,18 @@ test("子から refines されている Goal にだけ decomposition が付く",
   const data = fixture();
   data.nodes.push({
     type: "Goal",
-    id: "G-2",
+    id: "Goal-2",
     text: "承認を速くする",
     status: "proposed",
     has_source: [],
     decomposition: "AND",
-    refines: ["G-1"],
+    refines: ["Goal-1"],
     motivates: [],
   });
-  data.edges.push({ source: "G-2", name: "refines", target: "G-1" });
+  data.edges.push({ source: "Goal-2", name: "refines", target: "Goal-1" });
   const view = createView(data, allOn(data));
 
-  assert.match(nodeContext(view, "G-2"), /G-1: .*\n {4}\(status=approved, decomposition=AND\)/);
+  assert.match(nodeContext(view, "Goal-2"), /Goal-1: .*\n {4}\(status=approved, decomposition=AND\)/);
 });
 
 test("エッジを絞ると nodeContext にフィルタ行が出る", () => {
@@ -880,7 +880,7 @@ test("深さを指定すると探索深さの行が出て、範囲もそこで�
 test("無向のときは関連ノードを 1 ブロックにまとめる", () => {
   const text = nodeContext(viewOf(), "FR-1", { depth: null, undirected: true });
 
-  //: 無向なら FR-1 から Goal 側 (G-1) まで届く (有向の上流は QR-1 だけ)。
+  //: 無向なら FR-1 から Goal 側 (Goal-1) まで届く (有向の上流は QR-1 だけ)。
   assert.match(text, /対象 1 件 \/ 関連 4 件 \/ 合計 5 件/);
   assert.match(text, /探索方向: 無向 \(エッジの向きを無視\)/);
   assert.match(text, /## 関連ノード \(向きを問わず繋がっているノード\) \(4 件\)/);
@@ -933,13 +933,13 @@ test("graphElements はノードとエッジをそのまま要素にする", () 
 
   // ノード 5 + エッジ 6 + 帯枠 2 (Goal / Need)。枠は末尾に足す。
   assert.equal(elements.length, 13);
-  assert.equal(elements[0].data.id, "G-1");
+  assert.equal(elements[0].data.id, "Goal-1");
   assert.equal(elements[0].data.type, "Goal");
-  assert.match(elements[0].data.label, /^G-1\n/);
+  assert.match(elements[0].data.label, /^Goal-1\n/);
   assert.deepEqual(elements[5].data, {
     id: "e0",
     index: 0,
-    source: "G-1",
+    source: "Goal-1",
     target: "SRC-1",
     name: "has_source",
   });
@@ -1037,8 +1037,8 @@ test("無向で辿ったノードは関連の色で塗る", () => {
 test("graphElements は status をデータに載せる", () => {
   const elements = graphElements(fixture());
 
-  assert.equal(elements[0].data.status, "approved"); // G-1
-  assert.equal(elements[1].data.status, "approved"); // N-1
+  assert.equal(elements[0].data.status, "approved"); // Goal-1
+  assert.equal(elements[1].data.status, "approved"); // Need-1
   assert.equal(elements[2].data.status, "proposed"); // FR-1
 });
 
@@ -1190,14 +1190,14 @@ const BANDS = [
 test("bandedLayout は Goal 帯 → Need 帯 → その他 の順に上から並べる", () => {
   // dagre が Goal と FR を同じ高さ (y=0) に置いてしまった状態。
   const placed = [
-    placedNode("G-1", "Goal", 0, 0),
+    placedNode("Goal-1", "Goal", 0, 0),
     placedNode("FR-1", "FunctionalRequirement", 100, 0),
-    placedNode("N-1", "Need", 50, 80),
+    placedNode("Need-1", "Need", 50, 80),
   ];
   const { positions } = bandedLayout(BANDS, placed, [], "TD");
 
-  const goal = positions.get("G-1");
-  const need = positions.get("N-1");
+  const goal = positions.get("Goal-1");
+  const need = positions.get("Need-1");
   const fr = positions.get("FR-1");
   assert.ok(goal.y < need.y, "Goal は Need より上");
   assert.ok(need.y < fr.y, "Need は FR より上");
@@ -1207,14 +1207,14 @@ test("bandedLayout は Goal 帯 → Need 帯 → その他 の順に上から並
 
 test("bandedLayout は帯の中の並び順を保ったまま中央へ寄せる", () => {
   const placed = [
-    placedNode("G-1", "Goal", 0, 0),
-    placedNode("G-2", "Goal", 100, 0),
+    placedNode("Goal-1", "Goal", 0, 0),
+    placedNode("Goal-2", "Goal", 100, 0),
     placedNode("FR-1", "FunctionalRequirement", 400, 60),
   ];
   const { positions } = bandedLayout([BANDS[0]], placed, [], "TD");
 
-  const first = positions.get("G-1");
-  const second = positions.get("G-2");
+  const first = positions.get("Goal-1");
+  const second = positions.get("Goal-2");
   assert.ok(first.x < second.x, "帯の中の左右の並びは変わらない");
   assert.equal(second.x - first.x, 100, "帯の中の間隔も変わらない");
   // 図の全幅 (-30 〜 430) の中心 200 に、2 件の中心 (50) が寄る。
@@ -1223,8 +1223,8 @@ test("bandedLayout は帯の中の並び順を保ったまま中央へ寄せる"
 
 test("bandedLayout の枠は図の全幅に揃い、等幅で縦に並ぶ", () => {
   const placed = [
-    placedNode("G-1", "Goal", 0, 0),
-    placedNode("N-1", "Need", 50, 80),
+    placedNode("Goal-1", "Goal", 0, 0),
+    placedNode("Need-1", "Need", 50, 80),
     placedNode("FR-1", "FunctionalRequirement", 300, 160),
   ];
   const { positions, frames } = bandedLayout(BANDS, placed, [], "TD");
@@ -1238,41 +1238,41 @@ test("bandedLayout の枠は図の全幅に揃い、等幅で縦に並ぶ", () =
   assert.ok(goal.y < need.y, "縦に並ぶ");
   // 高さは中身 1 行ぶん (30) + 余白。枠は中身の上下に掛かる。
   assert.equal(goal.h, 30 + 28);
-  assert.equal(goal.y, positions.get("G-1").y);
+  assert.equal(goal.y, positions.get("Goal-1").y);
 });
 
 test("bandedLayout は refines の親 Goal を子 Goal より上の行に置く", () => {
   const placed = [
-    placedNode("G-1", "Goal", 0, 100), // 親 (dagre は下に置いた)
-    placedNode("G-2", "Goal", 0, 0), // 子
+    placedNode("Goal-1", "Goal", 0, 100), // 親 (dagre は下に置いた)
+    placedNode("Goal-2", "Goal", 0, 0), // 子
   ];
-  const edges = [{ source: "G-2", name: "refines", target: "G-1" }];
+  const edges = [{ source: "Goal-2", name: "refines", target: "Goal-1" }];
   const { positions } = bandedLayout([BANDS[0]], placed, edges, "TD");
 
-  assert.ok(positions.get("G-1").y < positions.get("G-2").y);
+  assert.ok(positions.get("Goal-1").y < positions.get("Goal-2").y);
 });
 
 test("bandedLayout は帯の中の重なりを副軸方向へ押して解消する", () => {
   const placed = [
-    placedNode("N-1", "Need", 0, 0),
-    placedNode("N-2", "Need", 10, 40), // 幅 60 なので N-1 と重なる
+    placedNode("Need-1", "Need", 0, 0),
+    placedNode("Need-2", "Need", 10, 40), // 幅 60 なので Need-1 と重なる
   ];
   const { positions } = bandedLayout([BANDS[1]], placed, [], "TD");
 
-  const left = positions.get("N-1");
-  const right = positions.get("N-2");
+  const left = positions.get("Need-1");
+  const right = positions.get("Need-2");
   assert.equal(left.y, right.y, "同じ行に並ぶ");
   assert.ok(right.x - left.x >= 60, "ノード幅ぶん以上離れる");
 });
 
 test("bandedLayout の LR は帯を左に積み、縦の並びを保つ", () => {
   const placed = [
-    placedNode("G-1", "Goal", 0, 0),
+    placedNode("Goal-1", "Goal", 0, 0),
     placedNode("FR-1", "FunctionalRequirement", 0, 100),
   ];
   const { positions } = bandedLayout(BANDS, placed, [], "LR");
 
-  assert.ok(positions.get("G-1").x < positions.get("FR-1").x, "Goal は FR より左");
+  assert.ok(positions.get("Goal-1").x < positions.get("FR-1").x, "Goal は FR より左");
   assert.equal(positions.get("FR-1").y, 100, "副軸 (y) は動かさない");
 });
 
@@ -1286,7 +1286,7 @@ test("bandedLayout は帯のノードが無ければ何も返さない", () => {
 
 test("bandedLayout は帯以外のノードの相対位置を保ったまま平行移動する", () => {
   const placed = [
-    placedNode("G-1", "Goal", 0, 50),
+    placedNode("Goal-1", "Goal", 0, 50),
     placedNode("FR-1", "FunctionalRequirement", 20, 0),
     placedNode("QR-1", "QualityRequirement", 80, 90),
   ];
@@ -1296,7 +1296,7 @@ test("bandedLayout は帯以外のノードの相対位置を保ったまま平�
   const qr = positions.get("QR-1");
   assert.equal(qr.x - fr.x, 60);
   assert.equal(qr.y - fr.y, 90);
-  assert.ok(positions.get("G-1").y < fr.y);
+  assert.ok(positions.get("Goal-1").y < fr.y);
 });
 
 test("layoutOptions は TD / LR を dagre の rankDir に写す", () => {
@@ -1353,7 +1353,7 @@ test("エッジ一覧は相手の id と本文を持つ", () => {
     out.map((item) => [item.arrow, item.id, item.text]),
     [
       ["--has_source-->", "SRC-1", "申請者となる一般社員"],
-      ["--satisfies-->", "N-1", "領収書を撮影するだけで申請したい"],
+      ["--satisfies-->", "Need-1", "領収書を撮影するだけで申請したい"],
     ],
   );
   assert.deepEqual(
@@ -1370,7 +1370,7 @@ test("絞り込みで消えたエッジは一覧にも出ない", () => {
 
   assert.deepEqual(
     edgeItems(view, "FR-1").out.map((item) => item.id),
-    ["N-1"],
+    ["Need-1"],
   );
 });
 
@@ -1552,9 +1552,9 @@ test("Mermaid は見えているノードとエッジだけを出す", () => {
   types.delete("Source");
   const text = mermaidText(createView(data, { ...allOn(data), types }));
 
-  //: 識別子は描く順の連番 (G-1, N-1, FR-1, QR-1 の 4 件)。
+  //: 識別子は描く順の連番 (Goal-1, Need-1, FR-1, QR-1 の 4 件)。
   assert.ok(text.startsWith("flowchart TD\n"));
-  assert.ok(text.includes('n1("<b>G-1</b> [Goal]<br/>経費精算を速くする")'));
+  assert.ok(text.includes('n1("<b>Goal-1</b> [Goal]<br/>経費精算を速くする")'));
   assert.ok(!text.includes("SRC-1"));
   assert.ok(!text.includes("has_source"));
   assert.ok(text.includes("    n1 -->|motivates| n2"));
@@ -1580,7 +1580,7 @@ test("破線にするエッジ種別は meta が決める", () => {
   const view = viewOf();
   const text = mermaidText(view);
 
-  //: G-1 = n1, N-1 = n2, FR-1 = n3, QR-1 = n4, SRC-1 = n5。
+  //: Goal-1 = n1, Need-1 = n2, FR-1 = n3, QR-1 = n4, SRC-1 = n5。
   assert.ok(text.includes("n1 -.->|has_source| n5"));
   assert.ok(text.includes("n3 -->|satisfies| n2"));
 });
@@ -1589,13 +1589,13 @@ test("記号だけが異なる id でもノードは融合しない", () => {
   const data = fixture();
   //: `FR-1` の記号違い。元の id から識別子を作ると両者が同じになる。
   data.nodes.push({ ...data.nodes[2], id: "FR_1", text: "金額を表示すること" });
-  data.edges.push({ source: "FR_1", name: "satisfies", target: "N-1" });
+  data.edges.push({ source: "FR_1", name: "satisfies", target: "Need-1" });
   const text = mermaidText(createView(data, allOn(data)));
 
   const declared = [...text.matchAll(/^ {4}(\w+)\("<b>(.+?)<\/b>/gm)];
   assert.equal(declared.length, 6);
   assert.equal(new Set(declared.map(([, id]) => id)).size, 6);
-  //: 2 つの FR が別々の端点から N-1 を指す。
+  //: 2 つの FR が別々の端点から Need-1 を指す。
   const [, dash] = declared.find(([, , nodeId]) => nodeId === "FR-1");
   const [, under] = declared.find(([, , nodeId]) => nodeId === "FR_1");
   assert.notEqual(dash, under);
@@ -1608,20 +1608,20 @@ test("記号だけが異なる id でもノードは融合しない", () => {
 const scene = (overrides = {}) => ({
   nodes: [
     {
-      id: "G-1",
+      id: "Goal-1",
       type: "Goal",
       status: "approved",
-      label: "G-1\n経費精算",
+      label: "Goal-1\n経費精算",
       x: 0,
       y: 0,
       w: 100,
       h: 40,
     },
     {
-      id: "N-1",
+      id: "Need-1",
       type: "Need",
       status: "proposed",
-      label: "N-1\n撮影するだけ",
+      label: "Need-1\n撮影するだけ",
       x: 0,
       y: 120,
       w: 100,

@@ -210,12 +210,12 @@ def render() -> str:
 
     # ゴール ----------------------------------------------------------------
     #
-    # G-1 (根) → G-2..G-5 (中間) → G-6..G-13 (葉)。葉だけが Need を動機づける。
+    # Goal-1 (根) → Goal-2..Goal-5 (中間) → Goal-6..Goal-13 (葉)。葉だけが Need を動機づける。
     parts.append(section("ゴール"))
     parts.append(
         node(
             "Goal",
-            id="G-1",
+            id="Goal-1",
             text="物流業務全体の処理時間を 30% 削減する",
             status="approved",
             has_source=["SRC-1"],
@@ -226,11 +226,11 @@ def render() -> str:
         parts.append(
             node(
                 "Goal",
-                id=f"G-{number}",
+                id=f"Goal-{number}",
                 text=f"{area(index)}業務の手戻りを 20% 減らす",
                 status="approved",
                 has_source=[source_of(index)],
-                refines=["G-1"],
+                refines=["Goal-1"],
             )
         )
     for index in range(GOALS_LEAF):
@@ -239,13 +239,13 @@ def render() -> str:
         parts.append(
             node(
                 "Goal",
-                id=f"G-{number}",
+                id=f"Goal-{number}",
                 text=f"{area(index + GOALS_MID)}の入力と確認にかかる工数を減らす",
                 status="approved",
                 has_source=[source_of(index + 1)],
-                refines=[f"G-{parent}"],
+                refines=[f"Goal-{parent}"],
                 motivates=[
-                    f"N-{need}"
+                    f"Need-{need}"
                     for need in range(1, NEEDS + 1)
                     if (need - 1) * GOALS_LEAF // NEEDS == index
                 ],
@@ -260,7 +260,7 @@ def render() -> str:
         parts.append(
             node(
                 "Need",
-                id=f"N-{number}",
+                id=f"Need-{number}",
                 text=f"{role}は、{area(index)}の{thing(index)}を{WANTS[index % len(WANTS)]}",
                 status="approved" if index % 3 else "implemented",
                 has_source=[source_of(index), source_of(index + 3)],
@@ -282,7 +282,7 @@ def render() -> str:
                 text=f"{area(index)}の{thing(index)}を{FR_VERBS[index % len(FR_VERBS)]}",
                 status=status,
                 has_source=[source_of(index)],
-                satisfies=[] if refines_parent else [f"N-{index % NEEDS + 1}"],
+                satisfies=[] if refines_parent else [f"Need-{index % NEEDS + 1}"],
                 refines=[f"FR-{number - 1}"] if refines_parent else [],
                 evidence=evidence_for(status, index),
                 acceptance_criteria=[
@@ -321,7 +321,7 @@ def render() -> str:
         parts.append(
             node(
                 "Constraint",
-                id=f"C-{number}",
+                id=f"Constraint-{number}",
                 text=f"{area(index)}の操作は社内ネットワークからのみ受け付けること",
                 status="approved" if index % 2 else "proposed",
                 has_source=[source_of(index + 4)],

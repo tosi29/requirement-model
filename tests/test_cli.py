@@ -33,7 +33,7 @@ def test_validate_json_output(capsys):
 def test_validate_reports_errors_and_exits_nonzero(tmp_path: Path, capsys):
     definition = tmp_path / "requirements.py"
     definition.write_text(
-        HEADER + 'n = Need(id="N-1", text="早く精算する")\n', encoding="utf-8"
+        HEADER + 'n = Need(id="Need-1", text="早く精算する")\n', encoding="utf-8"
     )
     assert main(["validate", str(definition)]) == 1
     assert "syntax.invalid_field" in capsys.readouterr().out
@@ -42,7 +42,7 @@ def test_validate_reports_errors_and_exits_nonzero(tmp_path: Path, capsys):
 def test_validate_strict_turns_warnings_into_failure(tmp_path: Path, capsys):
     definition = tmp_path / "requirements.py"
     definition.write_text(
-        HEADER + 'n = Need(id="N-1", text="早く精算したい")\n', encoding="utf-8"
+        HEADER + 'n = Need(id="Need-1", text="早く精算したい")\n', encoding="utf-8"
     )
     assert main(["validate", str(definition)]) == 0
     assert main(["validate", str(definition), "--strict"]) == 1
@@ -59,7 +59,7 @@ def test_validate_skips_layer2_when_layer0_fails(tmp_path: Path, capsys):
 def test_no_lexicon_option(tmp_path: Path, capsys):
     definition = tmp_path / "requirements.py"
     definition.write_text(
-        HEADER + 'n = Need(id="N-1", text="適切に精算したい")\n', encoding="utf-8"
+        HEADER + 'n = Need(id="Need-1", text="適切に精算したい")\n', encoding="utf-8"
     )
     main(["validate", str(definition)])
     assert "semantics.ambiguous_term" in capsys.readouterr().out
@@ -77,7 +77,7 @@ WAIVER_HEADER = (
 def waived(code: str) -> str:
     """指定コードを抑制した Need の定義ファイル。"""
     return (
-        WAIVER_HEADER + 'n = Need(id="N-1", text="早く精算したい", has_source=[s],\n'
+        WAIVER_HEADER + 'n = Need(id="Need-1", text="早く精算したい", has_source=[s],\n'
         f'         suppress=[("{code}", "この版では FR を書かない")])\n'
     )
 
@@ -115,7 +115,7 @@ def test_validate_json_reports_suppressed_findings(tmp_path: Path, capsys):
             "code": "structure.orphan_need",
             "layer": 2,
             "message": "どの FR からも satisfies されていない (置き去りのニーズ)",
-            "node_id": "N-1",
+            "node_id": "Need-1",
             "location": f"{definition}:3",
             "reason": "この版では FR を書かない",
         }
@@ -157,14 +157,14 @@ def test_explain_command(capsys):
     assert main(["explain", "FR-3", "-f", SAMPLE]) == 0
     out = capsys.readouterr().out
     assert "# 影響部分グラフ: FR-3" in out
-    assert "FR-3 --satisfies--> N-2" in out
+    assert "FR-3 --satisfies--> Need-2" in out
 
 
 def test_explain_json_command(capsys):
     assert main(["explain", "FR-3", "-f", SAMPLE, "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["targets"] == ["FR-3"]
-    assert "N-2" in payload["descendants"]
+    assert "Need-2" in payload["descendants"]
     assert payload["subgraph"]["nodes"]
 
 
@@ -209,12 +209,12 @@ def test_plan_command(tmp_path: Path, capsys, monkeypatch):
     git("config", "user.name", "t")
     definition = tmp_path / "requirements.py"
     definition.write_text(
-        HEADER + 'n = Need(id="N-1", text="早く精算したい")\n', encoding="utf-8"
+        HEADER + 'n = Need(id="Need-1", text="早く精算したい")\n', encoding="utf-8"
     )
     git("add", "requirements.py")
     git("commit", "-m", "first")
     definition.write_text(
-        HEADER + 'n = Need(id="N-1", text="今すぐ精算したい")\n', encoding="utf-8"
+        HEADER + 'n = Need(id="Need-1", text="今すぐ精算したい")\n', encoding="utf-8"
     )
 
     monkeypatch.chdir(tmp_path)
@@ -229,7 +229,7 @@ def test_doc_command_writes_spec(tmp_path: Path):
     assert main(["doc", SAMPLE, "-o", str(output)]) == 0
     text = output.read_text(encoding="utf-8")
     assert text.startswith("# 要求仕様書\n")
-    assert "### G-1 経費精算にかかる全社の工数を半減する" in text
+    assert "### Goal-1 経費精算にかかる全社の工数を半減する" in text
     assert "##### FR-1 領収書画像から金額と日付を抽出し" in text
 
 
@@ -243,7 +243,7 @@ def test_doc_matrix_infers_csv_from_output_suffix(tmp_path: Path):
     assert main(["doc", SAMPLE, "--matrix", "-o", str(output)]) == 0
     rows = list(csv.reader(output.read_text(encoding="utf-8").splitlines()))
     assert rows[0][:4] == ["matrix", "edge", "row_type", "row_id"]
-    assert ["Need × FR", "satisfies", "Need", "N-1"] in [row[:4] for row in rows]
+    assert ["Need × FR", "satisfies", "Need", "Need-1"] in [row[:4] for row in rows]
 
 
 def test_doc_matrix_markdown(capsys):
@@ -296,11 +296,11 @@ def test_stats_does_not_fail_on_an_unhealthy_model(tmp_path: Path, capsys):
     """stats は判定をしない。指摘だらけのモデルでも終了コードは 0。"""
     definition = tmp_path / "requirements.py"
     definition.write_text(
-        HEADER + 'n = Need(id="N-1", text="適切に精算したい")\n', encoding="utf-8"
+        HEADER + 'n = Need(id="Need-1", text="適切に精算したい")\n', encoding="utf-8"
     )
     assert main(["stats", str(definition)]) == 0
     out = capsys.readouterr().out
-    assert "- Need の充足率 (satisfies されている): 0.0% (0/1) 未達: N-1" in out
+    assert "- Need の充足率 (satisfies されている): 0.0% (0/1) 未達: Need-1" in out
     assert "- 指摘 1 件 / 1 ノード = 1.00 件/ノード" in out
 
 

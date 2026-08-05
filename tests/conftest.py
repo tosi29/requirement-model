@@ -20,12 +20,12 @@ def source(node_id: str = "S-1", **kwargs) -> Source:
     return Source(id=node_id, **kwargs)
 
 
-def need(node_id: str = "N-1", **kwargs) -> Need:
+def need(node_id: str = "Need-1", **kwargs) -> Need:
     kwargs.setdefault("text", "早く精算したい")
     return Need(id=node_id, **kwargs)
 
 
-def goal(node_id: str = "G-1", **kwargs) -> Goal:
+def goal(node_id: str = "Goal-1", **kwargs) -> Goal:
     kwargs.setdefault("text", "精算工数を半減する")
     return Goal(id=node_id, **kwargs)
 
@@ -42,7 +42,7 @@ def qr(node_id: str = "QR-1", **kwargs) -> QualityRequirement:
     return QualityRequirement(id=node_id, **kwargs)
 
 
-def constraint(node_id: str = "C-1", **kwargs) -> Constraint:
+def constraint(node_id: str = "Constraint-1", **kwargs) -> Constraint:
     kwargs.setdefault("text", "国内リージョンにのみ保存すること")
     return Constraint(id=node_id, **kwargs)
 

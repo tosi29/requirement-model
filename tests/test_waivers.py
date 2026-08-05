@@ -19,12 +19,12 @@ SRC = Path(__file__).resolve().parents[1] / "src" / "reqmodel"
 
 
 def orphan_need_graph(*waivers: tuple[str, str]):
-    """satisfies されない Need が 2 つ。N-1 だけに抑制を書く。"""
+    """satisfies されない Need が 2 つ。Need-1 だけに抑制を書く。"""
     s = source("S-1")
     return build(
         s,
-        need("N-1", has_source=[s], suppress=list(waivers)),
-        need("N-2", has_source=[s]),
+        need("Need-1", has_source=[s], suppress=list(waivers)),
+        need("Need-2", has_source=[s]),
     )
 
 
@@ -38,9 +38,9 @@ def test_suppresses_only_the_named_node_and_code():
     result = apply_waivers(graph, validate_structure(graph))
 
     remaining = [f for f in result.findings if f.code == "structure.orphan_need"]
-    assert [f.node_id for f in remaining] == ["N-2"]
+    assert [f.node_id for f in remaining] == ["Need-2"]
     assert result.count == 1
-    assert result.suppressed[0].finding.node_id == "N-1"
+    assert result.suppressed[0].finding.node_id == "Need-1"
     assert result.suppressed[0].reason == "この版では FR を書かない"
 
 
@@ -48,7 +48,7 @@ def test_other_codes_on_the_same_node_survive():
     s = source("S-1")
     graph = build(
         s,
-        need("N-1", suppress=[("structure.orphan_need", "FR は次版で書く")]),
+        need("Need-1", suppress=[("structure.orphan_need", "FR は次版で書く")]),
     )
     result = apply_waivers(graph, validate_structure(graph))
 
@@ -59,7 +59,7 @@ def test_other_codes_on_the_same_node_survive():
 
 def test_suppression_covers_lexical_findings():
     s = source("S-1")
-    n = need("N-1", has_source=[s])
+    n = need("Need-1", has_source=[s])
     f = fr(
         "FR-1",
         text="領収書を高速に読み取ること",
@@ -67,7 +67,7 @@ def test_suppression_covers_lexical_findings():
         has_source=[s],
         suppress=[("semantics.ambiguous_term", "計測条件は QR-1 側に書いた")],
     )
-    graph = build(s, n, goal("G-1", motivates=[n], has_source=[s]), f)
+    graph = build(s, n, goal("Goal-1", motivates=[n], has_source=[s]), f)
     result = apply_waivers(graph, validate_semantics_lexical(graph))
 
     assert list(result.findings) == []
@@ -87,7 +87,7 @@ def test_errors_are_never_suppressed():
                 code="structure.orphan_need",
                 layer=2,
                 message="仮にエラーになった場合",
-                node_id="N-1",
+                node_id="Need-1",
             )
         ]
     )
@@ -100,7 +100,7 @@ def test_errors_are_never_suppressed():
 def test_suppressed_finding_keeps_its_location():
     graph = orphan_need_graph(("structure.orphan_need", "既知"))
     result = apply_waivers(graph, validate_structure(graph))
-    assert result.suppressed[0].finding.node_id == "N-1"
+    assert result.suppressed[0].finding.node_id == "Need-1"
     assert "抑制: 既知" in result.suppressed[0].format()
 
 
@@ -111,13 +111,13 @@ def test_suppressed_finding_keeps_its_location():
 
 def test_stale_waiver_is_reported():
     s = source("S-1")
-    n = need("N-1", has_source=[s], suppress=[("structure.orphan_qr", "QR は無い")])
+    n = need("Need-1", has_source=[s], suppress=[("structure.orphan_qr", "QR は無い")])
     graph = build(s, n, fr("FR-1", satisfies=[n], has_source=[s]))
     result = apply_waivers(graph, validate_structure(graph))
 
     stale = [f for f in result.findings if f.code == "waiver.stale"]
     assert len(stale) == 1
-    assert stale[0].node_id == "N-1"
+    assert stale[0].node_id == "Need-1"
     assert stale[0].severity == "warning"
     assert "structure.orphan_qr" in stale[0].message
     assert "QR は無い" in stale[0].message
@@ -126,7 +126,7 @@ def test_stale_waiver_is_reported():
 
 def test_stale_waiver_gets_the_node_location():
     graph = orphan_need_graph(("structure.orphan_qr", "QR は無い"))
-    graph.locations["N-1"] = "requirements.py:12"
+    graph.locations["Need-1"] = "requirements.py:12"
     result = apply_waivers(graph, validate_structure(graph))
 
     stale = [f for f in result.findings if f.code == "waiver.stale"]
@@ -166,13 +166,13 @@ def test_summary_counts_suppressed():
 )
 def test_invalid_suppress_declarations_are_rejected(value, expected):
     with pytest.raises(ValidationError) as excinfo:
-        Need(id="N-1", text="知りたい", suppress=value)
+        Need(id="Need-1", text="知りたい", suppress=value)
     assert expected in str(excinfo.value)
 
 
 def test_reason_is_stripped_and_kept_as_pairs():
     node = Need(
-        id="N-1", text="知りたい", suppress=[("structure.orphan_need", "  既知  ")]
+        id="Need-1", text="知りたい", suppress=[("structure.orphan_need", "  既知  ")]
     )
     assert node.suppress == [("structure.orphan_need", "既知")]
 
@@ -180,7 +180,7 @@ def test_reason_is_stripped_and_kept_as_pairs():
 def test_suppress_is_not_an_edge():
     """suppress は (str, str) の組なので、エッジとして拾われてはならない。"""
     graph = orphan_need_graph(("structure.orphan_need", "既知"))
-    assert [e.name for e in graph.out_edges("N-1")] == ["has_source"]
+    assert [e.name for e in graph.out_edges("Need-1")] == ["has_source"]
 
 
 # ---------------------------------------------------------------------------

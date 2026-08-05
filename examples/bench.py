@@ -17,7 +17,6 @@ from reqmodel import (
     Need,
     QualityRequirement,
     Source,
-    System,
 )
 
 # --- 源泉 ------------------------------------------------------------------------
@@ -61,14 +60,6 @@ Source(
     id="SRC-6",
     text="現行の基幹システムと表計算による運用",
     kind="existing_system",
-    status="approved",
-)
-
-# --- システム ----------------------------------------------------------------------
-
-System(
-    id="SYS",
-    text="物流管理システム",
     status="approved",
 )
 
@@ -2606,47 +2597,56 @@ QualityRequirement(
 
 QualityRequirement(
     id="QR-46",
-    text="積載を含む全機能の稼働率を月間 99.9% 以上に保つこと",
+    text="積載の予定の表示を 2 秒以内に返すこと",
     status="approved",
     has_source=["SRC-6"],
-    qualifies=["SYS"],
+    qualifies=["FR-181"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
 QualityRequirement(
     id="QR-47",
-    text="通関を含む全機能の稼働率を月間 99.9% 以上に保つこと",
+    text="通関の明細の表示を 2 秒以内に返すこと",
     status="implemented",
     has_source=["SRC-1"],
-    qualifies=["SYS"],
+    qualifies=["FR-185"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
 QualityRequirement(
     id="QR-48",
-    text="検品を含む全機能の稼働率を月間 99.9% 以上に保つこと",
+    text="検品の残高の表示を 2 秒以内に返すこと",
     status="verified",
     has_source=["SRC-2"],
-    qualifies=["SYS"],
+    qualifies=["FR-189"],
     evidence=["検品の受入テスト第 3 回で、全項目が合格している"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
 QualityRequirement(
     id="QR-49",
-    text="受注を含む全機能の稼働率を月間 99.9% 以上に保つこと",
+    text="受注の区分の表示を 2 秒以内に返すこと",
     status="proposed",
     has_source=["SRC-3"],
-    qualifies=["SYS"],
+    qualifies=["FR-193"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 
 QualityRequirement(
     id="QR-50",
-    text="在庫を含む全機能の稼働率を月間 99.9% 以上に保つこと",
+    text="在庫の担当割当の表示を 2 秒以内に返すこと",
     status="approved",
     has_source=["SRC-4"],
-    qualifies=["SYS"],
+    qualifies=["FR-1"],
+    acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
+)
+
+QualityRequirement(
+    id="QR-51",
+    text="出荷の登録内容の表示を 2 秒以内に返すこと",
+    status="implemented",
+    has_source=["SRC-5"],
+    qualifies=["FR-5"],
     acceptance_criteria=["連続 30 日の計測で、上限を超えた回数が 0 件である"],
 )
 

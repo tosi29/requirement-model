@@ -25,7 +25,7 @@ def test_validate_sample_is_clean(capsys):
 def test_validate_json_output(capsys):
     assert main(["validate", "-f", SAMPLE, "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["node_count"] == 23
+    assert payload["node_count"] == 21
     assert payload["structure_checked"] is True
     assert payload["findings"] == []
 
@@ -262,7 +262,7 @@ def test_stats_command(capsys):
     assert main(["stats", SAMPLE]) == 0
     out = capsys.readouterr().out
     assert out.startswith("# モデル統計\n")
-    assert "- 規模: 23 ノード / 38 エッジ" in out
+    assert "- 規模: 21 ノード / 36 エッジ" in out
     assert "| FunctionalRequirement | 1 | 4 | 0 | 1 | 6 |" in out
     assert "- Need の充足率 (satisfies されている): 100.0% (3/3)" in out
 
@@ -271,10 +271,10 @@ def test_stats_json_output(capsys):
     assert main(["stats", "-f", SAMPLE, "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["files"] == [SAMPLE]
-    assert payload["totals"]["nodes"] == 23
+    assert payload["totals"]["nodes"] == 21
     assert payload["nodes"]["by_status"] == {
         "proposed": 1,
-        "approved": 20,
+        "approved": 18,
         "implemented": 0,
         "verified": 2,
     }

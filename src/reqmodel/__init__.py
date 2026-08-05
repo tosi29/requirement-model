@@ -29,7 +29,6 @@ from .definition import (
     Source,
     Sourced,
     Status,
-    System,
     Waiver,
 )
 from .application.stats import Ambiguity, Ratio, Stats, collect_stats
@@ -46,7 +45,6 @@ __all__ = [
     "QualityRequirement",
     "Constraint",
     "Source",
-    "System",
     "FR",
     "QR",
     # 基底・補助型

@@ -358,7 +358,7 @@ def test_site_command(tmp_path: Path, capsys):
 
     html = (output / "index.html").read_text(encoding="utf-8")
     data = embedded_data(html)
-    assert data["stats"]["nodes"] == 23
+    assert data["stats"]["nodes"] == 21
     assert data["generated_from"] == [SAMPLE]
     assert data["findings"] == []
 

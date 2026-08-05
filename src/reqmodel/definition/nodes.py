@@ -31,7 +31,6 @@ __all__ = [
     "QualityRequirement",
     "Constraint",
     "Source",
-    "System",
     "FR",
     "QR",
     "Ref",
@@ -249,7 +248,7 @@ class FunctionalRequirement(Requirement):
 class QualityRequirement(Requirement):
     """品質要求。qualifies を出せるのは QR だけ。"""
 
-    qualifies: list[Ref[Union["FunctionalRequirement", "System"]]] = []
+    qualifies: list[Ref["FunctionalRequirement"]] = []
 
 
 class Constraint(Sourced):
@@ -280,10 +279,6 @@ class Source(Node):
         if value is not None and not value.strip():
             raise ValueError("locator は空文字にできない (書かないなら省略する)")
         return value
-
-
-class System(Node):
-    """全体品質の張り先となるノード。"""
 
 
 #: 短縮名 (指示書中の FR / QR 表記に対応)。

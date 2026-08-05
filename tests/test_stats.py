@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from conftest import build, constraint, fr, goal, need, qr, source, system
+from conftest import build, constraint, fr, goal, need, qr, source
 
 from reqmodel.application.stats import collect_stats, render_stats
 
@@ -79,7 +79,6 @@ def test_source_trace_ratio_covers_the_same_types_as_missing_source():
             fr(has_source=["S-1"]),
             qr(),
             constraint(),
-            system(),  # System と Source は母数に入らない
         )
     )
 

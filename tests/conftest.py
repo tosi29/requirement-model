@@ -10,7 +10,6 @@ from reqmodel import (
     QualityRequirement,
     RequirementGraph,
     Source,
-    System,
 )
 
 
@@ -46,11 +45,6 @@ def qr(node_id: str = "QR-1", **kwargs) -> QualityRequirement:
 def constraint(node_id: str = "C-1", **kwargs) -> Constraint:
     kwargs.setdefault("text", "国内リージョンにのみ保存すること")
     return Constraint(id=node_id, **kwargs)
-
-
-def system(node_id: str = "SYS", **kwargs) -> System:
-    kwargs.setdefault("text", "経費精算システム")
-    return System(id=node_id, **kwargs)
 
 
 def build(*nodes) -> RequirementGraph:

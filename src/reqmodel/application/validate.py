@@ -203,7 +203,7 @@ def _check_orphan_quality(graph: RequirementGraph, findings: FindingList) -> Non
                     severity="warning",
                     code="structure.orphan_qr",
                     layer=2,
-                    message="qualifies の張り先が無い (FR か System に張ること)",
+                    message="qualifies の張り先が無い (FR に張ること)",
                     node_id=node.id,
                 )
             )

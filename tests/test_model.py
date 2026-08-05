@@ -14,7 +14,6 @@ from reqmodel.definition import (
     Need,
     QualityRequirement,
     Source,
-    System,
 )
 
 
@@ -70,7 +69,7 @@ def test_edge_specs_are_derived_from_field_annotations():
     assert fr_edges["refines"].targets == (FunctionalRequirement,)
 
     qr_edges = edge_specs_for(QualityRequirement)
-    assert qr_edges["qualifies"].targets == (FunctionalRequirement, System)
+    assert qr_edges["qualifies"].targets == (FunctionalRequirement,)
     assert "qualifies" not in fr_edges  # qualifies を出せるのは QR のみ
 
     constraint_edges = edge_specs_for(Constraint)

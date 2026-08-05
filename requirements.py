@@ -21,7 +21,6 @@ from reqmodel import (
     Need,
     QualityRequirement,
     Source,
-    System,
 )
 
 # --- 源泉 -------------------------------------------------------------------
@@ -61,14 +60,6 @@ SRC_BENCH = Source(
     text="300 ノードの合成モデル (examples/bench.py) による実測結果",
     kind="document",
     status="approved",
-)
-
-# --- システム ---------------------------------------------------------------
-
-SYSTEM = System(
-    id="SYS",
-    text="reqmodel (要求を型付き有向グラフとして扱う検証・分析ツール)",
-    status="implemented",
 )
 
 # --- ニーズ -----------------------------------------------------------------
@@ -507,17 +498,6 @@ QR_READABLE_ZOOM = QualityRequirement(
     has_source=[SRC_BENCH, SRC_OWNER],
     acceptance_criteria=[
         "300 ノードの合成モデルで、フォーカス 2 ホップ表示の倍率が 0.5 倍以上である",
-    ],
-)
-QR_VALIDATE_SPEED = QualityRequirement(
-    id="QR-2",
-    text="300 ノードの定義ファイルについて、読み取りから指摘の出力までを 2 秒以内で終えること",
-    status="verified",
-    qualifies=[SYSTEM],
-    has_source=[SRC_BENCH],
-    evidence=[
-        "examples/bench.py (300 ノード) に対する req validate を 3 回計測し、"
-        "0.25〜0.43 秒で終わった",
     ],
 )
 QR_SITE_CLI_PARITY = QualityRequirement(

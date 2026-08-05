@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..definition import (Constraint, FunctionalRequirement, Goal, Need, Node, QualityRequirement, Source, System)
+from ..definition import (Constraint, FunctionalRequirement, Goal, Need, Node, QualityRequirement, Source)
 from ..core.metamodel import TYPE_ORDER
 from ..definition.nodes import STATUS_RANK
 
@@ -15,7 +15,6 @@ _MERMAID_SHAPE: dict[type[Node], tuple[str, str]] = {
     FunctionalRequirement: ("[", "]"),
     QualityRequirement: ("[/", "/]"),
     Constraint: ("[[", "]]"),
-    System: ("([", "])"),
     Source: ("[(", ")]"),
 }
 
@@ -26,7 +25,6 @@ _PALETTE: dict[str, tuple[str, str]] = {
     "FunctionalRequirement": ("#fff8e1", "#c9971c"),
     "QualityRequirement": ("#fdeef4", "#c2557f"),
     "Constraint": ("#f2f2f2", "#777777"),
-    "System": ("#e0f7fa", "#3a97a8"),
     "Source": ("#ffffff", "#999999"),
 }
 
@@ -42,7 +40,6 @@ _CYTOSCAPE_SHAPE: dict[type[Node], str] = {
     FunctionalRequirement: "round-rectangle",
     QualityRequirement: "rhomboid",
     Constraint: "cut-rectangle",
-    System: "barrel",
     Source: "tag",
 }
 
@@ -116,7 +113,6 @@ _DOT_SHAPE: dict[type[Node], str] = {
     FunctionalRequirement: "box",
     QualityRequirement: "parallelogram",
     Constraint: "note",
-    System: "box3d",
     Source: "cylinder",
 }
 

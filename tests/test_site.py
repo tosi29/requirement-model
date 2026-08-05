@@ -102,6 +102,20 @@ def test_quality_requirement_uses_the_same_render_shape_as_functional_requiremen
     assert types["QualityRequirement"]["fill"] != types["FunctionalRequirement"]["fill"]
 
 
+def test_quality_requirement_and_constraint_use_semantic_palette():
+    """QR は紫系、Constraint は選択色と衝突しにくい落ち着いた赤系で表示する。"""
+    meta = render_meta()
+    types = meta["types"]
+
+    assert types["QualityRequirement"]["fill"] == "#f3e8ff"
+    assert types["QualityRequirement"]["stroke"] == "#7e57c2"
+    assert types["Constraint"]["fill"] == "#fdecea"
+    assert types["Constraint"]["stroke"] == "#b94a48"
+    assert types["Source"]["fill"] == "#ffffff"
+    assert types["Source"]["stroke"] == "#999999"
+    assert types["Constraint"]["stroke"] != meta["impact_colors"]["selected"]
+
+
 #: Cytoscape.js が持つノード形状の多角形 (外形の矩形に内接するよう正規化された座標)。
 #: 係数の検算をこの実物と突き合わせるための写しで、出典は cytoscape の
 #: ``nodeShapes`` (v3.34.0)。ellipse だけは多角形ではないので別に見る。

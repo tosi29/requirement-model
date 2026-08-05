@@ -13,7 +13,7 @@ _MERMAID_SHAPE: dict[type[Node], tuple[str, str]] = {
     Goal: ("{{", "}}"),
     Need: ("(", ")"),
     FunctionalRequirement: ("[", "]"),
-    QualityRequirement: ("[/", "/]"),
+    QualityRequirement: ("[", "]"),
     Constraint: ("[[", "]]"),
     Source: ("[(", ")]"),
 }
@@ -38,7 +38,7 @@ _CYTOSCAPE_SHAPE: dict[type[Node], str] = {
     Goal: "hexagon",
     Need: "ellipse",
     FunctionalRequirement: "round-rectangle",
-    QualityRequirement: "rhomboid",
+    QualityRequirement: "round-rectangle",
     Constraint: "cut-rectangle",
     Source: "tag",
 }
@@ -54,7 +54,6 @@ _CYTOSCAPE_SHAPE: dict[type[Node], str] = {
 #: 正規化されているので、比だけで決まる):
 #:
 #:   hexagon  … a <= 1 - b/2      左右の頂点に向かう斜辺が食い込む
-#:   rhomboid … a <= 2/3 - b/3    上下の辺が幅の 1/3 ずつずれた平行四辺形
 #:   tag      … a <= 1 - 3b/4     右端が尖る
 #:   diamond  … a <= 1 - b
 #:   ellipse  … a^2 + b^2 <= 1
@@ -67,7 +66,6 @@ _SHAPE_FIT: dict[str, tuple[float, float, float, float]] = {
     "cut-rectangle": (1.0, 26, 1.0, 20),
     "barrel": (1.0, 20, 1.0, 22),
     "hexagon": (1.70, 18, 1.25, 12),  # b = 0.80
-    "rhomboid": (2.55, 18, 1.25, 12),  # b = 0.80
     "tag": (2.20, 16, 1.40, 12),  # b = 0.71
     "diamond": (2.05, 16, 2.05, 12),  # b = 0.49
     "ellipse": (1.42, 14, 1.42, 10),  # b = 1/√2
@@ -111,7 +109,7 @@ _DOT_SHAPE: dict[type[Node], str] = {
     Goal: "hexagon",
     Need: "ellipse",
     FunctionalRequirement: "box",
-    QualityRequirement: "parallelogram",
+    QualityRequirement: "box",
     Constraint: "note",
     Source: "cylinder",
 }

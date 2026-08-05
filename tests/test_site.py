@@ -92,12 +92,21 @@ def test_render_meta_maps_status_to_a_line_style():
     assert widths == sorted(widths)
 
 
+def test_quality_requirement_uses_the_same_render_shape_as_functional_requirement():
+    """要求である FR と QR は色で区別し、形状は同じにする。"""
+    types = render_meta()["types"]
+
+    assert types["QualityRequirement"]["shape"] == types["FunctionalRequirement"]["shape"]
+    assert types["QualityRequirement"]["fit"] == types["FunctionalRequirement"]["fit"]
+    assert types["QualityRequirement"]["mermaid"] == types["FunctionalRequirement"]["mermaid"]
+    assert types["QualityRequirement"]["fill"] != types["FunctionalRequirement"]["fill"]
+
+
 #: Cytoscape.js が持つノード形状の多角形 (外形の矩形に内接するよう正規化された座標)。
 #: 係数の検算をこの実物と突き合わせるための写しで、出典は cytoscape の
 #: ``nodeShapes`` (v3.34.0)。ellipse だけは多角形ではないので別に見る。
 _SHAPE_POINTS: dict[str, list[tuple[float, float]]] = {
     "hexagon": [(-0.5, -1), (-1, 0), (-0.5, 1), (0.5, 1), (1, 0), (0.5, -1)],
-    "rhomboid": [(-1, -1), (0.333, -1), (1, 1), (-0.333, 1)],
     "tag": [(-1, -1), (0.25, -1), (1, 0), (0.25, 1), (-1, 1)],
     "diamond": [(0, 1), (1, 0), (0, -1), (-1, 0)],
 }

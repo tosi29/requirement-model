@@ -319,6 +319,16 @@ def test_dot_output_is_well_formed():
     assert text.rstrip().endswith("}")
 
 
+def test_quality_requirement_output_uses_requirement_shape():
+    graph = build(qr("QR-1", text="5 秒以内とすること"))
+
+    mermaid = render_mermaid(graph)
+    dot = render_dot(graph)
+
+    assert 'n1["<b>QR-1</b> [QualityRequirement]' in mermaid
+    assert 'n1 [shape=box, label="QR-1 [QualityRequirement]' in dot
+
+
 # 記号だけが異なる id は、元の id をそのまま識別子にすると衝突する
 # (`FR-1` と `FR_1` の非英数字を潰すとどちらも同じになる)。連番なら起こり得ない。
 

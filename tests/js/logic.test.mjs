@@ -1047,7 +1047,7 @@ test("graphStyle は render_meta の形状・配色をそのまま使う", () =>
 
 test("検索ヒットは枠線を使わず暈し (underlay) で示す", () => {
   const meta = fixture().meta;
-  const style = graphStyle(meta, { fg: "#111", bg: "#fff", border: "#ddd", muted: "#666" });
+  const style = graphStyle(meta, { fg: "#111", bg: "#fff", panel: "#f7f8fa", border: "#ddd", muted: "#666" });
   const hit = style.find((rule) => rule.selector === "node.hit");
 
   assert.equal(hit.style["underlay-color"], meta.search.hit);
@@ -1064,7 +1064,7 @@ test("検索ヒットは枠線を使わず暈し (underlay) で示す", () => {
 
 test("無向で辿ったノードは関連の色で塗る", () => {
   const meta = fixture().meta;
-  const style = graphStyle(meta, { fg: "#111", bg: "#fff", border: "#ddd", muted: "#666" });
+  const style = graphStyle(meta, { fg: "#111", bg: "#fff", panel: "#f7f8fa", border: "#ddd", muted: "#666" });
   const rel = style.find((rule) => rule.selector === "node.rel");
 
   assert.equal(rel.style["border-color"], meta.impact_colors.related);
@@ -1143,7 +1143,7 @@ test("legendGroups は実際のスタイル (配色・線種) から凡例を作
 
 test("status の定義が無い meta でも凡例と描画は壊れない", () => {
   const meta = { types: fixture().meta.types, impact_colors: {} };
-  const style = graphStyle(meta, { fg: "#111", bg: "#fff", border: "#ddd", muted: "#666" });
+  const style = graphStyle(meta, { fg: "#111", bg: "#fff", panel: "#f7f8fa", border: "#ddd", muted: "#666" });
 
   assert.ok(!style.some((rule) => rule.selector.startsWith("node[status")));
   assert.deepEqual(
@@ -1257,7 +1257,7 @@ test("visibleBandKeys は表示中メンバーを持つ RequirementGroup 枠だ�
 test("graphStyle は帯枠に型の配色を薄く写す", () => {
   const meta = fixture().meta;
   meta.types.Goal = { shape: "hexagon", fill: "#e8f0fe", stroke: "#3b6fd4" };
-  const style = graphStyle(meta, { fg: "#111", bg: "#fff", border: "#ddd", muted: "#666" });
+  const style = graphStyle(meta, { fg: "#111", bg: "#fff", panel: "#f7f8fa", border: "#ddd", muted: "#666" });
 
   const band = style.find(
     (rule) => rule.selector === 'node.band[bandType = "Goal"]',
@@ -1270,6 +1270,24 @@ test("graphStyle は帯枠に型の配色を薄く写す", () => {
   // 枠は一番下に敷き、クリックを素通しする。
   assert.equal(band.style["z-compound-depth"], "bottom");
   assert.equal(band.style.events, "no");
+});
+
+test("graphStyle は RequirementGroup の背景にテーマ共通の panel 色を不透明で使う", () => {
+  const meta = fixture().meta;
+  const palette = { fg: "#111", bg: "#fff", panel: "#f7f8fa", border: "#ddd", muted: "#666" };
+  const style = graphStyle(meta, palette);
+
+  const band = style.find(
+    (rule) => rule.selector === 'node.band[bandType = "RequirementGroup"]',
+  );
+  assert.equal(band.style["background-color"], palette.panel);
+  assert.equal(band.style["background-opacity"], 1);
+  assert.equal(band.style["border-color"], palette.border);
+  assert.equal(band.style["border-style"], "solid");
+  // Goal / Need の型別段枠とは違い、要求種別の色は継承しない。
+  assert.notEqual(band.style["background-color"], meta.types.FunctionalRequirement.fill);
+  assert.notEqual(band.style["background-color"], meta.types.QualityRequirement.fill);
+  assert.notEqual(band.style["background-color"], meta.types.Constraint.fill);
 });
 
 //: 幅 60 / 高さ 30 のノードを (x, y) 中心に置いた placed 1 件。
@@ -1746,7 +1764,7 @@ const scene = (overrides = {}) => ({
   edges: [{ name: "motivates", dashed: false, x1: 0, y1: 20, x2: 0, y2: 100 }],
   bands: [],
   meta: fixture().meta,
-  palette: { fg: "#000", bg: "#fff", border: "#ccc", muted: "#666" },
+  palette: { fg: "#000", bg: "#fff", panel: "#f7f8fa", border: "#ccc", muted: "#666" },
   title: "テスト",
   ...overrides,
 });

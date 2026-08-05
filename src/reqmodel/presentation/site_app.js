@@ -105,6 +105,7 @@ const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(name).
 const palette = () => ({
   fg: cssVar("--fg"),
   bg: cssVar("--bg"),
+  panel: cssVar("--panel"),
   border: cssVar("--border"),
   muted: cssVar("--muted"),
 });

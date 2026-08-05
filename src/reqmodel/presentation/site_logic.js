@@ -45,8 +45,11 @@ export const LABEL_FONT = {
     '-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif',
 };
 
-/** 1 行の上限幅 (px)。全角 11 文字ぶん。 */
-export const LABEL_WRAP_WIDTH = 112;
+/** ノード本文として表示する最大文字数。極端に長い本文だけ省略する。 */
+export const LABEL_MAX_LENGTH = 60;
+
+/** 1 行の上限幅 (px)。全角 16 文字ぶん。 */
+export const LABEL_WRAP_WIDTH = 160;
 
 //: 全角幅で数える文字 (CJK と全角記号)。
 const WIDE_CHAR =
@@ -1168,7 +1171,7 @@ export function graphElements(data, measure = estimateTextWidth) {
   const types = (data.meta || {}).types || {};
   return [
     ...data.nodes.map((node) => {
-      const text = wrapLabel(truncate(node.text, 30), LABEL_WRAP_WIDTH, measure);
+      const text = wrapLabel(truncate(node.text, LABEL_MAX_LENGTH), LABEL_WRAP_WIDTH, measure);
       const label = `${node.id}\n${text}`;
       const size = nodeSize(label, (types[node.type] || {}).fit, measure);
       return {

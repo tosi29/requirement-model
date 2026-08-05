@@ -51,6 +51,7 @@ import {
   storableHash,
   tableRows,
   truncate,
+  visibleBandKeys,
 } from "./site_logic.js";
 
 const cytoscape = window.cytoscape;
@@ -257,19 +258,20 @@ function applyVisibility() {
   const edges = new Set(
     view.edges.filter((edge) => nodes.has(edge.source) && nodes.has(edge.target)),
   );
-  const types = new Set(shown.map((node) => node.type));
+  const visibleBands = visibleBandKeys(DATA, shown);
   cy.batch(() => {
     cy.nodes().not(".band").forEach((element) => {
       element.toggleClass("hidden", !nodes.has(element.id()));
     });
-    //: 帯枠は、その型のノードが 1 つも見えていないときだけ隠す。
+    //: 帯枠は、その帯に属する表示中ノードが 1 つも無いときだけ隠す。
     cy.nodes(".band").forEach((element) => {
-      element.toggleClass("hidden", !types.has(element.data("bandType")));
+      element.toggleClass("hidden", !visibleBands.has(element.data("bandKey")));
     });
     cy.edges().forEach((element) => {
       element.toggleClass("hidden", !edges.has(DATA.edges[element.data("index")]));
     });
   });
+  applyBanding();
 }
 
 /**

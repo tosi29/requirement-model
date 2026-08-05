@@ -55,6 +55,7 @@ import {
   storableHash,
   tableRows,
   truncate,
+  visibleBandKeys,
   wrapLabel,
 } from "../../src/reqmodel/presentation/site_logic.js";
 import { ELLIPSE_FIT, allOn, defaultOn, fixture, largeFixture } from "./fixture.mjs";
@@ -1166,6 +1167,7 @@ test("graphElements は帯の枠ノードを末尾に足す (compound は使わ�
     id: "band:Goal",
     band: true,
     bandType: "Goal",
+    bandKey: "Goal",
     label: "Goal (最上位)",
     w: 10,
     h: 10,
@@ -1229,7 +1231,27 @@ test("graphElements は RequirementGroup の枠を追加する", () => {
 
   assert.equal(group.data.label, "入力");
   assert.equal(group.data.bandType, "RequirementGroup");
+  assert.equal(group.data.bandKey, "group:capture");
   assert.equal(unclassified.data.label, "未分類");
+  assert.equal(unclassified.data.bandKey, "group:__unclassified__");
+});
+
+test("visibleBandKeys は表示中メンバーを持つ RequirementGroup 枠だけを残す", () => {
+  const data = fixture({
+    requirement_groups: [
+      { id: "capture", label: "入力", order: 10, members: ["FR-1"] },
+      { id: "quality", label: "品質", order: 20, members: ["QR-1"] },
+    ],
+  });
+
+  assert.deepEqual(
+    [...visibleBandKeys(data, data.nodes.filter((node) => node.id !== "QR-1"))],
+    ["Goal", "Need", "group:capture"],
+  );
+  assert.deepEqual(
+    [...visibleBandKeys(data, data.nodes.filter((node) => node.id === "QR-1"))],
+    ["group:quality"],
+  );
 });
 
 test("graphStyle は帯枠に型の配色を薄く写す", () => {
@@ -1353,6 +1375,28 @@ test("bandedLayout は帯のノードが無ければ何も返さない", () => {
 
   assert.equal(positions.size, 0);
   assert.equal(frames.size, 0);
+});
+
+test("bandedLayout は RequirementGroup を Requirements 段の中で横に並べる", () => {
+  const bands = [
+    ...BANDS,
+    { key: "group:capture", label: "入力", members: ["FR-1", "Constraint-1"] },
+    { key: "group:notify", label: "通知", members: ["QR-1"] },
+  ];
+  const placed = [
+    placedNode("Goal-1", "Goal", 0, 0),
+    placedNode("Need-1", "Need", 0, 80),
+    placedNode("FR-1", "FunctionalRequirement", 0, 160),
+    placedNode("Constraint-1", "Constraint", 10, 200),
+    placedNode("QR-1", "QualityRequirement", 300, 180),
+  ];
+  const { positions, frames } = bandedLayout(bands, placed, [], "TD");
+
+  assert.ok(positions.get("Need-1").y < positions.get("FR-1").y);
+  assert.equal(positions.get("FR-1").y, positions.get("QR-1").y);
+  assert.ok(positions.get("FR-1").x < positions.get("QR-1").x);
+  assert.ok(frames.get("group:capture").x < frames.get("group:notify").x);
+  assert.ok(frames.get("group:capture").w < frames.get("Goal").w);
 });
 
 test("bandedLayout は帯以外のノードの相対位置を保ったまま平行移動する", () => {

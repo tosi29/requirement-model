@@ -402,3 +402,54 @@ def test_identifiers_follow_the_order_of_ordered_nodes():
     #: 宣言の順は ordered_nodes() そのもの = n1, n2, … が振られる順。
     assert declared == [node.id for node in graph.ordered_nodes()]
     assert render_mermaid(graph, include_sources=True) == text
+
+
+def test_mermaid_groups_requirements_without_duplicate_nodes():
+    from reqmodel import RequirementGroup
+
+    graph = build(
+        goal("Goal-1"),
+        need("Need-1"),
+        fr("FR-1"),
+        qr("QR-1", qualifies=["FR-1"]),
+        qr("QR-2"),
+    )
+    text = render_mermaid(
+        graph,
+        requirement_groups=[
+            RequirementGroup(
+                id="later", label="後続", order=20, members=["FR-1", "QR-1"]
+            ),
+            RequirementGroup(id="first", label="先行", order=10, members=["FR-1"]),
+        ],
+    )
+
+    assert "subgraph band_Goal[Goal]" in text
+    assert "subgraph band_Need[Need]" in text
+    assert "subgraph band_Requirements[Requirements]" in text
+    assert "subgraph group_first[先行]" in text
+    assert "subgraph group_later[後続]" in text
+    assert "subgraph group___unclassified__[未分類]" in text
+    assert text.count("<b>FR-1</b>") == 1
+    assert text.index("group_first") < text.index("group_later")
+    assert "-->|qualifies|" in text
+
+
+def test_dot_groups_requirements_in_clusters():
+    from reqmodel import RequirementGroup
+
+    graph = build(goal("Goal-1"), need("Need-1"), fr("FR-1"), qr("QR-1"))
+    text = render_dot(
+        graph,
+        requirement_groups=[
+            RequirementGroup(id="capture", label="入力", members=["FR-1"])
+        ],
+    )
+
+    assert "subgraph cluster_Goal" in text
+    assert "subgraph cluster_Need" in text
+    assert "subgraph cluster_Requirements" in text
+    assert "subgraph cluster_group_capture" in text
+    assert 'label="入力";' in text
+    assert "subgraph cluster_group___unclassified__" in text
+    assert text.count("FR-1 [FunctionalRequirement]") == 1

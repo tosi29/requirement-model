@@ -134,7 +134,9 @@ def site_data(
             node_type.__name__: list(edge_specs_for(node_type))
             for node_type in TYPE_ORDER
         },
-        "requirement_groups": [group.model_dump(mode="json") for group in requirement_groups],
+        "requirement_groups": [
+            group.model_dump(mode="json") for group in requirement_groups
+        ],
         "nodes": graph.to_json_obj()["nodes"],
         "edges": [
             {"source": edge.source, "name": edge.name, "target": edge.target}
@@ -156,7 +158,11 @@ def site_data(
 
 
 def _read(name: str) -> str:
-    return resources.files("reqmodel.presentation").joinpath(name).read_text(encoding="utf-8")
+    return (
+        resources.files("reqmodel.presentation")
+        .joinpath(name)
+        .read_text(encoding="utf-8")
+    )
 
 
 #: ページに載せる自前の JS。依存する側を後に置く (この順で連結する)。
@@ -166,7 +172,9 @@ SITE_SCRIPTS: tuple[str, ...] = ("site_logic.js", "site_app.js")
 #: これは「単体で lint / テストできる ES モジュール」を単一ファイル配布に
 #: 載せるための最小の橋渡しであり、これ以上の変換 (最小化・トランスパイル) はしない。
 _JS_IMPORT = re.compile(r'^import\s[^;]*?from\s+"\./[\w.-]+\.js";?[ \t]*\n', re.M)
-_JS_EXPORT = re.compile(r"^export\s+(?=(?:async\s+)?(?:function|const|let|var|class)\b)", re.M)
+_JS_EXPORT = re.compile(
+    r"^export\s+(?=(?:async\s+)?(?:function|const|let|var|class)\b)", re.M
+)
 
 
 def app_js() -> str:
@@ -176,7 +184,9 @@ def app_js() -> str:
         source = _JS_EXPORT.sub("", _JS_IMPORT.sub("", _read(name)))
         if "</script" in source:
             raise ValueError(f"{name} に </script> が含まれている")
-        parts.append(f"// --- {name} " + "-" * (60 - len(name)) + f"\n\n{source.strip()}\n")
+        parts.append(
+            f"// --- {name} " + "-" * (60 - len(name)) + f"\n\n{source.strip()}\n"
+        )
     return "\n".join(parts)
 
 
@@ -196,7 +206,9 @@ def build_site(
     scripts に相対パス (``asset_srcs(local=True)``) を渡し、同じディレクトリへ
     その UMD ビルドを置けば、外部への通信が無い自己完結のサイトになる。
     """
-    data = site_data(graph, findings, title, sources, suppressed, repo, requirement_groups)
+    data = site_data(
+        graph, findings, title, sources, suppressed, repo, requirement_groups
+    )
     payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
     tags = "\n".join(
         f'<script src="{escape(src, quote=True)}"></script>'
@@ -217,6 +229,10 @@ def build_site(
     index = out_dir / "index.html"
     index.write_text(html, encoding="utf-8")
     (out_dir / "model.json").write_text(graph.to_json(), encoding="utf-8")
-    (out_dir / "graph.mmd").write_text(render_mermaid(graph), encoding="utf-8")
-    (out_dir / "graph.dot").write_text(render_dot(graph), encoding="utf-8")
+    (out_dir / "graph.mmd").write_text(
+        render_mermaid(graph, requirement_groups=requirement_groups), encoding="utf-8"
+    )
+    (out_dir / "graph.dot").write_text(
+        render_dot(graph, requirement_groups=requirement_groups), encoding="utf-8"
+    )
     return index

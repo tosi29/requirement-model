@@ -212,6 +212,12 @@ function syncFocusLayout() {
  * dagre の副軸方向の並びは保つので、「整列」のたびに図の形が大きく変わる
  * ことは無い。
  */
+function bandingLimits() {
+  const width = graphEl?.clientWidth || 0;
+  if (!width) return {};
+  return { requirementsMaxWidth: Math.max(700, Math.min(1400, width - 80)) };
+}
+
 function applyBanding() {
   if (!cy) return;
   const bands = bandDefs(DATA);
@@ -229,7 +235,13 @@ function applyBanding() {
     });
   });
   if (!placed.length) return;
-  const { positions, frames } = bandedLayout(bands, placed, view.edges, state.direction);
+  const { positions, frames } = bandedLayout(
+    bands,
+    placed,
+    view.edges,
+    state.direction,
+    bandingLimits(),
+  );
   cy.batch(() => {
     for (const [id, position] of positions) cy.getElementById(id).position(position);
     for (const [key, frame] of frames) {

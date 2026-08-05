@@ -6,6 +6,7 @@ import { test } from "node:test";
 import {
   FOCUS_DEPTHS,
   LABEL_FONT,
+  LABEL_MAX_LENGTH,
   LABEL_WRAP_WIDTH,
   TABLE_COLUMNS,
   ALL_SEVERITIES,
@@ -385,6 +386,11 @@ test("statusFilters は成熟度の順に、絞り込み前の件数を添えて
 });
 
 // --- ラベル整形 ------------------------------------------------------------
+
+test("ラベル表示定数は本文を読みやすい上限にする", () => {
+  assert.equal(LABEL_MAX_LENGTH, 60);
+  assert.equal(LABEL_WRAP_WIDTH, 160);
+});
 
 test("truncate は末尾を省略記号に置き換える", () => {
   assert.equal(truncate("あいうえお", 10), "あいうえお");
@@ -958,6 +964,35 @@ test("graphElements はラベルを測って外形をデータに載せる", () 
   for (const line of goal.data.label.split("\n")) {
     assert.ok(estimateTextWidth(line) <= LABEL_WRAP_WIDTH, line);
   }
+});
+
+test("graphElements は 30 文字を超える本文を 60 文字まで表示する", () => {
+  const data = fixture();
+  const longText = "あ".repeat(59) + "い".repeat(10);
+  data.nodes = [{ ...data.nodes[0], text: longText }];
+  data.edges = [];
+  data.meta = { ...data.meta };
+  delete data.meta.bands;
+
+  const [node] = graphElements(data, () => 5);
+  const body = node.data.label.split("\n").slice(1).join("");
+
+  assert.equal(body.length, LABEL_MAX_LENGTH);
+  assert.equal(body, `${"あ".repeat(59)}…`);
+});
+
+test("graphElements は広げた折り返し幅で日本語本文の行数を抑える", () => {
+  const data = fixture();
+  data.nodes = [{ ...data.nodes[0], text: "あ".repeat(16) }];
+  data.edges = [];
+  data.meta = { ...data.meta };
+  delete data.meta.bands;
+
+  const [node] = graphElements(data);
+  const bodyLines = node.data.label.split("\n").slice(1);
+
+  assert.deepEqual(bodyLines, ["あ".repeat(16)]);
+  assert.ok(estimateTextWidth(bodyLines[0]) <= LABEL_WRAP_WIDTH);
 });
 
 test("graphElements は渡された実測関数でラベルを測る", () => {

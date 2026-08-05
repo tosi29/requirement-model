@@ -25,6 +25,7 @@ import {
   explainCommand,
   focusSet,
   graphElements,
+  graphStyle,
   graphSvg,
   groupFindings,
   impactScope,
@@ -932,7 +933,7 @@ test("allEdgeNames はノード型から現れうるエッジ種別を数える"
   ]);
 });
 
-// --- SVG 描画に渡す値 -------------------------------------------------------
+// --- Cytoscape に渡す値 -----------------------------------------------------
 
 test("graphElements はノードとエッジをそのまま要素にする", () => {
   const elements = graphElements(fixture());
@@ -1003,12 +1004,121 @@ test("graphElements は渡された実測関数でラベルを測る", () => {
   assert.ok(wide[0].data.w > narrow[0].data.w);
 });
 
+test("graphStyle はノードの外形をデータから取る", () => {
+  //: `width: "label"` だとラベルの外接矩形になり、六角形や菱形からはみ出す。
+  const style = graphStyle(fixture().meta, {
+    fg: "#111",
+    bg: "#fff",
+    border: "#ddd",
+    muted: "#666",
+  });
+
+  const node = style.find((rule) => rule.selector === "node");
+  assert.equal(node.style.width, "data(w)");
+  assert.equal(node.style.height, "data(h)");
+  assert.equal(node.style["font-size"], LABEL_FONT.size);
+  assert.equal(node.style["font-family"], LABEL_FONT.family);
+});
+
+test("graphStyle は render_meta の形状・配色をそのまま使う", () => {
+  const meta = fixture().meta;
+  meta.types.Goal = { shape: "hexagon", fill: "#e8f0fe", stroke: "#3b6fd4" };
+  const style = graphStyle(meta, {
+    fg: "#111",
+    bg: "#fff",
+    border: "#ddd",
+    muted: "#666",
+  });
+
+  const goal = style.find((rule) => rule.selector === 'node[type = "Goal"]');
+  assert.deepEqual(goal.style, {
+    shape: "hexagon",
+    "background-color": "#e8f0fe",
+    "border-color": "#3b6fd4",
+  });
+
+  const selected = style.find((rule) => rule.selector === "node.sel");
+  assert.equal(selected.style["border-color"], meta.impact_colors.selected);
+
+  const edge = style.find((rule) => rule.selector === "edge");
+  assert.equal(edge.style["line-color"], "#ddd");
+  assert.equal(edge.style.color, "#666");
+});
+
+test("検索ヒットは枠線を使わず暈し (underlay) で示す", () => {
+  const meta = fixture().meta;
+  const style = graphStyle(meta, { fg: "#111", bg: "#fff", panel: "#f7f8fa", border: "#ddd", muted: "#666" });
+  const hit = style.find((rule) => rule.selector === "node.hit");
+
+  assert.equal(hit.style["underlay-color"], meta.search.hit);
+  //: 影響範囲 (枠線) と property が衝突しない。
+  for (const key of Object.keys(hit.style)) {
+    assert.ok(!key.startsWith("border-"), key);
+  }
+  //: 検索の規則は影響範囲より後ろ = 減光より後に置く (dim でも暈しが残る)。
+  assert.ok(
+    style.findIndex((rule) => rule.selector === "node.dim.hit") >
+      style.findIndex((rule) => rule.selector === ".dim"),
+  );
+});
+
+test("無向で辿ったノードは関連の色で塗る", () => {
+  const meta = fixture().meta;
+  const style = graphStyle(meta, { fg: "#111", bg: "#fff", panel: "#f7f8fa", border: "#ddd", muted: "#666" });
+  const rel = style.find((rule) => rule.selector === "node.rel");
+
+  assert.equal(rel.style["border-color"], meta.impact_colors.related);
+});
+
 test("graphElements は status をデータに載せる", () => {
   const elements = graphElements(fixture());
 
   assert.equal(elements[0].data.status, "approved"); // Goal-1
   assert.equal(elements[1].data.status, "approved"); // Need-1
   assert.equal(elements[2].data.status, "proposed"); // FR-1
+});
+
+test("graphStyle は status を線種に写す", () => {
+  const style = graphStyle(fixture().meta, {
+    fg: "#111",
+    bg: "#fff",
+    border: "#ddd",
+    muted: "#666",
+  });
+
+  const proposed = style.find((rule) => rule.selector === 'node[status = "proposed"]');
+  assert.deepEqual(proposed.style, { "border-style": "dotted", "border-width": 1.5 });
+  const verified = style.find((rule) => rule.selector === 'node[status = "verified"]');
+  assert.deepEqual(verified.style, { "border-style": "double", "border-width": 4 });
+
+  // 線種だけで 4 つの status を区別できること (太さは影響範囲に奪われるため)。
+  const lines = Object.keys(fixture().meta.statuses).map(
+    (status) =>
+      style.find((rule) => rule.selector === `node[status = "${status}"]`).style[
+        "border-style"
+      ],
+  );
+  assert.equal(new Set(lines).size, lines.length);
+});
+
+test("影響範囲の規則は型・status より後に置かれる (後勝ちなので上書きできる)", () => {
+  const style = graphStyle(fixture().meta, {
+    fg: "#111",
+    bg: "#fff",
+    border: "#ddd",
+    muted: "#666",
+  });
+  const at = (selector) => style.findIndex((rule) => rule.selector === selector);
+
+  assert.ok(at('node[type = "Goal"]') < at('node[status = "proposed"]'));
+  assert.ok(at('node[status = "proposed"]') < at("node.sel"));
+  assert.ok(at("node.sel") < at("node.up") && at("node.up") < at("node.down"));
+
+  // 影響範囲が奪うのは色と太さだけ。線種は強調中も残る。
+  for (const selector of ["node.sel", "node.up", "node.down"]) {
+    const keys = Object.keys(style.find((rule) => rule.selector === selector).style);
+    assert.ok(!keys.includes("border-style"));
+  }
 });
 
 test("legendGroups は実際のスタイル (配色・線種) から凡例を作る", () => {
@@ -1031,13 +1141,25 @@ test("legendGroups は実際のスタイル (配色・線種) から凡例を作
   assert.equal(statuses.items[3].swatch.borderWidth, 3);
 });
 
+test("status の定義が無い meta でも凡例と描画は壊れない", () => {
+  const meta = { types: fixture().meta.types, impact_colors: {} };
+  const style = graphStyle(meta, { fg: "#111", bg: "#fff", panel: "#f7f8fa", border: "#ddd", muted: "#666" });
+
+  assert.ok(!style.some((rule) => rule.selector.startsWith("node[status")));
+  assert.deepEqual(
+    legendGroups(meta).map((group) => group.title),
+    ["種別"],
+  );
+});
+
 // --- 帯 (Goal / Need の枠) ---------------------------------------------------
 
 test("graphElements は帯の枠ノードを末尾に足す (compound は使わない)", () => {
   const elements = graphElements(fixture());
   const byId = new Map(elements.map((element) => [element.data.id, element]));
 
-  //: 枠はグループ化ノードではなく独立した背面描画なので、どのノードも parent を持たない。
+  //: compound にすると cytoscape-dagre が dagre を compound モードにして
+  //: レイアウトが壊れるので、どのノードも parent を持たない。
   assert.ok(elements.every((element) => !("parent" in element.data)));
 
   const goalBand = byId.get(bandId("Goal"));
@@ -1130,6 +1252,42 @@ test("visibleBandKeys は表示中メンバーを持つ RequirementGroup 枠だ�
     [...visibleBandKeys(data, data.nodes.filter((node) => node.id === "QR-1"))],
     ["group:quality"],
   );
+});
+
+test("graphStyle は帯枠に型の配色を薄く写す", () => {
+  const meta = fixture().meta;
+  meta.types.Goal = { shape: "hexagon", fill: "#e8f0fe", stroke: "#3b6fd4" };
+  const style = graphStyle(meta, { fg: "#111", bg: "#fff", panel: "#f7f8fa", border: "#ddd", muted: "#666" });
+
+  const band = style.find(
+    (rule) => rule.selector === 'node.band[bandType = "Goal"]',
+  );
+  assert.equal(band.style["border-color"], "#3b6fd4");
+  assert.equal(band.style["background-color"], "#e8f0fe");
+  assert.ok(band.style["background-opacity"] < 1);
+  // 枠のラベルは上辺に出す。中央だと帯の中のノードと重なる。
+  assert.equal(band.style["text-valign"], "top");
+  // 枠は一番下に敷き、クリックを素通しする。
+  assert.equal(band.style["z-compound-depth"], "bottom");
+  assert.equal(band.style.events, "no");
+});
+
+test("graphStyle は RequirementGroup の背景にテーマ共通の panel 色を不透明で使う", () => {
+  const meta = fixture().meta;
+  const palette = { fg: "#111", bg: "#fff", panel: "#f7f8fa", border: "#ddd", muted: "#666" };
+  const style = graphStyle(meta, palette);
+
+  const band = style.find(
+    (rule) => rule.selector === 'node.band[bandType = "RequirementGroup"]',
+  );
+  assert.equal(band.style["background-color"], palette.panel);
+  assert.equal(band.style["background-opacity"], 1);
+  assert.equal(band.style["border-color"], palette.border);
+  assert.equal(band.style["border-style"], "solid");
+  // Goal / Need の型別段枠とは違い、要求種別の色は継承しない。
+  assert.notEqual(band.style["background-color"], meta.types.FunctionalRequirement.fill);
+  assert.notEqual(band.style["background-color"], meta.types.QualityRequirement.fill);
+  assert.notEqual(band.style["background-color"], meta.types.Constraint.fill);
 });
 
 //: 幅 60 / 高さ 30 のノードを (x, y) 中心に置いた placed 1 件。

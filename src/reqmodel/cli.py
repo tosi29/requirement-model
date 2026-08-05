@@ -196,7 +196,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("cdn", "local"),
         default="cdn",
         help=(
-            "レイアウトライブラリ (dagre) の参照先。local を選び、出力先に "
+            "描画ライブラリ (Cytoscape.js) の参照先。local を選び、出力先に "
             f"{' / '.join(asset.file for asset in SITE_ASSETS)} を置けば、"
             "外部通信の無い自己完結サイトになる (既定: cdn)"
         ),

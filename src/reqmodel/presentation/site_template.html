@@ -108,46 +108,6 @@ main {
 .graph-frame { flex: 1; position: relative; min-height: 480px; }
 #graph { position: absolute; inset: 0; }
 #graph .empty { padding: 14px; }
-#graph svg { display: block; width: 100%; height: 100%; background: var(--graph-bg, var(--bg)); cursor: grab; user-select: none; }
-#graph svg:active { cursor: grabbing; }
-#graph .graph-bg { fill: transparent; }
-#graph .node { cursor: pointer; }
-#graph .node.band { cursor: default; pointer-events: none; }
-#graph .node-shape {
-  vector-effect: non-scaling-stroke;
-  transition: opacity 120ms, stroke-width 120ms, stroke 120ms;
-}
-#graph .node-label {
-  fill: #1f2328;
-  pointer-events: none;
-  dominant-baseline: auto;
-}
-#graph .band .node-shape { fill-opacity: .3; stroke-dasharray: 6 4; }
-#graph .band-label { fill: var(--graph-muted, var(--muted)); }
-#graph .edge-line {
-  stroke: var(--graph-border, var(--border));
-  stroke-width: 1.2;
-  vector-effect: non-scaling-stroke;
-}
-#graph .edge-label {
-  fill: var(--graph-muted, var(--muted));
-  stroke: var(--graph-bg, var(--bg));
-  stroke-width: 3;
-  paint-order: stroke;
-  font-size: 9px;
-  pointer-events: none;
-}
-#graph .dashed .edge-line { stroke-dasharray: 6 4; }
-#graph .hidden { display: none; }
-#graph .dim { opacity: .28; }
-#graph .node.sel .node-shape { stroke: var(--impact-selected); stroke-width: 4; }
-#graph .node.up .node-shape { stroke: var(--impact-upstream); stroke-width: 3; }
-#graph .node.down .node-shape { stroke: var(--impact-downstream); stroke-width: 3; }
-#graph .node.rel .node-shape { stroke: var(--impact-related); stroke-width: 3; }
-#graph .edge.on-path .edge-line { stroke: var(--graph-fg, var(--fg)); stroke-width: 2; }
-#graph .hit .node-shape { filter: drop-shadow(0 0 8px var(--search-hit)); }
-#graph .hit-current .node-shape { filter: drop-shadow(0 0 12px var(--search-hit)); }
-#graph .dim.hit { opacity: .65; }
 [hidden] { display: none !important; }
 .tabs, .tool-group { display: flex; gap: 6px; align-items: center; }
 .tabs { margin-right: 6px; }

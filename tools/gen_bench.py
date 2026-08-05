@@ -38,14 +38,12 @@ GOALS = 1 + GOALS_MID + GOALS_LEAF
 NEEDS = 24
 #: 全体で 300 ノード (tests/test_bench_example.py の MIN_NODES) に届く数。
 FRS = 196
-QRS = 50
+QRS = 51
 CONSTRAINTS = 10
 SOURCES = 6
 
 #: FR どうしの詳細化。この倍数の FR は Need ではなく 1 つ前の FR を詳細化する。
 FR_REFINE_EVERY = 7
-#: System に張る QR (残りは FR に張る)。
-QR_ON_SYSTEM = 5
 
 # --- 語彙 -------------------------------------------------------------------
 #
@@ -156,7 +154,6 @@ from reqmodel import (
     Need,
     QualityRequirement,
     Source,
-    System,
 )
 '''
 
@@ -210,9 +207,6 @@ def render() -> str:
     for index, (kind, text) in enumerate(SOURCE_KINDS, start=1):
         parts.append(node("Source", id=f"SRC-{index}", text=text, kind=kind, status="approved"))
 
-    # システム --------------------------------------------------------------
-    parts.append(section("システム"))
-    parts.append(node("System", id="SYS", text="物流管理システム", status="approved"))
 
     # ゴール ----------------------------------------------------------------
     #
@@ -302,13 +296,8 @@ def render() -> str:
     parts.append(section("品質要求"))
     for index in range(QRS):
         number = index + 1
-        on_system = number > QRS - QR_ON_SYSTEM
-        if on_system:
-            text = f"{area(index)}を含む全機能の稼働率を月間 99.9% 以上に保つこと"
-            target = "SYS"
-        else:
-            target = f"FR-{index * 4 % FRS + 1}"
-            text = f"{area(index)}の{thing(index)}の表示を 2 秒以内に返すこと"
+        target = f"FR-{index * 4 % FRS + 1}"
+        text = f"{area(index)}の{thing(index)}の表示を 2 秒以内に返すこと"
         status = STATUSES_QR[index % len(STATUSES_QR)]
         parts.append(
             node(

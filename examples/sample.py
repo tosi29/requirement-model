@@ -14,7 +14,6 @@ from reqmodel import (
     Need,
     QualityRequirement,
     Source,
-    System,
 )
 
 # --- 源泉 -------------------------------------------------------------------
@@ -73,8 +72,6 @@ SRC_CFO_BACKLOG = Source(
 )
 
 # --- システム ---------------------------------------------------------------
-
-SYSTEM = System(id="SYS", text="経費精算システム", status="approved")
 
 # --- ニーズ -----------------------------------------------------------------
 
@@ -209,16 +206,6 @@ QR_OCR_LATENCY = QualityRequirement(
     ],
     acceptance_criteria=[
         "本番同等環境で 100 回計測し、95 パーセンタイル値が 5.0 秒以下である",
-    ],
-)
-QR_AVAILABILITY = QualityRequirement(
-    id="QR-2",
-    text="システムの月間稼働率を 99.9% 以上とすること",
-    status="approved",
-    qualifies=[SYSTEM],
-    has_source=[SRC_FINANCE_HEAD],
-    acceptance_criteria=[
-        "月次の稼働率レポートで 99.9% 以上を 3 か月連続で満たす",
     ],
 )
 

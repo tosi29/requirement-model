@@ -129,7 +129,7 @@ import 文は実行されないが、mypy と IDE 補完のために必ず書く
 
 ## メタモデル
 
-### ノード型 (7種)
+### ノード型 (6種)
 
 | 型 | 意味 | 備考 |
 |---|---|---|
@@ -139,7 +139,6 @@ import 文は実行されないが、mypy と IDE 補完のために必ず書く
 | `QualityRequirement` (QR) | 品質要求 (性能・可用性等) | 「非機能要求」の語は使わない |
 | `Constraint` | 解決策の自由度を制限する条件 | 要求ではない |
 | `Source` | 要求の源泉 (引用も含む) | `kind` で分類、`part_of` で引用を束ねる |
-| `System` | 全体品質の張り先となるノード | 「稼働率 99.9%」等の受け皿 |
 
 `Source` は単一型とし、`kind: "stakeholder" | "document" | "existing_system"` で分類する。
 
@@ -190,7 +189,7 @@ Need は「〜たい」、FR は「〜こと」で終わる必要がある (層1
 
 要求系の 3 つは主語では分かれない。ここは構造が決める ([エッジ型と型規則](#エッジ型と型規則))。
 
-- 他の FR か System の性質を述べている (`qualifies` を出せる) → `QR`
+- 他の FR の性質を述べている (`qualifies` を出せる) → `QR`
 - 消すと機能が減る → `FR` / 消すと選択肢が増えるだけ → `Constraint`
 
 この主語の規則は、**要求は世界について、仕様は機械について書く** (Jackson & Zave) の境界を
@@ -199,8 +198,7 @@ Need は「〜たい」、FR は「〜こと」で終わる必要がある (層1
 `Need` / 要求系の境界は**割り当て先が環境の側かシステムの側か**の分岐に対応する。
 
 **機械が検査しているのは語尾だけで、主語は検査していない。** 上の規約は
-`requirements.py` と `examples/sample.py` の該当 61 ノード (Goal 6 / Need 11 / FR 32 /
-QR 6 / Constraint 6) すべてで守られているが、破っても `req validate` は何も言わない。
+`requirements.py` と `examples/sample.py` の要求系ノードで守られているが、破っても `req validate` は何も言わない。
 
 ### 共通属性
 
@@ -227,7 +225,7 @@ FR / QR には検証に関わる 2 つの欄が加わる。
 | `refines` | Goal→Goal, FR→FR | 分解・詳細化 (子 → 親) |
 | `motivates` | Goal→Need | 動機づけ |
 | `satisfies` | FR→Need | 充足 |
-| `qualifies` | QR→FR, QR→System | 品質の付与 |
+| `qualifies` | QR→FR | 品質の付与 |
 | `constrains` | Constraint→{FR, QR} | 制約 |
 | `has_source` | {Goal, Need, FR, QR, Constraint}→Source | 源泉トレース (図には描かない) |
 | `part_of` | Source→Source | 引用と、その引用元 (子 → 親。図には描かない) |
@@ -389,16 +387,15 @@ Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`statu
 | 節 | 内容 |
 |---|---|
 | 1. 要求階層 | Goal → Need → FR → QR。Goal の詳細化は DFS の並び順で表す |
-| 2. システムに張られた品質要求 | `qualifies` の張り先が System の QR |
-| 3. 制約 | Constraint と、その制約対象 |
-| 4. 源泉 | Source と、それを参照しているノード |
-| 5. 上記に現れなかったノード | どの節にも入らなかったもの (ゴール未接続の Need 等) |
+| 2. 制約 | Constraint と、その制約対象 |
+| 3. 源泉 | Source と、それを参照しているノード |
+| 4. 上記に現れなかったノード | どの節にも入らなかったもの (ゴール未接続の Need 等) |
 
 見出しの深さは Goal=h3 / Need=h4 / FR=h5 / QR=h6 に固定する。Goal の詳細化は
 何段でも書けるため、深さをそのまま見出しレベルに写すと h6 を超えてしまうため。
 同じノードが複数の親にぶら下がるとき (1 つの FR が 2 つの Need を満たす等) は、
 最初の 1 か所だけ本文を出し、以降は `- (前掲) FR-1 …` として参照だけを置く。
-**5 節があるので、どのノードも必ずどこかに現れる**。文書から要求が落ちない。
+**4 節があるので、どのノードも必ずどこかに現れる**。文書から要求が落ちない。
 
 ### トレーサビリティ表 (`req doc --matrix`)
 
@@ -415,7 +412,7 @@ Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`statu
 - トレースの無い列: なし
 ```
 
-出る表は 5 枚 (`Goal × Need` / `Need × FR` / `FR/System × QR` / `Source × 要求` /
+出る表は 5 枚 (`Goal × Need` / `Need × FR` / `FR × QR` / `Source × 要求` /
 `Constraint × 制約対象`)。表ごとに「トレースの無い行 / 列」を添えるので、
 どこが未カバーかがそのまま読める。表の定義は `src/reqmodel/doc.py` の `MATRICES`。
 

@@ -6,7 +6,7 @@ import csv
 import io
 
 import pytest
-from conftest import build, constraint, fr, goal, need, qr, source, system
+from conftest import build, constraint, fr, goal, need, qr, source
 
 from reqmodel.application.doc import (
     CSV_HEADER,
@@ -92,22 +92,15 @@ def test_spec_sections_cover_constraint_and_source():
     assert "- **S-1** (stakeholder) 経理部長 — C-1" in text
 
 
-def test_spec_puts_system_quality_in_its_own_section():
-    text = render_spec(build(system("SYS"), qr("QR-2", qualifies=["SYS"])))
-    assert "## 2. システムに張られた品質要求" in text
-    assert heading_of(text, "SYS") == "###"
-    assert heading_of(text, "QR-2") == "####"
-
-
 def test_spec_lists_nodes_that_no_section_reached():
     text = render_spec(build(need("N-9")))  # どの Goal からも動機づけられていない
-    assert "## 5. 上記に現れなかったノード" in text
+    assert "## 4. 上記に現れなかったノード" in text
     assert "- **N-9** (Need) 早く精算したい" in text
 
 
 def test_spec_keeps_empty_sections_with_placeholder():
     text = render_spec(build(goal("G-1")))
-    assert "## 3. 制約\n\n該当なし。" in text
+    assert "## 2. 制約\n\n該当なし。" in text
 
 
 def test_spec_orders_goals_by_refines_tree_and_survives_cycles():
@@ -148,7 +141,7 @@ def test_build_matrix_puts_upstream_on_rows():
 
 
 def test_build_matrix_ignores_edges_outside_the_declared_types():
-    graph = build(system("SYS"), qr("QR-1", qualifies=["SYS"]), fr("FR-1"), need("N-1"))
+    graph = build(qr("QR-1", qualifies=["MISSING"]), fr("FR-1"), need("N-1"))
     assert build_matrix(graph, NEED_FR).cells == frozenset()
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from conftest import build, fr, goal, need, qr, source, system
+from conftest import build, fr, goal, need, qr, source
 from reqmodel.core.graph import RequirementGraph
 
 
@@ -80,5 +80,5 @@ def test_locations_of_unknown_nodes_are_dropped():
 
 
 def test_node_order_is_deterministic():
-    graph = build(qr("QR-1"), goal("G-2"), goal("G-1"), system("SYS"))
-    assert [n.id for n in graph.ordered_nodes()] == ["G-1", "G-2", "QR-1", "SYS"]
+    graph = build(qr("QR-1"), goal("G-2"), goal("G-1"), source("SRC-1"))
+    assert [n.id for n in graph.ordered_nodes()] == ["G-1", "G-2", "QR-1", "SRC-1"]

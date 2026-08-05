@@ -15,7 +15,6 @@ from ..definition import (
     Node,
     QualityRequirement,
     Source,
-    System,
 )
 from ..definition.nodes import STATUS_RANK
 

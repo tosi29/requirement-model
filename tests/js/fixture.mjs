@@ -17,7 +17,6 @@ export const EDGE_NAMES_BY_TYPE = {
   FunctionalRequirement: ["has_source", "satisfies", "refines"],
   QualityRequirement: ["has_source", "qualifies"],
   Constraint: ["has_source", "constrains"],
-  System: [],
   Source: [],
 };
 
@@ -34,7 +33,6 @@ export const TYPES = [
   "FunctionalRequirement",
   "QualityRequirement",
   "Constraint",
-  "System",
   "Source",
 ];
 

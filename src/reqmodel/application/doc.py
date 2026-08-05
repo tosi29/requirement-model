@@ -28,7 +28,6 @@ from ..definition import (
     Node,
     QualityRequirement,
     Source,
-    System,
 )
 
 __all__ = [
@@ -253,18 +252,6 @@ def _hierarchy_lines(graph: RequirementGraph, emitted: set[str]) -> list[str]:
     return lines
 
 
-def _system_lines(graph: RequirementGraph, emitted: set[str]) -> list[str]:
-    lines: list[str] = []
-    for system in graph.by_type(System):
-        emitted.add(system.id)
-        lines.extend(_node_block(graph, system, 3))
-        for qr in _sources_of(graph, system.id, "qualifies"):
-            if isinstance(qr, QualityRequirement) and qr.id not in emitted:
-                emitted.add(qr.id)
-                lines.extend(_node_block(graph, qr, 4))
-    return lines
-
-
 def _simple_section(
     graph: RequirementGraph, nodes: Sequence[Node], emitted: set[str]
 ) -> list[str]:
@@ -363,7 +350,6 @@ def render_spec(
 
     body = [
         ("要求階層 (Goal → Need → FR → QR)", _hierarchy_lines(graph, emitted)),
-        ("システムに張られた品質要求", _system_lines(graph, emitted)),
         ("制約", _simple_section(graph, graph.by_type(Constraint), emitted)),
         ("源泉", _source_section(graph, emitted)),
     ]
@@ -403,9 +389,9 @@ MATRICES: tuple[MatrixSpec, ...] = (
     MatrixSpec("Goal × Need", "motivates", (Goal,), (Need,)),
     MatrixSpec("Need × FR", "satisfies", (Need,), (FunctionalRequirement,), reverse=True),
     MatrixSpec(
-        "FR/System × QR",
+        "FR × QR",
         "qualifies",
-        (FunctionalRequirement, System),
+        (FunctionalRequirement,),
         (QualityRequirement,),
         reverse=True,
     ),

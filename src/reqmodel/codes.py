@@ -54,7 +54,7 @@ CHECK_CODES: dict[str, CheckCode] = {
         _code("structure.part_of_cycle", 2, "part_of の閉路", False),
         _code("structure.orphan_fr", 2, "Goal に到達できない FR", True),
         _code("structure.orphan_need", 2, "satisfies されない Need", True),
-        _code("structure.orphan_qr", 2, "qualifies の張り先が無い QR", True),
+        _code("structure.orphan_qr", 2, "FR への qualifies が無い QR", True),
         _code("structure.unused_source", 2, "参照されない Source", True),
         _code("structure.goal_leaf", 2, "未分解の Goal", True),
         _code("structure.goal_decomposition", 2, "AND/OR 分解が要求群に到達しない", True),

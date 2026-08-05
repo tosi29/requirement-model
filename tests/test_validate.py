@@ -12,7 +12,6 @@ from conftest import (
     need,
     qr,
     source,
-    system,
 )
 from reqmodel.application.loader import load_sources
 from reqmodel.application.validate import validate_semantics_lexical, validate_structure
@@ -86,12 +85,6 @@ def test_need_without_satisfies_is_reported():
 def test_quality_requirement_without_qualifies_is_reported():
     findings = validate_structure(build(qr("QR-1")))
     assert "structure.orphan_qr" in codes_for(findings, "QR-1")
-
-
-def test_quality_requirement_may_qualify_the_system():
-    sys_node = system("SYS")
-    findings = validate_structure(build(sys_node, qr("QR-1", qualifies=[sys_node])))
-    assert "structure.orphan_qr" not in codes_for(findings, "QR-1")
 
 
 def test_unused_source_is_information():

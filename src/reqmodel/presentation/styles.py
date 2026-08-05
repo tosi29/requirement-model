@@ -33,8 +33,8 @@ _MERMAID_CLASSDEF = {
     for type_name, (fill, stroke) in _PALETTE.items()
 }
 
-#: 型 → Cytoscape.js のノード形状。静的サイトの描画に使う。
-_CYTOSCAPE_SHAPE: dict[type[Node], str] = {
+#: 型 → SVG のノード形状。静的サイトの描画に使う。
+_SVG_SHAPE: dict[type[Node], str] = {
     Goal: "hexagon",
     Need: "ellipse",
     FunctionalRequirement: "round-rectangle",
@@ -43,14 +43,14 @@ _CYTOSCAPE_SHAPE: dict[type[Node], str] = {
     Source: "tag",
 }
 
-#: Cytoscape.js の形状 → ラベルを内側に収めるための外形の係数。
+#: SVG の形状 → ラベルを内側に収めるための外形の係数。
 #: ``(幅の倍率, 幅の余白, 高さの倍率, 高さの余白)`` で、外形は
 #: ``(テキスト幅 * 倍率 + 余白, テキスト高 * 倍率 + 余白)``。
 #:
-#: ラベルの外接矩形にそのまま合わせる (Cytoscape の ``width: "label"``) と、
+#: ラベルの外接矩形にそのまま合わせる (ラベル外接矩形) と、
 #: 内側が矩形より狭い図形では文字が図形からはみ出す。中央に置いたテキスト矩形の
 #: 大きさを外形に対する割合 (a = 幅の比, b = 高さの比) で見ると、図形ごとに
-#: ``a <= f(b)`` の形の制約になる (Cytoscape の多角形は外形の矩形に内接するよう
+#: ``a <= f(b)`` の形の制約になる (SVG の多角形は外形の矩形に内接するよう
 #: 正規化されているので、比だけで決まる):
 #:
 #:   hexagon  … a <= 1 - b/2      左右の頂点に向かう斜辺が食い込む
@@ -82,7 +82,7 @@ _IMPACT_COLORS = {
 }
 
 #: 検索ヒットの暈し (halo) の色。枠線は型 (色) と status (線種)、枠線の色と太さは
-#: 影響範囲で埋まっているので、検索はノードの下に敷く underlay を使う。
+#: 影響範囲で埋まっているので、検索はノードの周囲に敷く halo を使う。
 #: 他のどの表現とも property が衝突しない。
 _SEARCH_HIT = "#00b8d4"
 
@@ -134,7 +134,7 @@ def _mermaid_shape_of_type(node_type: type[Node]) -> tuple[str, str]:
 
 
 def render_meta() -> dict[str, Any]:
-    """型・status ごとの描画情報。ブラウザ側 (Cytoscape.js) の初期化に使う。
+    """型・status ごとの描画情報。ブラウザ側 (SVG 描画に使う。
 
     形状・配色・線種の定義をこのモジュールに一本化し、静的サイト側に複製しない
     ための出口。凡例もここから作るので、定義を足せば凡例にも自動で並ぶ。
@@ -142,11 +142,11 @@ def render_meta() -> dict[str, Any]:
     return {
         "types": {
             node_type.__name__: {
-                "shape": _CYTOSCAPE_SHAPE[node_type],
+                "shape": _SVG_SHAPE[node_type],
                 "fill": _PALETTE[node_type.__name__][0],
                 "stroke": _PALETTE[node_type.__name__][1],
                 # ラベルが図形の内側に収まる外形の決め方 (_SHAPE_FIT を参照)。
-                "fit": _fit_of(_CYTOSCAPE_SHAPE[node_type]),
+                "fit": _fit_of(_SVG_SHAPE[node_type]),
                 # 画面から Mermaid を書き出す (絞り込み後の図) ときの形状。
                 # 書式そのものは render_mermaid() と揃える。
                 "mermaid": dict(

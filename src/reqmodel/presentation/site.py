@@ -48,22 +48,16 @@ class Asset:
     url: str
 
 
-#: 図の描画に使うライブラリ。バージョンは固定する。
-#: どちらも単一ファイルの UMD ビルドなので、公開先に置いて相対パスを指す
-#: (自己完結) こともできる。cytoscape-dagre は dagre を同梱しているため、
-#: 別途 dagre を置く必要は無い。
-CYTOSCAPE_VERSION = "3.34.0"
-CYTOSCAPE_DAGRE_VERSION = "4.0.0"
+#: 図のレイアウトに使うライブラリ。バージョンは固定する。
+#: 単一ファイルの UMD ビルドなので、公開先に置いて相対パスを指す
+#: (自己完結) こともできる。描画はブラウザ標準の SVG DOM で行う。
+DAGRE_VERSION = "1.1.5"
 _CDN = "https://cdn.jsdelivr.net/npm"
 
 SITE_ASSETS: tuple[Asset, ...] = (
     Asset(
-        "cytoscape.min.js",
-        f"{_CDN}/cytoscape@{CYTOSCAPE_VERSION}/dist/cytoscape.min.js",
-    ),
-    Asset(
-        "cytoscape-dagre.js",
-        f"{_CDN}/cytoscape-dagre@{CYTOSCAPE_DAGRE_VERSION}/dist/cytoscape-dagre.js",
+        "dagre.min.js",
+        f"{_CDN}/@dagrejs/dagre@{DAGRE_VERSION}/dist/dagre.min.js",
     ),
 )
 

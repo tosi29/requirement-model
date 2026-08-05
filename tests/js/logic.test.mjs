@@ -1415,6 +1415,28 @@ test("bandedLayout は RequirementGroup を Requirements 段の中で横に並�
   assert.ok(positions.get("FR-1").x < positions.get("QR-1").x);
   assert.ok(frames.get("group:capture").x < frames.get("group:notify").x);
   assert.ok(frames.get("group:capture").w < frames.get("Goal").w);
+  assert.equal(frames.get("group:capture").h, frames.get("group:notify").h);
+  assert.equal(frames.get("group:capture").y, frames.get("group:notify").y);
+});
+
+test("bandedLayout は表示中の RequirementGroup だけで枠の高さを再計算する", () => {
+  const bands = [
+    { key: "group:capture", label: "入力", members: ["FR-1", "Constraint-1"] },
+    { key: "group:notify", label: "通知", members: ["QR-1"] },
+    { key: "group:hidden", label: "非表示", members: ["FR-hidden"] },
+  ];
+  const placed = [
+    placedNode("FR-1", "FunctionalRequirement", 0, 0),
+    placedNode("Constraint-1", "Constraint", 0, 80),
+    placedNode("QR-1", "QualityRequirement", 300, 0),
+  ];
+  const { positions, frames } = bandedLayout(bands, placed, [], "TD");
+
+  assert.equal(frames.get("group:capture").h, frames.get("group:notify").h);
+  assert.equal(frames.get("group:capture").y, frames.get("group:notify").y);
+  assert.equal(positions.get("FR-1").y, positions.get("QR-1").y);
+  assert.ok(frames.get("group:capture").w !== frames.get("group:notify").w);
+  assert.equal(frames.has("group:hidden"), false);
 });
 
 test("bandedLayout は帯以外のノードの相対位置を保ったまま平行移動する", () => {

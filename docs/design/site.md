@@ -95,8 +95,17 @@ FR→Need と上向き) ため、レイアウトエンジンに任せるだけ�
   引き継がれる
 - 枠はクリックを素通しするただの背面描画で、選択・影響範囲・検索には関わらない
 - 種別の絞り込みでその型を外せば、枠ごと消える
-- 帯にする型とラベルは `presentation/styles.py` の `_BANDS` を唯一の出典とし、meta 経由で
+- Goal / Need の帯にする型とラベルは `presentation/styles.py` の `_BANDS` を唯一の出典とし、meta 経由で
   ページに渡る (帯の並べ直しそのものは `site_logic.js` の `bandedLayout()`)
+- Requirements 段は `RequirementGroup` を出典にした表示専用の機能枠で横方向に並べる。
+  これは presentation 層のビュー定義であり、FR / QR / Constraint の公開ノード型へ
+  表示都合の `group` フィールドは足さない
+- 1 ノードの主所属は 1 つだけで、複数グループの `members` に現れた場合は
+  `order` と `id` で最初に来るグループへ描き、`presentation.group_multiple` の info として報告する。
+  未指定の FR / QR / Constraint は `未分類` 枠へ置き、`presentation.group_unassigned` の info として報告する。
+  枠をまたぐ関係は通常のエッジとして残す
+- この info はモデルを失敗させるためではなく、表示上の補正が暗黙に起きたことを
+  レビュー対象として露出するためのものである。`--strict` でも info は失敗条件にしない
 
 ## ノードラベルの収まりと折り返し
 

@@ -61,6 +61,10 @@ CHECK_CODES: dict[str, CheckCode] = {
         _code("structure.missing_source", 2, "源泉 (has_source) が無い", True),
         _code("structure.unverified_claim", 2, "verified なのに根拠が無い", True),
         _code("structure.status_inconsistent", 2, "状態の成熟度が逆転している", True),
+        # presentation: 表示用グループ
+        _code("presentation.group_unassigned", 2, "要求グループに属さない要求", False),
+        _code("presentation.group_multiple", 2, "要求グループへの複数所属", False),
+        _code("presentation.group_dangling", 2, "要求グループの存在しない参照", False),
         # 抑制機構そのもの
         _code(WAIVER_STALE, 2, "指摘が出ていない抑制 (陳腐化)", False),
     )

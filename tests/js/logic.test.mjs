@@ -1196,6 +1196,42 @@ test("meta に bands が無ければ従来どおりの要素になる", () => {
   assert.equal(bandDefs(data).length, 0);
 });
 
+
+test("bandDefs は RequirementGroup から要求枠を order 順に作り未分類を残す", () => {
+  const data = fixture({
+    requirement_groups: [
+      { id: "notify", label: "通知", order: 20, members: ["QR-1", "FR-1"] },
+      { id: "capture", label: "入力", order: 10, members: ["FR-1"] },
+    ],
+  });
+  const bands = bandDefs(data);
+
+  assert.deepEqual(
+    bands.map((band) => [band.key, band.label, band.members || null]),
+    [
+      ["Goal", "Goal (最上位)", null],
+      ["Need", "Need (上位)", null],
+      ["group:capture", "入力", ["FR-1"]],
+      ["group:notify", "通知", ["QR-1"]],
+    ],
+  );
+});
+
+test("graphElements は RequirementGroup の枠を追加する", () => {
+  const data = fixture({
+    requirement_groups: [{ id: "capture", label: "入力", order: 10, members: ["FR-1"] }],
+  });
+  const elements = graphElements(data);
+  const group = elements.find((element) => element.data.id === bandId("group:capture"));
+  const unclassified = elements.find(
+    (element) => element.data.id === bandId("group:__unclassified__"),
+  );
+
+  assert.equal(group.data.label, "入力");
+  assert.equal(group.data.bandType, "RequirementGroup");
+  assert.equal(unclassified.data.label, "未分類");
+});
+
 test("graphStyle は帯枠に型の配色を薄く写す", () => {
   const meta = fixture().meta;
   meta.types.Goal = { shape: "hexagon", fill: "#e8f0fe", stroke: "#3b6fd4" };

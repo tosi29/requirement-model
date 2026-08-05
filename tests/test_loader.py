@@ -136,3 +136,50 @@ def test_sample_definition_loads_cleanly():
     result = load_paths([sample])
     assert result.ok, [f.format() for f in result.findings]
     assert len(result.graph) == 21
+
+
+def test_requirement_group_is_loaded_as_presentation_view(tmp_path: Path) -> None:
+    path = tmp_path / "requirements.py"
+    path.write_text(
+        """
+from reqmodel import FunctionalRequirement, Need, RequirementGroup
+
+NEED = Need(id="Need-1", text="利用者は、入力したい")
+FR = FunctionalRequirement(id="FR-1", text="入力すること", satisfies=[NEED])
+GROUP = RequirementGroup(id="input", label="入力", order=20, members=[FR])
+""",
+        encoding="utf-8",
+    )
+
+    result = load_paths([path])
+
+    assert result.ok
+    assert list(result.graph.nodes) == ["Need-1", "FR-1"]
+    assert [group.model_dump(mode="json") for group in result.requirement_groups] == [
+        {"id": "input", "label": "入力", "members": ["FR-1"], "order": 20}
+    ]
+
+
+def test_requirement_group_membership_is_diagnosed(tmp_path: Path) -> None:
+    path = tmp_path / "requirements.py"
+    path.write_text(
+        """
+from reqmodel import FunctionalRequirement, Need, RequirementGroup
+
+NEED = Need(id="Need-1", text="利用者は、入力したい")
+FR1 = FunctionalRequirement(id="FR-1", text="入力すること", satisfies=[NEED])
+FR2 = FunctionalRequirement(id="FR-2", text="確認すること", satisfies=[NEED])
+G1 = RequirementGroup(id="a", label="A", order=20, members=[FR1, "FR-X"])
+G2 = RequirementGroup(id="b", label="B", order=10, members=[FR1])
+""",
+        encoding="utf-8",
+    )
+
+    result = load_paths([path])
+
+    assert result.ok
+    assert [(group.id, group.order) for group in result.requirement_groups] == [("b", 10), ("a", 20)]
+    by_code = {finding.code: finding for finding in result.findings}
+    assert by_code["presentation.group_unassigned"].node_id == "FR-2"
+    assert by_code["presentation.group_multiple"].node_id == "FR-1"
+    assert by_code["presentation.group_dangling"].node_id == "a"

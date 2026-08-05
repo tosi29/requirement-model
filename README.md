@@ -103,7 +103,7 @@ Python ファイルの diff とグラフの diff が一対一対応し、コー�
 (環境変数・現在時刻・乱数・ネットワークが入り込む余地がそもそも無い)。
 
 ```python
-from reqmodel import Goal, Need, FunctionalRequirement, Source
+from reqmodel import Goal, Need, FunctionalRequirement, RequirementGroup, Source
 
 SRC_EMPLOYEE = Source(id="SRC-EMP", text="申請者となる一般社員", kind="stakeholder")
 
@@ -126,6 +126,37 @@ FR_OCR = FunctionalRequirement(
 参照はただの変数参照なので、参照されるノードを先に書く。前方参照したいときは
 変数の代わりに id 文字列 (`satisfies=["Need-1"]`) を書いてもよい。
 import 文は実行されないが、mypy と IDE 補完のために必ず書く。
+
+### 表示用の要求グループ
+
+`RequirementGroup` は静的サイトの Requirements 段で、FR / QR / Constraint を機能単位の枠へまとめるための**表示定義**である。要求ノード本体の意味や構造規則には関わらないため、`FunctionalRequirement` などへ `group` フィールドは持たせない。
+
+```python
+from reqmodel import FunctionalRequirement, Need, RequirementGroup
+
+NEED_PHOTO_ONLY = Need(
+    id="Need-1",
+    text="申請者は、領収書を撮影するだけで経費を申請したい",
+)
+FR_OCR = FunctionalRequirement(
+    id="FR-1",
+    text="領収書画像から金額と日付を抽出すること",
+    satisfies=[NEED_PHOTO_ONLY],
+)
+
+GROUP_CAPTURE = RequirementGroup(
+    id="capture",
+    label="領収書入力",
+    order=10,
+    members=[FR_OCR],
+)
+```
+
+- `label` は枠タイトル、`order` は Requirements 段で左から並べる順序である。
+- `members` は主所属のノードで、同じノードを複数グループへ書くと `order` と `id` で最初に来る 1 グループへ描き、`presentation.group_multiple` の info として報告される。
+- グループ未指定の FR / QR / Constraint は消さず、`未分類` 枠に入り、`presentation.group_unassigned` の info として報告される。
+- これらの info は「未分類や複数所属を禁止する」ためではなく、サイトが行う補正 (`未分類` への配置 / 主所属の先勝ち) をレビュー時に見えるようにするためのものである。
+- Goal と Need は従来どおり上段・中段の帯へ型ごとに並び、Requirements 段だけが `RequirementGroup` で機能枠に分かれる。
 
 ## メタモデル
 

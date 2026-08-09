@@ -302,6 +302,11 @@ FR_SITE = FunctionalRequirement(
     acceptance_criteria=[
         "生成物を静的ファイルとして配るだけでブラウザから閲覧できる",
         "ノードを選ぶと影響範囲が色分けされ、指摘の一覧から該当ノードへ飛べる",
+        "図は SVG DOM として描画され、表示中の図をそのまま SVG ファイルに保存できる",
+        "ダークテーマでは明色の文字に暗色のノード背景、ライトテーマではその逆を使用する",
+        "グラフのパン操作では選択中のノードを維持する",
+        "帯の再配置後に端点から遠く離れたエッジ経路点を残さない",
+        "エッジ経路の折れ点を曲線で描く",
     ],
 )
 FR_FIT_WHOLE = FunctionalRequirement(
@@ -514,12 +519,13 @@ QR_SITE_CLI_PARITY = QualityRequirement(
 )
 QR_KEYBOARD = QualityRequirement(
     id="QR-4",
-    text="閲覧用サイトの図 (canvas) 以外の要素を、キーボードだけで辿れるようにすること",
-    status="approved",
+    text="閲覧用サイトのすべての操作要素を、キーボードだけで辿れるようにすること",
+    status="implemented",
     qualifies=[FR_SITE],
     has_source=[SRC_OWNER],
     acceptance_criteria=[
         "一覧・表・指摘の各行に tab キーだけで到達でき、Enter で開ける",
+        "SVG の各ノードに tab キーで到達でき、Enter または Space で選択できる",
         "フォーカスの位置がマウス操作以外では常に見える",
     ],
 )

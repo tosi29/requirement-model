@@ -1,7 +1,7 @@
 /**
  * 静的サイトのロジック層。
  *
- * DOM にも Cytoscape.js にも一切触れない純関数だけを置く。ここに置いたものは
+ * DOM にも描画 API にも一切触れない純関数だけを置く。ここに置いたものは
  * Node からそのまま import してテストできる (`tests/js/`)。ページに載せるときは
  * `site.py` が `site_app.js` と一緒に 1 枚の HTML へインライン化する。
  *
@@ -28,7 +28,7 @@ export function escapeAttr(text) {
 
 // --- ラベルの折り返し ------------------------------------------------------
 //
-// Cytoscape の text-wrap は空白でしか折り返さず、日本語には効かない。かといって
+// SVG の text は自動折り返ししない。かといって
 // 文字数で機械的に折ると「24 / 時間」のように数値と単位が離れる。ここでは
 //
 //   1. 文を「文節らしいまとまり」(chunk) に切り、
@@ -37,7 +37,7 @@ export function escapeAttr(text) {
 // の 2 段でやる。切る位置の判断は 1. に閉じているので、幅の決め方 (2.) を
 // 変えても組み方の癖は変わらない。
 
-/** ラベルの字体。canvas での実測と Cytoscape のスタイルで同じものを使う。 */
+/** ラベルの字体。canvas での実測と SVG の描画で同じものを使う。 */
 export const LABEL_FONT = {
   size: 10,
   lineHeight: 1.25,
@@ -1137,7 +1137,7 @@ export function nodeContext(view, id, scope = null) {
   return lines.join("\n") + "\n";
 }
 
-// --- Cytoscape.js に渡す値 --------------------------------------------------
+// --- SVG 描画に渡す値 -------------------------------------------------------
 //
 // 生成するのはただのオブジェクトなので、ライブラリを読み込まなくてもテストできる。
 
@@ -1215,12 +1215,10 @@ export const bandId = (key) => `band:${key}`;
  * status をデータに載せておくと、スタイル側は属性セレクタ
  * (`node[status = "..."]`) で拾える。絞り込みで作り直す必要が無い。
  *
- * meta.bands に挙がった型 (Goal / Need) には帯枠を 1 つずつ足す。compound node
- * は使わない (cytoscape-dagre は子ノードを見ると dagre を compound モードに
- * してしまい、レイアウトが壊れる)。枠はただの背面ノードで、位置と大きさは
+ * meta.bands に挙がった型 (Goal / Need) には帯枠を 1 つずつ足す。グループ化ノードは使わない。枠はただの背面描画で、位置と大きさは
  * `bandedLayout()` の結果 (frames) から与える。
  *
- * ノードの外形 (w / h) もここで決める。Cytoscape に `width: "label"` を任せると
+ * ノードの外形 (w / h) もここで決める。ラベルの外接矩形をそのまま使うと
  * ラベルの外接矩形になり、六角形や菱形では文字が図形の外に出る。measure は
  * ラベル 1 行の幅 (px) を返す関数で、省略すると概算 (`estimateTextWidth`) を使う。
  */
@@ -1270,199 +1268,6 @@ export function graphElements(data, measure = estimateTextWidth) {
   ];
 }
 
-/**
- * スタイル定義。形状・配色・線種は `render_meta()` から来た meta が唯一の出典で、
- * テーマ依存の色 (fg / bg / panel / border / muted) だけ palette で受け取る。
- *
- * Cytoscape のスタイルは **並び順で解決される** (後に置いた規則が勝つ) ので、
- * 5 段に重ねる。この順序が「どの表現がどれを上書きするか」の決定そのもの:
- *
- *   1. 基本   … ノード / エッジ共通
- *   2. 型     … 形 (shape) と 色 (background-color / border-color)
- *   3. status … 線種 (border-style) と、その補強の太さ (border-width)
- *   4. 状態   … 影響範囲の色分けと見せ消し (border-color / border-width / opacity)
- *   5. 検索   … ヒットの暈し (underlay-*)
- *
- * 影響範囲のハイライトが奪うのは border-color と border-width だけなので、
- * status の **線種** は強調中も残る。status を線種だけで区別できるように
- * してあるのは、このためである (`_STATUS_BORDER` を参照)。
- *
- * 検索ヒットは枠線をまったく使わず、ノードの下に敷く暈し (underlay) で示す。
- * 影響範囲と同時に点いても、どちらが何を言っているか読み分けられる。
- */
-export function graphStyle(meta, palette) {
-  const impact = meta.impact_colors;
-
-  // 1. 基本
-  const style = [
-    {
-      selector: "node",
-      style: {
-        label: "data(label)",
-        "text-wrap": "wrap",
-        //: 折り返しは `wrapLabel()` が済ませてある。Cytoscape 側で更に折られると
-        //: 行数が変わり、外形の計算 (`nodeSize()`) と食い違うので効かせない。
-        "text-max-width": "1000px",
-        "text-valign": "center",
-        "font-family": LABEL_FONT.family,
-        "font-size": LABEL_FONT.size,
-        "line-height": LABEL_FONT.lineHeight,
-        color: "#1f2328",
-        //: ラベルではなく `graphElements()` が測った外形に合わせる。
-        width: "data(w)",
-        height: "data(h)",
-        "border-width": 1.5,
-        "transition-property": "opacity, border-width, border-color",
-        "transition-duration": "120ms",
-      },
-    },
-    {
-      selector: "edge",
-      style: {
-        label: "data(name)",
-        "font-size": 9,
-        color: palette.muted,
-        "text-background-color": palette.bg,
-        "text-background-opacity": 0.85,
-        "text-background-padding": "1px",
-        width: 1.2,
-        "line-color": palette.border,
-        "target-arrow-color": palette.border,
-        "target-arrow-shape": "triangle",
-        "arrow-scale": 0.8,
-        "curve-style": "bezier",
-      },
-    },
-  ];
-
-  // 2. 型
-  for (const [type, typeMeta] of Object.entries(meta.types)) {
-    style.push({
-      selector: `node[type = "${type}"]`,
-      style: {
-        shape: typeMeta.shape,
-        "background-color": typeMeta.fill,
-        "border-color": typeMeta.stroke,
-      },
-    });
-  }
-
-  // 2.5. 帯 (枠)。ノード・エッジの下に敷く背面ノードで、型の配色を薄く使う。
-  //      events: "no" なのでクリックは素通りし、選択や影響範囲には関わらない。
-  //      status を持たないので 3. 以降の規則には掛からない。
-  for (const band of meta.bands || []) {
-    const typeMeta = meta.types[band.type] || {};
-    style.push({
-      selector: `node.band[bandType = "${band.type}"]`,
-      style: {
-        shape: "round-rectangle",
-        width: "data(w)",
-        height: "data(h)",
-        padding: "0px",
-        "background-color": typeMeta.fill || palette.bg,
-        "background-opacity": 0.3,
-        "border-color": typeMeta.stroke || palette.border,
-        "border-width": 1,
-        "border-style": "dashed",
-        //: ラベルは枠の上辺の外に出す。中に置くと最上段のノードと重なる。
-        "text-valign": "top",
-        "text-halign": "center",
-        "text-margin-y": -2,
-        "font-size": 11,
-        "font-weight": "bold",
-        color: typeMeta.stroke || palette.muted,
-        "z-compound-depth": "bottom",
-        events: "no",
-      },
-    });
-  }
-
-
-  style.push({
-    selector: 'node.band[bandType = "RequirementGroup"]',
-    style: {
-      shape: "round-rectangle",
-      width: "data(w)",
-      height: "data(h)",
-      padding: "0px",
-      "background-color": palette.panel,
-      "background-opacity": 1,
-      "border-color": palette.border,
-      "border-width": 1,
-      "border-style": "solid",
-      "text-valign": "top",
-      "text-halign": "center",
-      "text-margin-y": -2,
-      "font-size": 11,
-      "font-weight": "bold",
-      color: palette.muted,
-      "z-compound-depth": "bottom",
-      events: "no",
-    },
-  });
-
-  // 3. status
-  for (const [status, statusMeta] of Object.entries(meta.statuses || {})) {
-    style.push({
-      selector: `node[status = "${status}"]`,
-      style: {
-        "border-style": statusMeta.border_style,
-        "border-width": statusMeta.border_width,
-      },
-    });
-  }
-
-  // 4. 状態
-  style.push(
-    { selector: "edge.dashed", style: { "line-style": "dashed" } },
-    { selector: ".hidden", style: { display: "none" } },
-    { selector: ".dim", style: { opacity: 0.28 } },
-    {
-      selector: "node.sel",
-      style: { "border-width": 4, "border-color": impact.selected, "z-index": 10 },
-    },
-    {
-      selector: "node.up",
-      style: { "border-width": 3, "border-color": impact.upstream },
-    },
-    {
-      selector: "node.down",
-      style: { "border-width": 3, "border-color": impact.downstream },
-    },
-    //: 無向で辿ったときは上流/下流の区別が付かない (CLI の --undirected と同じ)。
-    {
-      selector: "node.rel",
-      style: { "border-width": 3, "border-color": impact.related },
-    },
-    {
-      selector: "edge.on-path",
-      style: { width: 2, "line-color": palette.fg, "target-arrow-color": palette.fg },
-    },
-  );
-
-  // 5. 検索
-  if (meta.search) {
-    style.push(
-      {
-        selector: "node.hit",
-        style: {
-          "underlay-color": meta.search.hit,
-          "underlay-opacity": 0.3,
-          "underlay-padding": 8,
-        },
-      },
-      //: ↑↓ で送っている最中の 1 件。他のヒットより強く出す。
-      {
-        selector: "node.hit-current",
-        style: { "underlay-opacity": 0.55, "underlay-padding": 12, "z-index": 9 },
-      },
-      //: 影響範囲の外にあるヒットも、暈しが読める程度には残す。
-      { selector: "node.dim.hit", style: { opacity: 0.65 } },
-    );
-  }
-  return style;
-}
-
 // --- 凡例 ------------------------------------------------------------------
 
 //: 凡例の見本は小さいので、太い枠 (verified の double 等) はここで頭打ちにする。
@@ -1475,15 +1280,16 @@ const LEGEND_MAX_BORDER = 3;
  * 各 swatch は CSS の border 指定にそのまま写せる形にしてある
  * (`borderColor` が null ならテーマの文字色を使う、の意味)。
  */
-export function legendGroups(meta) {
+export function legendGroups(meta, colorScheme = "light") {
+  const dark = colorScheme === "dark";
   const groups = [
     {
       title: "種別",
       items: Object.entries(meta.types).map(([type, typeMeta]) => ({
         label: type,
         swatch: {
-          background: typeMeta.fill,
-          borderColor: typeMeta.stroke,
+          background: dark ? typeMeta.dark_fill || typeMeta.fill : typeMeta.fill,
+          borderColor: dark ? typeMeta.dark_stroke || typeMeta.stroke : typeMeta.stroke,
           borderStyle: "solid",
           borderWidth: 1,
         },
@@ -1511,8 +1317,8 @@ export function legendGroups(meta) {
 }
 
 /**
- * ノードが表示範囲に収まっているか。extent (`cy.extent()`) も box
- * (`node.boundingBox()`) も Cytoscape のモデル座標 `{x1, y1, x2, y2}`。
+ * ノードが表示範囲に収まっているか。extent も box も SVG のモデル座標
+ * `{x1, y1, x2, y2}`。
  *
  * margin は端に貼り付いた状態を「見えている」と扱わないための余白。
  * ノードが視野より大きくて収めようが無いときは、中心が見えていれば十分とする
@@ -1540,6 +1346,72 @@ export function isNodeVisible(extent, box, margin = 0) {
     centerY >= extent.y1 &&
     centerY <= extent.y2
   );
+}
+
+/**
+ * 帯への再配置で端点だけが大きく動いた dagre 経路を、短い 1 折れ線へ戻す。
+ *
+ * dagre は帯を適用する前の座標で、逆向き・同一ランクのエッジをグラフの外側へ
+ * 迂回させることがある。その中間点を新しい端点へそのまま補間すると、端点同士は
+ * 近いのに経路だけが数千 px 離れた場所で尖る。経路長が弦の `maxRatio` 倍を超えた
+ * 場合だけ、dagre が選んだ迂回方向を `maxBend` まで残して穏やかな折れ線にする。
+ */
+export function tameRoute(points, maxRatio = 2.5, maxBend = 48) {
+  if (points.length < 3) return points;
+  const start = points[0];
+  const end = points.at(-1);
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const chord = Math.hypot(dx, dy);
+  if (chord < 1) return points;
+  const length = points.slice(1).reduce(
+    (sum, point, index) => sum + Math.hypot(point.x - points[index].x, point.y - points[index].y),
+    0,
+  );
+  if (length <= chord * maxRatio) return points;
+
+  const middle = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+  const normal = { x: -dy / chord, y: dx / chord };
+  let deviation = 0;
+  for (const point of points.slice(1, -1)) {
+    const candidate = (point.x - middle.x) * normal.x + (point.y - middle.y) * normal.y;
+    if (Math.abs(candidate) > Math.abs(deviation)) deviation = candidate;
+  }
+  deviation = Math.max(-maxBend, Math.min(maxBend, deviation));
+  return [start, { x: middle.x + normal.x * deviation, y: middle.y + normal.y * deviation }, end];
+}
+
+/** dagre の折れ線を保ったまま、各角だけを二次 Bézier で丸める。 */
+export function roundedPath(points, radius = 24) {
+  if (!points.length) return "";
+  const coord = (value) => Math.round(value * 100) / 100;
+  const commands = [`M ${coord(points[0].x)} ${coord(points[0].y)}`];
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const previous = points[index - 1];
+    const corner = points[index];
+    const next = points[index + 1];
+    const before = Math.hypot(corner.x - previous.x, corner.y - previous.y);
+    const after = Math.hypot(next.x - corner.x, next.y - corner.y);
+    const amount = Math.min(radius, before / 2, after / 2);
+    if (amount < 0.5) {
+      commands.push(`L ${coord(corner.x)} ${coord(corner.y)}`);
+      continue;
+    }
+    const entry = {
+      x: corner.x + ((previous.x - corner.x) * amount) / before,
+      y: corner.y + ((previous.y - corner.y) * amount) / before,
+    };
+    const exit = {
+      x: corner.x + ((next.x - corner.x) * amount) / after,
+      y: corner.y + ((next.y - corner.y) * amount) / after,
+    };
+    commands.push(
+      `L ${coord(entry.x)} ${coord(entry.y)} Q ${coord(corner.x)} ${coord(corner.y)} ${coord(exit.x)} ${coord(exit.y)}`,
+    );
+  }
+  const end = points.at(-1);
+  commands.push(`L ${coord(end.x)} ${coord(end.y)}`);
+  return commands.join(" ");
 }
 
 /** dagre のレイアウト設定。direction は "TD" か "LR"。 */
@@ -1868,17 +1740,17 @@ export function mermaidText(view, maxLabel = EXPORT_LABEL_LIMIT) {
 
 // --- SVG --------------------------------------------------------------------
 //
-// 図の見た目 (位置・大きさ・折り返し済みのラベル) は Cytoscape が持っているので、
+// 図の見た目 (位置・大きさ・折り返し済みのラベル) は表示層が持っているので、
 // 表示層が実測値を集めて scene として渡し、ここは**組み立てだけ**を行う。
 //
-// 形状は Cytoscape の描画そのものではなく**近似**である。書き出しの用途 (資料に
+// 形状は画面表示と同じ近似である。書き出しの用途 (資料に
 // 貼る) では、位置関係とラベルと配色が保たれていれば足りる。近似の範囲は
 // 各定数のコメントに書く。
 
 //: 図の周りに空ける余白 (px)。
 export const SVG_PADDING = 24;
 
-//: Cytoscape の多角形を、外形の矩形に内接する頂点 (-1..1 の座標) で写したもの。
+//: 多角形を、外形の矩形に内接する頂点 (-1..1 の座標) で写したもの。
 const SVG_POLYGONS = {
   hexagon: [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1],
   rhomboid: [-1, -1, 0.333, -1, 1, 1, -0.333, 1],
@@ -1886,7 +1758,7 @@ const SVG_POLYGONS = {
   tag: [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1],
 };
 
-//: 角を落とす比率 (cut-rectangle)。Cytoscape は固定長で落とすが、書き出しでは
+//: 角を落とす比率 (cut-rectangle)。画面表示と同じく、書き出しでは
 //: 大きさに対する比で近似する。
 const SVG_CUT_RATIO = 0.16;
 //: 角の丸め (round-rectangle) と、樽の膨らみ (barrel) の代わりの丸め。
@@ -1970,7 +1842,7 @@ function labelElement(label, x, y, { size = LABEL_FONT.size, fill, weight } = {}
 /**
  * いま図に描かれているものを SVG 1 枚にする。
  *
- * scene は表示層 (`site_app.js`) が Cytoscape から集めた実測値:
+ * scene は表示層 (`site_app.js`) が SVG 描画状態から集めた実測値:
  *
  * - `nodes`: `{ id, type, status, label, x, y, w, h }`
  * - `edges`: `{ name, dashed, x1, y1, x2, y2 }` (端点はノードの縁の座標)

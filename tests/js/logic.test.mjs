@@ -18,6 +18,7 @@ import {
   createView,
   decodeHash,
   defaultState,
+  edgeControl,
   edgeItems,
   encodeHash,
   escapeHtml,
@@ -42,8 +43,9 @@ import {
   nodeSize,
   normalizeTheme,
   reach,
+  quadraticPath,
+  quadraticPoint,
   related,
-  roundedPath,
   searchHits,
   severityTabs,
   sortRows,
@@ -54,7 +56,6 @@ import {
   stepHit,
   storableHash,
   tableRows,
-  tameRoute,
   truncate,
   visibleBandKeys,
   wrapLabel,
@@ -1315,46 +1316,34 @@ test("layoutOptions は TD / LR を dagre の rankDir に写す", () => {
   assert.equal(layoutOptions("TD").animate, false);
 });
 
-test("tameRoute は通常の dagre 経路をそのまま保つ", () => {
-  const points = [{ x: 0, y: 0 }, { x: 50, y: 20 }, { x: 100, y: 0 }];
-
-  assert.equal(tameRoute(points), points);
+test("edgeControl は異なるランク間を端点の中間で結ぶ", () => {
+  assert.deepEqual(edgeControl({ x: 0, y: 0 }, { x: 100, y: 100 }, "TD"), { x: 50, y: 50 });
 });
 
-test("tameRoute は端点を通り過ぎた経路を端点間の短い折れ線へ戻す", () => {
-  const points = [{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 100, y: 0 }];
-
-  assert.deepEqual(tameRoute(points), [
-    { x: 0, y: 0 },
-    { x: 50, y: 0 },
-    { x: 100, y: 0 },
-  ]);
+test("edgeControl は TD の同一ランクを上側へ短く膨らませる", () => {
+  assert.deepEqual(edgeControl({ x: 0, y: 0 }, { x: 100, y: 0 }, "TD"), { x: 50, y: -12 });
 });
 
-test("tameRoute は dagre の迂回方向を残しつつ尖りを 48px までにする", () => {
-  const points = [{ x: 0, y: 0 }, { x: 50, y: 500 }, { x: 100, y: 0 }];
-
-  assert.deepEqual(tameRoute(points), [
-    { x: 0, y: 0 },
-    { x: 50, y: 48 },
-    { x: 100, y: 0 },
-  ]);
+test("edgeControl は LR の同一ランクを左側へ短く膨らませる", () => {
+  assert.deepEqual(edgeControl({ x: 0, y: 0 }, { x: 0, y: 100 }, "LR"), { x: -12, y: 50 });
 });
 
-test("roundedPath は 2 点の経路を直線のまま描く", () => {
-  assert.equal(roundedPath([{ x: 0, y: 0 }, { x: 100, y: 0 }]), "M 0 0 L 100 0");
+test("edgeControl は複数エッジを端点間の法線方向へずらす", () => {
+  assert.deepEqual(edgeControl({ x: 0, y: 0 }, { x: 100, y: 0 }, "LR", 12), { x: 50, y: 12 });
 });
 
-test("roundedPath は折れ点の前後を二次 Bézier で丸める", () => {
-  const points = [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 50 }];
-
-  assert.equal(roundedPath(points, 10), "M 0 0 L 40 0 Q 50 0 50 10 L 50 50");
+test("quadraticPath は端点と制御点から短い曲線を作る", () => {
+  assert.equal(
+    quadraticPath({ x: 0, y: 0 }, { x: 50, y: -12 }, { x: 100, y: 0 }),
+    "M 0 0 Q 50 -12 100 0",
+  );
 });
 
-test("roundedPath は短い線分の半分を超えて丸めない", () => {
-  const points = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }];
-
-  assert.equal(roundedPath(points), "M 0 0 L 5 0 Q 10 0 10 5 L 10 10");
+test("quadraticPoint は描画と同じ曲線上のラベル位置を返す", () => {
+  assert.deepEqual(
+    quadraticPoint({ x: 0, y: 0 }, { x: 50, y: -24 }, { x: 100, y: 0 }),
+    { x: 50, y: -12 },
+  );
 });
 
 // --- 選択ノードの追従 -------------------------------------------------------

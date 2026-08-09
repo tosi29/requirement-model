@@ -21,6 +21,7 @@ import {
   createView,
   decodeHash,
   edgeItems,
+  edgeControl,
   encodeHash,
   escapeAttr,
   escapeHtml,
@@ -40,7 +41,8 @@ import {
   nextTheme,
   nodeContext,
   normalizeTheme,
-  roundedPath,
+  quadraticPath,
+  quadraticPoint,
   searchHits,
   severityTabs,
   sortRows,
@@ -50,7 +52,6 @@ import {
   stepHit,
   storableHash,
   tableRows,
-  tameRoute,
   truncate,
   visibleBandKeys,
 } from "./site_logic.js";
@@ -470,67 +471,21 @@ function edgeEndpoint(from, to) {
   return rectangleEndpoint(from, to);
 }
 
-function pathMidpoint(points) {
-  if (points.length < 2) return points[0] || { x: 0, y: 0 };
-  const lengths = points.slice(1).map((point, index) =>
-    Math.hypot(point.x - points[index].x, point.y - points[index].y));
-  const half = lengths.reduce((sum, length) => sum + length, 0) / 2;
-  let travelled = 0;
-  for (let index = 0; index < lengths.length; index += 1) {
-    if (travelled + lengths[index] >= half) {
-      const ratio = lengths[index] ? (half - travelled) / lengths[index] : 0;
-      return {
-        x: points[index].x + (points[index + 1].x - points[index].x) * ratio,
-        y: points[index].y + (points[index + 1].y - points[index].y) * ratio,
-      };
-    }
-    travelled += lengths[index];
-  }
-  return points.at(-1);
-}
-
-function offsetRoute(points, amount) {
-  if (!amount || points.length < 2) return points;
-  const start = points[0];
-  const end = points.at(-1);
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const length = Math.hypot(dx, dy) || 1;
-  const ox = (-dy / length) * amount;
-  const oy = (dx / length) * amount;
-  if (points.length === 2) {
-    return [start, { x: (start.x + end.x) / 2 + ox, y: (start.y + end.y) / 2 + oy }, end];
-  }
-  return points.map((point, index) =>
-    index === 0 || index === points.length - 1 ? point : { x: point.x + ox, y: point.y + oy });
-}
-
 function updateEdges() {
   for (const edge of edgeItemsByKey.values()) {
     const source = nodeItems.get(edge.source);
     const target = nodeItems.get(edge.target);
     if (!source || !target) continue;
-    const route = edge.route.length >= 2 ? edge.route : [source, target];
-    const layoutSource = edge.layoutSource || source;
-    const layoutTarget = edge.layoutTarget || target;
-    const sourceDelta = { x: source.x - layoutSource.x, y: source.y - layoutSource.y };
-    const targetDelta = { x: target.x - layoutTarget.x, y: target.y - layoutTarget.y };
-    const moved = route.map((point, index) => {
-      const ratio = route.length === 1 ? 0 : index / (route.length - 1);
-      return {
-        x: point.x + sourceDelta.x * (1 - ratio) + targetDelta.x * ratio,
-        y: point.y + sourceDelta.y * (1 - ratio) + targetDelta.y * ratio,
-      };
-    });
-    const shifted = offsetRoute(tameRoute(moved), edge.parallelOffset || 0);
-    const from = edgeEndpoint(source, shifted[1] || target);
-    const to = edgeEndpoint(target, shifted.at(-2) || source);
-    const points = [from, ...shifted.slice(1, -1), to];
-    setAttrs(edge.path, { d: roundedPath(points) });
-    const middle = pathMidpoint(points);
+    const offset = edge.parallelOffset || 0;
+    let control = edgeControl(source, target, state.direction, offset);
+    const from = edgeEndpoint(source, control);
+    const to = edgeEndpoint(target, control);
+    control = edgeControl(from, to, state.direction, offset);
+    setAttrs(edge.path, { d: quadraticPath(from, control, to) });
+    const middle = quadraticPoint(from, control, to);
     setAttrs(edge.label, { x: middle.x, y: middle.y - 4 });
     edge.x1 = from.x; edge.y1 = from.y; edge.x2 = to.x; edge.y2 = to.y;
-    edge.points = points;
+    edge.points = [from, control, to];
   }
 }
 
@@ -574,7 +529,7 @@ function runLayout() {
     const edge = DATA.edges[item.index];
     if (!nodes.has(edge.source) || !nodes.has(edge.target)) continue;
     g.setEdge(edge.source, edge.target, { width: estimateTextWidth(edge.name), height: 12 }, item.id);
-    const key = `${edge.source}\u0000${edge.target}`;
+    const key = [edge.source, edge.target].sort().join("\u0000");
     const siblings = parallel.get(key) || [];
     siblings.push(item);
     parallel.set(key, siblings);
@@ -587,11 +542,8 @@ function runLayout() {
   }
   for (const siblings of parallel.values()) {
     siblings.forEach((item, index) => {
-      const route = g.edge({ v: item.source, w: item.target, name: item.id });
-      item.route = route?.points || [];
-      item.layoutSource = { ...g.node(item.source) };
-      item.layoutTarget = { ...g.node(item.target) };
-      item.parallelOffset = (index - (siblings.length - 1) / 2) * 8;
+      const orientation = item.source.localeCompare(item.target) <= 0 ? 1 : -1;
+      item.parallelOffset = (index - (siblings.length - 1) / 2) * 12 * orientation;
     });
   }
   applyBanding();

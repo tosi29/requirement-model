@@ -1457,8 +1457,9 @@ function bandRows(members, edges) {
  * frames は型 → `{ x, y, w, h }` (枠の中心と大きさ) の Map。
  * 帯のノードが 1 つも無ければ両方とも空。
  *
- * Goal / Need / Requirements の各段は図の全幅に揃える。RequirementGroup 自体は
- * 1 行のまま保ち、グループ内のノードだけを指定された最大幅で折り返す。
+ * Goal / Need は両者の中身に必要な幅だけを共通幅として中央へ寄せる。
+ * RequirementGroup 自体は 1 行のまま保ち、グループ内のノードだけを指定された
+ * 最大幅で折り返す。
  */
 export function bandedLayout(bands, placed, edges, direction, options = {}) {
   const positions = new Map();
@@ -1526,7 +1527,6 @@ export function bandedLayout(bands, placed, edges, direction, options = {}) {
   // 1. 型帯は縦に積み、RequirementGroup は同じ Requirements 段の中で横に並べる。
   const banded = new Set();
   const spans = new Map();
-  const requirementSections = [];
   let cursor = topOf(placed);
   let index = 0;
   while (index < bands.length) {
@@ -1566,7 +1566,6 @@ export function bandedLayout(bands, placed, edges, direction, options = {}) {
         index += 1;
       }
       for (const bandIndex of sectionBandIndexes) spans.get(bandIndex).to = sectionTo;
-      requirementSections.push(sectionBandIndexes);
       cursor = sectionTo + BAND_GAP;
       continue;
     }
@@ -1613,15 +1612,30 @@ export function bandedLayout(bands, placed, edges, direction, options = {}) {
     secMin = Math.min(secMin, secCenter(node) - secSize(node) / 2);
     secMax = Math.max(secMax, secCenter(node) + secSize(node) / 2);
   }
+  let requirementSecMin = Infinity;
+  let requirementSecMax = -Infinity;
+  for (let bandIndex = 0; bandIndex < bands.length; bandIndex++) {
+    if (!bands[bandIndex].members || !spans.has(bandIndex)) continue;
+    const span = spans.get(bandIndex);
+    requirementSecMin = Math.min(requirementSecMin, span.secMin);
+    requirementSecMax = Math.max(requirementSecMax, span.secMax);
+    secMin = Math.min(secMin, span.secMin);
+    secMax = Math.max(secMax, span.secMax);
+  }
   const secMiddle = (secMin + secMax) / 2;
-  const frameSecSize = secMax - secMin + BAND_FRAME_PAD * 2;
-
-  //: Requirements 段の外端も型帯と揃える。グループ間隔は変えず、両端の枠だけを
-  //: 図の外端まで広げる (グループ自体を別の行へ送らない)。
-  for (const bandIndexes of requirementSections) {
-    if (!bandIndexes.length) continue;
-    spans.get(bandIndexes[0]).secMin = secMin - BAND_FRAME_PAD;
-    spans.get(bandIndexes.at(-1)).secMax = secMax + BAND_FRAME_PAD;
+  const bandMiddle = Number.isFinite(requirementSecMin)
+    ? (requirementSecMin + requirementSecMax) / 2
+    : secMiddle;
+  let typeSecSize = 0;
+  for (let bandIndex = 0; bandIndex < bands.length; bandIndex++) {
+    if (bands[bandIndex].members || !membersOf[bandIndex].length) continue;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const node of membersOf[bandIndex]) {
+      min = Math.min(min, secCenter(node) - secSize(node) / 2);
+      max = Math.max(max, secCenter(node) + secSize(node) / 2);
+    }
+    typeSecSize = Math.max(typeSecSize, max - min + BAND_FRAME_PAD * 2);
   }
 
   // 4. 型帯は全幅の中央へ寄せ、RequirementGroup 枠は各グループの外接矩形に掛ける。
@@ -1650,7 +1664,7 @@ export function bandedLayout(bands, placed, edges, direction, options = {}) {
       min = Math.min(min, secCenter(node) - secSize(node) / 2);
       max = Math.max(max, secCenter(node) + secSize(node) / 2);
     }
-    const shift = secMiddle - (min + max) / 2;
+    const shift = bandMiddle - (min + max) / 2;
     for (const node of members) {
       const position = positions.get(node.id);
       positions.set(
@@ -1662,9 +1676,9 @@ export function bandedLayout(bands, placed, edges, direction, options = {}) {
     }
     const framePriSize = span.to - span.from + BAND_FRAME_PAD * 2;
     frames.set(bands[bandIndex].type || bands[bandIndex].key, {
-      ...at(secMiddle, (span.from + span.to) / 2),
-      w: vertical ? frameSecSize : framePriSize,
-      h: vertical ? framePriSize : frameSecSize,
+      ...at(bandMiddle, (span.from + span.to) / 2),
+      w: vertical ? typeSecSize : framePriSize,
+      h: vertical ? framePriSize : typeSecSize,
     });
   }
   return { positions, frames };

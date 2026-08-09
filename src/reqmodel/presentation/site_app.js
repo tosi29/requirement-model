@@ -511,7 +511,11 @@ function applyBanding() {
     item.w = frame.w; item.h = frame.h;
     updateShape(item.shape, "round-rectangle", item);
     moveItem(item, frame.x, frame.y);
-    setAttrs(item.label, { y: -item.h / 2 - 6 });
+    // renderLabel() puts the coordinates on tspans, so changing the parent
+    // text's y attribute would leave the title at the centre of the frame.
+    // Use the frame's existing top padding as a header instead: the title is
+    // kept inside the group while remaining clear of its first node row.
+    renderLabel(item.label, item.label.textContent, 0, -item.h / 2 + 7, 11, "bold");
   }
   updateEdges();
 }

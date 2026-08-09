@@ -321,6 +321,14 @@ def test_svg_bands_are_behind_nodes_and_do_not_capture_input(tmp_path: Path):
     assert 'item.bandType === "RequirementGroup" ? pal.panel' in html
 
 
+def test_band_labels_use_the_frame_header_instead_of_overlapping_nodes(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert 'renderLabel(item.label, item.label.textContent, 0, -item.h / 2 + 7, 11, "bold")' in html
+    assert "#graph .band-label {" in html
+    assert "paint-order: stroke;" in html
+
+
 def test_filter_changes_only_visibility_and_keeps_node_positions(tmp_path: Path):
     html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
     visibility = html.split("function applyVisibility()", 1)[1].split(

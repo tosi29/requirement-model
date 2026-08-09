@@ -602,7 +602,8 @@ def test_page_uses_an_icon_button_to_copy_the_link(tmp_path: Path):
 
     assert 'id="copy-link" class="icon-button"' in html
     assert 'aria-label="表示中のページへのリンクをコピー"' in html
-    assert '<svg viewBox="0 0 24 24" aria-hidden="true">' in html
+    assert '<path d="M10 13a5 5 0 0 0 7.54.54l3-3' in html
+    assert '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3' in html
 
 
 def test_page_has_a_theme_toggle(tmp_path: Path):

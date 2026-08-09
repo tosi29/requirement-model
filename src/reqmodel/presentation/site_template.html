@@ -132,7 +132,13 @@ main {
   dominant-baseline: auto;
 }
 #graph .band .node-shape { fill-opacity: .3; stroke-dasharray: 6 4; }
-#graph .band-label { fill: var(--graph-muted, var(--muted)); }
+#graph .band-label {
+  fill: var(--graph-muted, var(--muted));
+  paint-order: stroke;
+  stroke: var(--graph-bg, var(--bg));
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
 #graph .edge-line {
   fill: none;
   stroke: var(--graph-border, var(--border));

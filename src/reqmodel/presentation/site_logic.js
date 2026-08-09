@@ -1400,8 +1400,8 @@ export function layoutOptions(direction) {
 // エッジの向きが混在している (motivates は Goal→Need と下向き、satisfies は
 // FR→Need と上向き) ため、dagre に任せるだけでは Goal と FR が同じ高さに並ぶ。
 // meta.bands に挙がった型 (Goal / Need) を主軸方向の帯にまとめ、常に図の上
-// (LR なら左) に出す。dagre の結果の副軸方向の並びは保つので、交差の少なさは
-// おおむね引き継がれる。
+// (LR なら左) に出す。dagre の結果は副軸方向の並び順にだけ使い、絶対座標や
+// 不要な空白は引き継がない。
 
 //: 帯の中の行間 (refines で親子になった Goal の段差)。
 const BAND_ROW_GAP = 30;
@@ -1411,6 +1411,9 @@ const BAND_SIBLING_GAP = 26;
 const BAND_GAP = 96;
 //: ノードの外接矩形から枠までの余白。
 const BAND_FRAME_PAD = 14;
+//: RequirementGroup 内をカードとして詰めるときの既定最大幅。
+const REQUIREMENT_GROUP_MAX_WIDTH = 600;
+const REQUIREMENT_GROUP_GAP = 48;
 
 /**
  * 帯の中の行分け。refines (子 → 親) で親を上の行に置く。
@@ -1454,11 +1457,10 @@ function bandRows(members, edges) {
  * frames は型 → `{ x, y, w, h }` (枠の中心と大きさ) の Map。
  * 帯のノードが 1 つも無ければ両方とも空。
  *
- * **枠は図の全幅に揃える**。帯ごとに中身の外接矩形を掛けると幅も左端もばらばらに
- * なり、「上に積んだ層」に見えない。等幅・同位置の枠が縦に並ぶ形にし、中身は
- * その中央に寄せる (帯の中の相対位置は変えない)。
+ * RequirementGroup 自体は 1 行のまま保ち、その全体幅を Goal / Need の共通幅にも
+ * 使う。グループ内のノードだけを指定された最大幅で折り返す。
  */
-export function bandedLayout(bands, placed, edges, direction) {
+export function bandedLayout(bands, placed, edges, direction, options = {}) {
   const positions = new Map();
   const frames = new Map();
   const membersOf = bands.map((band) => {
@@ -1480,6 +1482,46 @@ export function bandedLayout(bands, placed, edges, direction) {
     return vertical ? position.x : position.y;
   };
   const topOf = (nodes) => Math.min(...nodes.map((node) => pri(node) - priSize(node) / 2));
+  const groupMaxWidth = Math.max(1, options.groupMaxWidth || REQUIREMENT_GROUP_MAX_WIDTH);
+
+  /** 1 グループを原点基準で詰める。dagre の座標は順序にだけ使う。 */
+  const layoutGroup = (members, maxWidth) => {
+    const contentLimit = Math.max(1, maxWidth - BAND_FRAME_PAD * 2);
+    const positions = new Map();
+    let rowTop = 0;
+    let contentWidth = 0;
+    for (const depthRow of bandRows(members, edges)) {
+      depthRow.sort((a, b) => sec(a) - sec(b));
+      let line = [];
+      let lineWidth = 0;
+      const finishLine = () => {
+        if (!line.length) return;
+        const height = Math.max(...line.map(priSize));
+        let offset = 0;
+        for (const node of line) {
+          const size = secSize(node);
+          positions.set(node.id, { sec: offset + size / 2, pri: rowTop + height / 2 });
+          offset += size + BAND_SIBLING_GAP;
+        }
+        contentWidth = Math.max(contentWidth, lineWidth);
+        rowTop += height + BAND_ROW_GAP;
+        line = [];
+        lineWidth = 0;
+      };
+      for (const node of depthRow) {
+        const nextWidth = lineWidth + (line.length ? BAND_SIBLING_GAP : 0) + secSize(node);
+        if (line.length && nextWidth > contentLimit) finishLine();
+        line.push(node);
+        lineWidth += (line.length > 1 ? BAND_SIBLING_GAP : 0) + secSize(node);
+      }
+      finishLine();
+    }
+    return {
+      positions,
+      width: contentWidth + BAND_FRAME_PAD * 2,
+      height: rowTop - BAND_ROW_GAP + BAND_FRAME_PAD * 2,
+    };
+  };
 
   // 1. 型帯は縦に積み、RequirementGroup は同じ Requirements 段の中で横に並べる。
   const banded = new Set();
@@ -1489,46 +1531,40 @@ export function bandedLayout(bands, placed, edges, direction) {
   while (index < bands.length) {
     if (bands[index].members) {
       const sectionFrom = cursor;
-      let sectionTo = sectionFrom;
-      let groupCursor = Math.min(
-        ...placed.map((node) => sec(node) - secSize(node) / 2),
-      );
+      const sectionStart = Math.min(...placed.map((node) => sec(node) - secSize(node) / 2));
       const sectionBandIndexes = [];
+      let groupLeft = sectionStart;
+      let sectionTo = sectionFrom;
       while (index < bands.length && bands[index].members) {
         const members = membersOf[index];
         if (!members.length) {
           index += 1;
           continue;
         }
-        sectionBandIndexes.push(index);
         for (const node of members) banded.add(node.id);
-
-        let groupTo = sectionFrom;
-        let groupMin = Infinity;
-        let groupMax = -Infinity;
-        for (const row of bandRows(members, edges)) {
-          const height = Math.max(...row.map(priSize));
-          row.sort((a, b) => sec(a) - sec(b));
-          let occupied = groupCursor;
-          for (const node of row) {
-            const half = secSize(node) / 2;
-            const center = Math.max(sec(node), occupied + BAND_SIBLING_GAP + half);
-            positions.set(node.id, at(center, groupTo + height / 2));
-            occupied = center + half;
-            groupMin = Math.min(groupMin, center - half);
-            groupMax = Math.max(groupMax, center + half);
-          }
-          groupTo += height + BAND_ROW_GAP;
+        const group = layoutGroup(members, groupMaxWidth);
+        for (const node of members) {
+          const local = group.positions.get(node.id);
+          positions.set(
+            node.id,
+            at(
+              groupLeft + BAND_FRAME_PAD + local.sec,
+              sectionFrom + BAND_FRAME_PAD + local.pri,
+            ),
+          );
         }
-        const to = groupTo - BAND_ROW_GAP;
-        spans.set(index, { from: sectionFrom, to, secMin: groupMin, secMax: groupMax });
-        sectionTo = Math.max(sectionTo, to);
-        groupCursor = groupMax + BAND_GAP;
+        spans.set(index, {
+          from: sectionFrom,
+          to: sectionFrom + group.height,
+          secMin: groupLeft,
+          secMax: groupLeft + group.width,
+        });
+        sectionBandIndexes.push(index);
+        sectionTo = Math.max(sectionTo, sectionFrom + group.height);
+        groupLeft += group.width + REQUIREMENT_GROUP_GAP;
         index += 1;
       }
-      for (const bandIndex of sectionBandIndexes) {
-        spans.get(bandIndex).to = sectionTo;
-      }
+      for (const bandIndex of sectionBandIndexes) spans.get(bandIndex).to = sectionTo;
       cursor = sectionTo + BAND_GAP;
       continue;
     }
@@ -1542,14 +1578,14 @@ export function bandedLayout(bands, placed, edges, direction) {
     const from = cursor;
     for (const row of bandRows(members, edges)) {
       const height = Math.max(...row.map(priSize));
-      //: 副軸は dagre の並びを保ち、重なりだけを右 (下) に押して解消する。
+      //: dagre の並び順だけを保ち、帯の左端から一定間隔で 1 行に詰め直す。
       row.sort((a, b) => sec(a) - sec(b));
-      let occupied = -Infinity;
+      let occupied = Math.min(...placed.map((node) => sec(node) - secSize(node) / 2));
       for (const node of row) {
         const half = secSize(node) / 2;
-        const center = Math.max(sec(node), occupied + BAND_SIBLING_GAP + half);
+        const center = occupied + half;
         positions.set(node.id, at(center, cursor + height / 2));
-        occupied = center + half;
+        occupied = center + half + BAND_SIBLING_GAP;
       }
       cursor += height + BAND_ROW_GAP;
     }
@@ -1575,8 +1611,34 @@ export function bandedLayout(bands, placed, edges, direction) {
     secMin = Math.min(secMin, secCenter(node) - secSize(node) / 2);
     secMax = Math.max(secMax, secCenter(node) + secSize(node) / 2);
   }
+  let requirementSecMin = Infinity;
+  let requirementSecMax = -Infinity;
+  for (let bandIndex = 0; bandIndex < bands.length; bandIndex++) {
+    if (!bands[bandIndex].members || !spans.has(bandIndex)) continue;
+    const span = spans.get(bandIndex);
+    requirementSecMin = Math.min(requirementSecMin, span.secMin);
+    requirementSecMax = Math.max(requirementSecMax, span.secMax);
+    secMin = Math.min(secMin, span.secMin);
+    secMax = Math.max(secMax, span.secMax);
+  }
   const secMiddle = (secMin + secMax) / 2;
-  const frameSecSize = secMax - secMin + BAND_FRAME_PAD * 2;
+  const bandMiddle = Number.isFinite(requirementSecMin)
+    ? (requirementSecMin + requirementSecMax) / 2
+    : secMiddle;
+  let typeSecSize = 0;
+  for (let bandIndex = 0; bandIndex < bands.length; bandIndex++) {
+    if (bands[bandIndex].members || !membersOf[bandIndex].length) continue;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const node of membersOf[bandIndex]) {
+      min = Math.min(min, secCenter(node) - secSize(node) / 2);
+      max = Math.max(max, secCenter(node) + secSize(node) / 2);
+    }
+    typeSecSize = Math.max(typeSecSize, max - min + BAND_FRAME_PAD * 2);
+  }
+  const commonSecSize = Number.isFinite(requirementSecMin)
+    ? requirementSecMax - requirementSecMin
+    : typeSecSize;
 
   // 4. 型帯は全幅の中央へ寄せ、RequirementGroup 枠は各グループの外接矩形に掛ける。
   for (let bandIndex = 0; bandIndex < bands.length; bandIndex++) {
@@ -1589,11 +1651,11 @@ export function bandedLayout(bands, placed, edges, direction) {
       frames.set(bands[bandIndex].key, {
         ...at((span.secMin + span.secMax) / 2, (span.from + span.to) / 2),
         w: vertical
-          ? span.secMax - span.secMin + BAND_FRAME_PAD * 2
-          : span.to - span.from + BAND_FRAME_PAD * 2,
+          ? span.secMax - span.secMin
+          : span.to - span.from,
         h: vertical
-          ? span.to - span.from + BAND_FRAME_PAD * 2
-          : span.secMax - span.secMin + BAND_FRAME_PAD * 2,
+          ? span.to - span.from
+          : span.secMax - span.secMin,
       });
       continue;
     }
@@ -1604,7 +1666,7 @@ export function bandedLayout(bands, placed, edges, direction) {
       min = Math.min(min, secCenter(node) - secSize(node) / 2);
       max = Math.max(max, secCenter(node) + secSize(node) / 2);
     }
-    const shift = secMiddle - (min + max) / 2;
+    const shift = bandMiddle - (min + max) / 2;
     for (const node of members) {
       const position = positions.get(node.id);
       positions.set(
@@ -1616,9 +1678,9 @@ export function bandedLayout(bands, placed, edges, direction) {
     }
     const framePriSize = span.to - span.from + BAND_FRAME_PAD * 2;
     frames.set(bands[bandIndex].type || bands[bandIndex].key, {
-      ...at(secMiddle, (span.from + span.to) / 2),
-      w: vertical ? frameSecSize : framePriSize,
-      h: vertical ? framePriSize : frameSecSize,
+      ...at(bandMiddle, (span.from + span.to) / 2),
+      w: vertical ? commonSecSize : framePriSize,
+      h: vertical ? framePriSize : commonSecSize,
     });
   }
   return { positions, frames };

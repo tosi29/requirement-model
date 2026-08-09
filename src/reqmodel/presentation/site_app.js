@@ -498,7 +498,9 @@ function applyBanding() {
     id: item.id, type: item.type, x: item.x, y: item.y, w: item.w, h: item.h,
   }));
   if (!placed.length) return;
-  const { positions, frames } = bandedLayout(bands, placed, view.edges, state.direction);
+  const { positions, frames } = bandedLayout(bands, placed, view.edges, state.direction, {
+    groupMaxWidth: 600,
+  });
   for (const [id, position] of positions) {
     const item = nodeItems.get(id);
     if (item) moveItem(item, position.x, position.y);

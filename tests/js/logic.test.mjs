@@ -1172,7 +1172,7 @@ test("bandedLayout は Goal 帯 → Need 帯 → その他 の順に上から並
   assert.equal(fr.x, 100);
 });
 
-test("bandedLayout は帯の中の並び順を保ったまま中央へ寄せる", () => {
+test("bandedLayout は帯の中の並び順を保って不要な空白を詰める", () => {
   const placed = [
     placedNode("Goal-1", "Goal", 0, 0),
     placedNode("Goal-2", "Goal", 100, 0),
@@ -1183,12 +1183,12 @@ test("bandedLayout は帯の中の並び順を保ったまま中央へ寄せる"
   const first = positions.get("Goal-1");
   const second = positions.get("Goal-2");
   assert.ok(first.x < second.x, "帯の中の左右の並びは変わらない");
-  assert.equal(second.x - first.x, 100, "帯の中の間隔も変わらない");
-  // 図の全幅 (-30 〜 430) の中心 200 に、2 件の中心 (50) が寄る。
+  assert.equal(second.x - first.x, 86, "ノード幅と一定間隔まで詰める");
+  // 図の全幅の中心 200 に、詰め直した 2 件を寄せる。
   assert.equal((first.x + second.x) / 2, 200);
 });
 
-test("bandedLayout の枠は図の全幅に揃い、等幅で縦に並ぶ", () => {
+test("bandedLayout の Goal・Need 枠は中身に必要な共通幅で縦に並ぶ", () => {
   const placed = [
     placedNode("Goal-1", "Goal", 0, 0),
     placedNode("Need-1", "Need", 50, 80),
@@ -1198,8 +1198,8 @@ test("bandedLayout の枠は図の全幅に揃い、等幅で縦に並ぶ", () =
 
   const goal = frames.get("Goal");
   const need = frames.get("Need");
-  // 全幅 = 外接矩形 (-30 〜 330 = 360) + 余白 14 × 2。
-  assert.equal(goal.w, 388);
+  // 共通幅 = 最も広い Goal / Need の中身 60 + 余白 14 × 2。
+  assert.equal(goal.w, 88);
   assert.equal(need.w, goal.w, "2 つの枠は等幅");
   assert.equal(need.x, goal.x, "左端も揃う");
   assert.ok(goal.y < need.y, "縦に並ぶ");
@@ -1230,6 +1230,16 @@ test("bandedLayout は帯の中の重なりを副軸方向へ押して解消す�
   const right = positions.get("Need-2");
   assert.equal(left.y, right.y, "同じ行に並ぶ");
   assert.ok(right.x - left.x >= 60, "ノード幅ぶん以上離れる");
+});
+
+test("bandedLayout は多数の Goal も同じ階層なら折り返さない", () => {
+  const placed = Array.from({ length: 6 }, (_, index) =>
+    placedNode(`Goal-${index}`, "Goal", index * 1000, 0),
+  );
+  const { positions } = bandedLayout([BANDS[0]], placed, [], "TD");
+  assert.equal(new Set([...positions.values()].map((position) => position.y)).size, 1);
+  const xs = [...positions.values()].map((position) => position.x);
+  assert.equal(Math.max(...xs) - Math.min(...xs), 86 * 5, "不要な空白だけを詰める");
 });
 
 test("bandedLayout の LR は帯を左に積み、縦の並びを保つ", () => {
@@ -1270,7 +1280,8 @@ test("bandedLayout は RequirementGroup を Requirements 段の中で横に並�
   assert.equal(positions.get("FR-1").y, positions.get("QR-1").y);
   assert.ok(positions.get("FR-1").x < positions.get("QR-1").x);
   assert.ok(frames.get("group:capture").x < frames.get("group:notify").x);
-  assert.ok(frames.get("group:capture").w < frames.get("Goal").w);
+  assert.ok(frames.get("group:capture").w !== frames.get("Goal").w,
+    "Requirements 枠を Goal / Need の共通幅へ引き延ばさない");
   assert.equal(frames.get("group:capture").h, frames.get("group:notify").h);
   assert.equal(frames.get("group:capture").y, frames.get("group:notify").y);
 });
@@ -1293,6 +1304,93 @@ test("bandedLayout は表示中の RequirementGroup だけで枠の高さを再�
   assert.equal(positions.get("FR-1").y, positions.get("QR-1").y);
   assert.ok(frames.get("group:capture").w !== frames.get("group:notify").w);
   assert.equal(frames.has("group:hidden"), false);
+});
+
+test("bandedLayout は多数の RequirementGroup を折り返さず同じ段に並べる", () => {
+  const bands = Array.from({ length: 8 }, (_, group) => ({
+    key: `group:${group}`,
+    label: String(group),
+    members: Array.from({ length: 4 }, (_, node) => `FR-${group}-${node}`),
+  }));
+  const placed = bands.flatMap((band, group) =>
+    band.members.map((id, node) => placedNode(id, "FunctionalRequirement", group * 1000 + node * 200, 0)),
+  );
+  const { positions, frames } = bandedLayout(bands, placed, [], "TD", {
+    groupMaxWidth: 250,
+  });
+  const boxes = [...frames.values()];
+  assert.equal(new Set(boxes.map((frame) => frame.y)).size, 1, "全グループが同じ段に残る");
+  assert.equal(positions.size, 32);
+  for (const band of bands) {
+    assert.ok(new Set(band.members.map((id) => positions.get(id).x)).size > 1,
+      "各グループを 1 ノード幅まで潰さない");
+  }
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+    const a = boxes[i]; const b = boxes[j];
+    assert.ok(Math.abs(a.x - b.x) >= (a.w + b.w) / 2 || Math.abs(a.y - b.y) >= (a.h + b.h) / 2);
+  }
+});
+
+test("bandedLayout は単一グループ内の同階層ノードを詰めて折り返す", () => {
+  const members = Array.from({ length: 12 }, (_, index) => `FR-${index}`);
+  const placed = members.map((id, index) => placedNode(id, "FunctionalRequirement", index * 500, 0));
+  const { positions, frames } = bandedLayout(
+    [{ key: "group:many", label: "多数", members }], placed, [], "TD",
+    { groupMaxWidth: 250 },
+  );
+  assert.ok(new Set([...positions.values()].map((position) => position.y)).size > 1);
+  assert.ok(frames.get("group:many").w <= 250);
+  assert.ok(Math.max(...[...positions.values()].map((position) => position.x)) < 250,
+    "dagre の大きな絶対座標を引き継がない");
+});
+
+test("bandedLayout は Goal・Need を全 RequirementGroup の横幅へ揃える", () => {
+  const bands = [
+    ...BANDS,
+    { key: "group:requirements", members: ["FR-1", "FR-2", "FR-3"] },
+    { key: "group:other", members: ["FR-4"] },
+  ];
+  const placed = [
+    placedNode("Goal-1", "Goal", 0, 0),
+    placedNode("Goal-2", "Goal", 500, 0),
+    placedNode("Need-1", "Need", 250, 80),
+    placedNode("FR-1", "FunctionalRequirement", 0, 160),
+    placedNode("FR-2", "FunctionalRequirement", 10, 200),
+    placedNode("FR-3", "FunctionalRequirement", 20, 240),
+    placedNode("FR-4", "FunctionalRequirement", 800, 160),
+  ];
+  const { frames } = bandedLayout(bands, placed, [], "TD", { groupMaxWidth: 300 });
+  const goal = frames.get("Goal");
+  const need = frames.get("Need");
+  const requirements = frames.get("group:requirements");
+  const other = frames.get("group:other");
+  assert.equal(goal.x - goal.w / 2, need.x - need.w / 2);
+  assert.equal(goal.x + goal.w / 2, need.x + need.w / 2);
+  const requirementsLeft = requirements.x - requirements.w / 2;
+  const requirementsRight = other.x + other.w / 2;
+  const requirementsMiddle = (
+    requirementsLeft + requirementsRight
+  ) / 2;
+  assert.equal(goal.x, requirementsMiddle, "全 Requirements の中心へ揃える");
+  assert.equal(goal.x - goal.w / 2, requirementsLeft);
+  assert.equal(goal.x + goal.w / 2, requirementsRight);
+});
+
+test("bandedLayout の枠内折り返しは refines 階層と LR の非重複を保つ", () => {
+  const members = ["FR-parent", "FR-child", "FR-peer"];
+  const placed = members.map((id, index) => placedNode(id, "FunctionalRequirement", 0, index * 500));
+  const edges = [{ source: "FR-child", name: "refines", target: "FR-parent" }];
+  const { positions, frames } = bandedLayout(
+    [{ key: "group:tree", members }], placed, edges, "LR",
+    { groupMaxWidth: 150 },
+  );
+  assert.ok(positions.get("FR-parent").x < positions.get("FR-child").x);
+  assert.ok(frames.get("group:tree").h <= 150);
+  const nodes = members.map((id) => ({ ...positions.get(id), w: 60, h: 30 }));
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+    const a = nodes[i]; const b = nodes[j];
+    assert.ok(Math.abs(a.x - b.x) >= 60 || Math.abs(a.y - b.y) >= 30);
+  }
 });
 
 test("bandedLayout は帯以外のノードの相対位置を保ったまま平行移動する", () => {

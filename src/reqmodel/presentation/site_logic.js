@@ -1348,70 +1348,37 @@ export function isNodeVisible(extent, box, margin = 0) {
   );
 }
 
-/**
- * 帯への再配置で端点だけが大きく動いた dagre 経路を、短い 1 折れ線へ戻す。
- *
- * dagre は帯を適用する前の座標で、逆向き・同一ランクのエッジをグラフの外側へ
- * 迂回させることがある。その中間点を新しい端点へそのまま補間すると、端点同士は
- * 近いのに経路だけが数千 px 離れた場所で尖る。経路長が弦の `maxRatio` 倍を超えた
- * 場合だけ、dagre が選んだ迂回方向を `maxBend` まで残して穏やかな折れ線にする。
- */
-export function tameRoute(points, maxRatio = 2.5, maxBend = 48) {
-  if (points.length < 3) return points;
-  const start = points[0];
-  const end = points.at(-1);
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const chord = Math.hypot(dx, dy);
-  if (chord < 1) return points;
-  const length = points.slice(1).reduce(
-    (sum, point, index) => sum + Math.hypot(point.x - points[index].x, point.y - points[index].y),
-    0,
-  );
-  if (length <= chord * maxRatio) return points;
-
-  const middle = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-  const normal = { x: -dy / chord, y: dx / chord };
-  let deviation = 0;
-  for (const point of points.slice(1, -1)) {
-    const candidate = (point.x - middle.x) * normal.x + (point.y - middle.y) * normal.y;
-    if (Math.abs(candidate) > Math.abs(deviation)) deviation = candidate;
-  }
-  deviation = Math.max(-maxBend, Math.min(maxBend, deviation));
-  return [start, { x: middle.x + normal.x * deviation, y: middle.y + normal.y * deviation }, end];
+/** 最終ノード座標から、短い二次 Bézier の制御点を作る。 */
+export function edgeControl(source, target, direction, offset = 0) {
+  const dx = target.x - source.x;
+  const dy = target.y - source.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const control = {
+    x: (source.x + target.x) / 2 + (-dy / length) * offset,
+    y: (source.y + target.y) / 2 + (dx / length) * offset,
+  };
+  const sameRank = direction === "LR" ? Math.abs(dx) < 8 : Math.abs(dy) < 8;
+  if (!sameRank) return control;
+  const span = direction === "LR" ? Math.abs(dy) : Math.abs(dx);
+  const bend = Math.min(48, Math.max(8, span * 0.12));
+  if (direction === "LR") control.x -= bend;
+  else control.y -= bend;
+  return control;
 }
 
-/** dagre の折れ線を保ったまま、各角だけを二次 Bézier で丸める。 */
-export function roundedPath(points, radius = 24) {
-  if (!points.length) return "";
+/** 二次 Bézier の SVG path。 */
+export function quadraticPath(start, control, end) {
   const coord = (value) => Math.round(value * 100) / 100;
-  const commands = [`M ${coord(points[0].x)} ${coord(points[0].y)}`];
-  for (let index = 1; index < points.length - 1; index += 1) {
-    const previous = points[index - 1];
-    const corner = points[index];
-    const next = points[index + 1];
-    const before = Math.hypot(corner.x - previous.x, corner.y - previous.y);
-    const after = Math.hypot(next.x - corner.x, next.y - corner.y);
-    const amount = Math.min(radius, before / 2, after / 2);
-    if (amount < 0.5) {
-      commands.push(`L ${coord(corner.x)} ${coord(corner.y)}`);
-      continue;
-    }
-    const entry = {
-      x: corner.x + ((previous.x - corner.x) * amount) / before,
-      y: corner.y + ((previous.y - corner.y) * amount) / before,
-    };
-    const exit = {
-      x: corner.x + ((next.x - corner.x) * amount) / after,
-      y: corner.y + ((next.y - corner.y) * amount) / after,
-    };
-    commands.push(
-      `L ${coord(entry.x)} ${coord(entry.y)} Q ${coord(corner.x)} ${coord(corner.y)} ${coord(exit.x)} ${coord(exit.y)}`,
-    );
-  }
-  const end = points.at(-1);
-  commands.push(`L ${coord(end.x)} ${coord(end.y)}`);
-  return commands.join(" ");
+  return `M ${coord(start.x)} ${coord(start.y)} Q ${coord(control.x)} ${coord(control.y)} ${coord(end.x)} ${coord(end.y)}`;
+}
+
+/** 二次 Bézier 上の点。ラベル位置にも描画と同じ曲線を使う。 */
+export function quadraticPoint(start, control, end, t = 0.5) {
+  const rest = 1 - t;
+  return {
+    x: rest * rest * start.x + 2 * rest * t * control.x + t * t * end.x,
+    y: rest * rest * start.y + 2 * rest * t * control.y + t * t * end.y,
+  };
 }
 
 /** dagre のレイアウト設定。direction は "TD" か "LR"。 */

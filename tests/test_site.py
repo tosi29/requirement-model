@@ -227,12 +227,13 @@ def test_page_links_the_search_box_to_the_graph(tmp_path: Path):
 
 
 def test_page_uses_svg_dom_and_dagre_without_cytoscape(tmp_path: Path):
-    """描画は SVG DOM、dagre は座標と経路の計算だけに使う。"""
+    """描画は SVG DOM、dagre はノード座標の計算だけに使う。"""
     html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
 
     assert 'createElementNS(SVG_NS, name)' in html
     assert 'new dagre.graphlib.Graph({ multigraph: true })' in html
-    assert 'route?.points || []' in html
+    assert 'const pos = g.node(id)' in html
+    assert 'g.edge({' not in html
     assert 'svgEl("path", { class: "edge-line"' in html
     assert "cytoscape(" not in html
     assert "cytoscape.min.js" not in html
@@ -284,14 +285,14 @@ def test_svg_preserves_four_distinct_status_patterns(tmp_path: Path):
     assert ".status-verified .node-status-ring { display: block; }" in html
 
 
-def test_svg_edges_keep_labels_line_types_and_dagre_routes(tmp_path: Path):
+def test_svg_edges_keep_labels_line_types_and_use_final_node_positions(tmp_path: Path):
     html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
 
     assert 'const label = svgEl("text", { class: "edge-label"' in html
     assert "#graph .dashed .edge-line { stroke-dasharray: 6 4; }" in html
-    assert "route?.points || []" in html
-    assert "tameRoute(moved)" in html
-    assert "setAttrs(edge.path, { d: roundedPath(points) })" in html
+    assert "edgeControl(source, target, state.direction, offset)" in html
+    assert "setAttrs(edge.path, { d: quadraticPath(from, control, to) })" in html
+    assert "quadraticPoint(from, control, to)" in html
 
 
 def test_svg_parallel_edges_remain_distinguishable(tmp_path: Path):
@@ -299,7 +300,7 @@ def test_svg_parallel_edges_remain_distinguishable(tmp_path: Path):
 
     assert "new dagre.graphlib.Graph({ multigraph: true })" in html
     assert "item.parallelOffset" in html
-    assert "(index - (siblings.length - 1) / 2) * 8" in html
+    assert "(index - (siblings.length - 1) / 2) * 12 * orientation" in html
 
 
 def test_svg_theme_and_pan_zoom_use_shared_css_and_transform(tmp_path: Path):

@@ -308,8 +308,8 @@ FR_SITE = FunctionalRequirement(
         "エッジは帯の再配置後のノード座標から短い曲線として描く",
         "Requirements 段は機能枠内のノードだけを幅制限で折り返し、機能枠自体は同じ段に並べる",
         "Goal・Need・Requirements の各段は同じ幅で表示する",
-        "Goal と Need は dagre の並び順だけを使って詰め、表示幅で折って不要な横方向の空白を残さない",
-        "Requirements 段の表示幅を機能枠へ配分し、枠内の折り返しで共通の段幅を抑える",
+        "Goal と Need は折り返さず、dagre の並び順だけを使って不要な横方向の空白を詰める",
+        "Requirements の各機能枠はグループ数にかかわらず個別の最大幅まで使用できる",
     ],
 )
 FR_FIT_WHOLE = FunctionalRequirement(

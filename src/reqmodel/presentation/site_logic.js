@@ -1412,7 +1412,6 @@ const BAND_GAP = 96;
 //: ノードの外接矩形から枠までの余白。
 const BAND_FRAME_PAD = 14;
 //: RequirementGroup 内をカードとして詰めるときの既定最大幅。
-const REQUIREMENTS_MAX_WIDTH = 1400;
 const REQUIREMENT_GROUP_MAX_WIDTH = 600;
 const REQUIREMENT_GROUP_GAP = 48;
 
@@ -1483,10 +1482,6 @@ export function bandedLayout(bands, placed, edges, direction, options = {}) {
     return vertical ? position.x : position.y;
   };
   const topOf = (nodes) => Math.min(...nodes.map((node) => pri(node) - priSize(node) / 2));
-  const requirementsMaxWidth = Math.max(
-    1,
-    options.requirementsMaxWidth || REQUIREMENTS_MAX_WIDTH,
-  );
   const groupMaxWidth = Math.max(1, options.groupMaxWidth || REQUIREMENT_GROUP_MAX_WIDTH);
 
   /** 1 グループを原点基準で詰める。dagre の座標は順序にだけ使う。 */
@@ -1539,18 +1534,6 @@ export function bandedLayout(bands, placed, edges, direction, options = {}) {
       const sectionFrom = cursor;
       const sectionStart = Math.min(...placed.map((node) => sec(node) - secSize(node) / 2));
       const sectionBandIndexes = [];
-      const visibleGroupCount = bands.slice(index).findIndex((band) => !band.members);
-      const groupCount = membersOf
-        .slice(index, visibleGroupCount < 0 ? undefined : index + visibleGroupCount)
-        .filter((members) => members.length).length;
-      const sharedGroupMaxWidth = Math.min(
-        groupMaxWidth,
-        Math.max(
-          1,
-          (requirementsMaxWidth - REQUIREMENT_GROUP_GAP * Math.max(0, groupCount - 1)) /
-            Math.max(1, groupCount),
-        ),
-      );
       let groupLeft = sectionStart;
       let sectionTo = sectionFrom;
       while (index < bands.length && bands[index].members) {
@@ -1560,7 +1543,7 @@ export function bandedLayout(bands, placed, edges, direction, options = {}) {
           continue;
         }
         for (const node of members) banded.add(node.id);
-        const group = layoutGroup(members, sharedGroupMaxWidth);
+        const group = layoutGroup(members, groupMaxWidth);
         for (const node of members) {
           const local = group.positions.get(node.id);
           positions.set(
@@ -1595,32 +1578,18 @@ export function bandedLayout(bands, placed, edges, direction, options = {}) {
     }
     for (const node of members) banded.add(node.id);
     const from = cursor;
-    for (const hierarchyRow of bandRows(members, edges)) {
-      //: dagre の並び順だけを保ち、帯の左端から一定間隔で詰めて上限幅で折る。
-      hierarchyRow.sort((a, b) => sec(a) - sec(b));
-      let line = [];
-      let lineWidth = 0;
-      const finishLine = () => {
-        if (!line.length) return;
-        const height = Math.max(...line.map(priSize));
-        let occupied = Math.min(...placed.map((node) => sec(node) - secSize(node) / 2));
-        for (const node of line) {
-          const half = secSize(node) / 2;
-          const center = occupied + half;
-          positions.set(node.id, at(center, cursor + height / 2));
-          occupied = center + half + BAND_SIBLING_GAP;
-        }
-        cursor += height + BAND_ROW_GAP;
-        line = [];
-        lineWidth = 0;
-      };
-      for (const node of hierarchyRow) {
-        const nextWidth = lineWidth + (line.length ? BAND_SIBLING_GAP : 0) + secSize(node);
-        if (line.length && nextWidth > requirementsMaxWidth) finishLine();
-        line.push(node);
-        lineWidth += (line.length > 1 ? BAND_SIBLING_GAP : 0) + secSize(node);
+    for (const row of bandRows(members, edges)) {
+      const height = Math.max(...row.map(priSize));
+      //: dagre の並び順だけを保ち、帯の左端から一定間隔で 1 行に詰め直す。
+      row.sort((a, b) => sec(a) - sec(b));
+      let occupied = Math.min(...placed.map((node) => sec(node) - secSize(node) / 2));
+      for (const node of row) {
+        const half = secSize(node) / 2;
+        const center = occupied + half;
+        positions.set(node.id, at(center, cursor + height / 2));
+        occupied = center + half + BAND_SIBLING_GAP;
       }
-      finishLine();
+      cursor += height + BAND_ROW_GAP;
     }
     spans.set(index, { from, to: cursor - BAND_ROW_GAP });
     cursor += BAND_GAP - BAND_ROW_GAP;

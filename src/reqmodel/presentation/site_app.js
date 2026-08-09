@@ -498,10 +498,7 @@ function applyBanding() {
     id: item.id, type: item.type, x: item.x, y: item.y, w: item.w, h: item.h,
   }));
   if (!placed.length) return;
-  const availableWidth = state.direction === "LR" ? svg.clientHeight : svg.clientWidth;
   const { positions, frames } = bandedLayout(bands, placed, view.edges, state.direction, {
-    // グループを別の行へ送らず、各枠の内側を多く折って段全体を表示領域へ収める。
-    requirementsMaxWidth: Math.max(600, availableWidth),
     groupMaxWidth: 600,
   });
   for (const [id, position] of positions) {

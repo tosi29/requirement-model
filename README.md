@@ -163,7 +163,7 @@ GROUP_CAPTURE = RequirementGroup(
 
 | 型 | 意味 | 備考 |
 |---|---|---|
-| `Goal` | 事業・ステークホルダーの意図 (なぜ) | `decomposition="AND"\|"OR"` を持つ |
+| `Goal` | 事業・ステークホルダーの意図 (なぜ) | 子 Goal はすべて達成する必要がある |
 | `Need` | 何が満たされたいか | 語尾規則あり・主語 (役割) を書く |
 | `FunctionalRequirement` (FR) | システムが提供すべき機能 | 語尾規則・根拠 / 受け入れ基準 |
 | `QualityRequirement` (QR) | 品質要求 (性能・可用性等) | 「非機能要求」の語は使わない |
@@ -296,7 +296,7 @@ FR / QR には検証に関わる 2 つの欄が加わる。
 | `structure.orphan_need` | warning | どの FR からも satisfy されない Need |
 | `structure.orphan_qr` | warning | qualifies の張り先が無い QR |
 | `structure.unused_source` | info | どの要求からも参照されない Source (引用を持つ源泉は、子の側で報告するので除く) |
-| `structure.goal_decomposition` | warning | AND 分解で要求群に到達しない子がある / OR 分解でどの子も到達しない |
+| `structure.goal_decomposition` | warning | 要求群に到達しない子 Goal がある |
 | `structure.goal_leaf` | warning | 子 Goal も Need も持たない Goal |
 | `structure.missing_source` | warning | 源泉リンクの無い要求 |
 | `structure.unverified_claim` | warning | `verified` なのに `evidence` の無い FR / QR |

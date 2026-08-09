@@ -697,7 +697,6 @@ function renderDetail() {
   rows.push("<dl>");
   rows.push(`<dt>status</dt><dd>${node.status}</dd>`);
   if (node.kind) rows.push(`<dt>kind</dt><dd>${node.kind}</dd>`);
-  if (node.decomposition) rows.push(`<dt>分解</dt><dd>${node.decomposition}</dd>`);
   if (node.location) rows.push(`<dt>出所</dt><dd class="loc">${locationHtml(node.location)}</dd>`);
   //: 件数は影響範囲の設定 (深さ・向き) に従う。図の色分けと同じ範囲を数える。
   if (impact.undirected) {

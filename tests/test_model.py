@@ -48,6 +48,11 @@ def test_unknown_field_is_rejected():
         need(nonexistent="x")
 
 
+def test_goal_has_no_decomposition_mode():
+    with pytest.raises(ValidationError):
+        Goal(id="Goal-1", text="工数を半減する", decomposition="OR")
+
+
 def test_reference_accepts_node_or_id_string():
     s = source("S-1")
     assert need("Need-1", has_source=[s]).has_source == ["S-1"]

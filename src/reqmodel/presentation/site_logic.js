@@ -997,15 +997,6 @@ function describe(view, id, inlineSources = true) {
   const node = view.byId.get(id);
   const attrs = [`status=${node.status}`];
   if (node.type === "Source") attrs.push(`kind=${node.kind}`);
-  // decomposition は「子から refines されている Goal」にだけ意味がある。
-  // CLI 側と揃えるため、ここだけは絞り込み前の全エッジを見る。
-  if (
-    node.decomposition !== null &&
-    node.decomposition !== undefined &&
-    view.data.edges.some((edge) => edge.name === "refines" && edge.target === id)
-  ) {
-    attrs.push(`decomposition=${node.decomposition}`);
-  }
   const lines = [`- [${node.type}] ${node.id}: ${node.text}`, `    (${attrs.join(", ")})`];
   for (const item of node.evidence || []) {
     lines.push(`    根拠: ${item}`);

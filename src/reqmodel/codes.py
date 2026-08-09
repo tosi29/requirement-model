@@ -57,7 +57,7 @@ CHECK_CODES: dict[str, CheckCode] = {
         _code("structure.orphan_qr", 2, "FR への qualifies が無い QR", True),
         _code("structure.unused_source", 2, "参照されない Source", True),
         _code("structure.goal_leaf", 2, "未分解の Goal", True),
-        _code("structure.goal_decomposition", 2, "AND/OR 分解が要求群に到達しない", True),
+        _code("structure.goal_decomposition", 2, "Goal の分解が要求群に到達しない", True),
         _code("structure.missing_source", 2, "源泉 (has_source) が無い", True),
         _code("structure.unverified_claim", 2, "verified なのに根拠が無い", True),
         _code("structure.status_inconsistent", 2, "状態の成熟度が逆転している", True),

@@ -12,7 +12,6 @@
         "SRC-OWNER",
         "SRC-LEGACY"
       ],
-      "decomposition": "AND",
       "refines": [],
       "motivates": [
         "Need-1",
@@ -31,7 +30,6 @@
         "SRC-SPEC",
         "SRC-LEGACY"
       ],
-      "decomposition": "AND",
       "refines": [],
       "motivates": [
         "Need-3",
@@ -50,7 +48,6 @@
         "SRC-OWNER",
         "SRC-LEGACY"
       ],
-      "decomposition": "AND",
       "refines": [],
       "motivates": [
         "Need-5",

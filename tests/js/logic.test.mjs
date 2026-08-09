@@ -1295,6 +1295,81 @@ test("bandedLayout は表示中の RequirementGroup だけで枠の高さを再�
   assert.equal(frames.has("group:hidden"), false);
 });
 
+test("bandedLayout は多数の RequirementGroup を指定幅で複数行に折り返す", () => {
+  const bands = Array.from({ length: 8 }, (_, group) => ({
+    key: `group:${group}`,
+    label: String(group),
+    members: Array.from({ length: 4 }, (_, node) => `FR-${group}-${node}`),
+  }));
+  const placed = bands.flatMap((band, group) =>
+    band.members.map((id, node) => placedNode(id, "FunctionalRequirement", group * 1000 + node * 200, 0)),
+  );
+  const { positions, frames } = bandedLayout(bands, placed, [], "TD", {
+    requirementsMaxWidth: 500,
+    groupMaxWidth: 250,
+  });
+  const boxes = [...frames.values()];
+  assert.ok(new Set(boxes.map((frame) => frame.y)).size > 1, "グループが複数行になる");
+  assert.ok(Math.max(...boxes.map((frame) => frame.x + frame.w / 2)) -
+    Math.min(...boxes.map((frame) => frame.x - frame.w / 2)) <= 500);
+  assert.equal(positions.size, 32);
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+    const a = boxes[i]; const b = boxes[j];
+    assert.ok(Math.abs(a.x - b.x) >= (a.w + b.w) / 2 || Math.abs(a.y - b.y) >= (a.h + b.h) / 2);
+  }
+});
+
+test("bandedLayout は単一グループ内の同階層ノードを詰めて折り返す", () => {
+  const members = Array.from({ length: 12 }, (_, index) => `FR-${index}`);
+  const placed = members.map((id, index) => placedNode(id, "FunctionalRequirement", index * 500, 0));
+  const { positions, frames } = bandedLayout(
+    [{ key: "group:many", label: "多数", members }], placed, [], "TD",
+    { requirementsMaxWidth: 400, groupMaxWidth: 250 },
+  );
+  assert.ok(new Set([...positions.values()].map((position) => position.y)).size > 1);
+  assert.ok(frames.get("group:many").w <= 250);
+  assert.ok(Math.max(...[...positions.values()].map((position) => position.x)) < 250,
+    "dagre の大きな絶対座標を引き継がない");
+});
+
+test("bandedLayout は行の最大グループ高の後から次行を始める", () => {
+  const bands = [
+    { key: "group:tall", members: ["FR-1", "FR-2", "FR-3", "FR-4"] },
+    { key: "group:short", members: ["FR-5"] },
+    { key: "group:next", members: ["FR-6"] },
+  ];
+  const placed = bands.flatMap((band, group) =>
+    band.members.map((id, node) => placedNode(id, "FunctionalRequirement", group * 100 + node * 10, 0)),
+  );
+  const { frames } = bandedLayout(bands, placed, [], "TD", {
+    requirementsMaxWidth: 300,
+    groupMaxWidth: 150,
+  });
+  const tall = frames.get("group:tall");
+  const short = frames.get("group:short");
+  const next = frames.get("group:next");
+  assert.equal(tall.y, short.y);
+  assert.equal(tall.h, short.h);
+  assert.ok(next.y - next.h / 2 > tall.y + tall.h / 2);
+});
+
+test("bandedLayout のグループ折り返しは refines 階層と LR の非重複を保つ", () => {
+  const members = ["FR-parent", "FR-child", "FR-peer"];
+  const placed = members.map((id, index) => placedNode(id, "FunctionalRequirement", 0, index * 500));
+  const edges = [{ source: "FR-child", name: "refines", target: "FR-parent" }];
+  const { positions, frames } = bandedLayout(
+    [{ key: "group:tree", members }], placed, edges, "LR",
+    { requirementsMaxWidth: 150, groupMaxWidth: 150 },
+  );
+  assert.ok(positions.get("FR-parent").x < positions.get("FR-child").x);
+  assert.ok(frames.get("group:tree").h <= 150);
+  const nodes = members.map((id) => ({ ...positions.get(id), w: 60, h: 30 }));
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+    const a = nodes[i]; const b = nodes[j];
+    assert.ok(Math.abs(a.x - b.x) >= 60 || Math.abs(a.y - b.y) >= 30);
+  }
+});
+
 test("bandedLayout は帯以外のノードの相対位置を保ったまま平行移動する", () => {
   const placed = [
     placedNode("Goal-1", "Goal", 0, 50),

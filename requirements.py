@@ -306,6 +306,7 @@ FR_SITE = FunctionalRequirement(
         "ダークテーマでは明色の文字に暗色のノード背景、ライトテーマではその逆を使用する",
         "グラフのパン操作では選択中のノードを維持する",
         "エッジは帯の再配置後のノード座標から短い曲線として描く",
+        "Requirements 段は機能枠と枠内ノードを表示幅に合わせて折り返し、ノードや枠を重ねない",
     ],
 )
 FR_FIT_WHOLE = FunctionalRequirement(

@@ -115,8 +115,6 @@ def _attr_line(graph: RequirementGraph, node: Node) -> str:
         parts.append(f"分類: {node.kind}")
         if node.locator is not None:
             parts.append(f"出典: {_inline(node.locator)}")
-    if isinstance(node, Goal) and graph.in_edges(node.id, ("refines",)):
-        parts.append(f"分解: {node.decomposition}")
     return "- " + " / ".join(parts)
 
 

@@ -54,7 +54,6 @@ export function fixture(overrides = {}) {
       text: "経費精算を速くする",
       status: "approved",
       has_source: ["SRC-1"],
-      decomposition: "AND",
       refines: [],
       motivates: ["Need-1"],
     },
@@ -146,7 +145,6 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
       id,
       text: `ゴール ${i}`,
       status: "approved",
-      decomposition: "AND",
     });
     //: 二分木にして、Goal を何段かの refines で積む。
     if (i > 1) link(id, "refines", `G-${Math.floor(i / 2)}`);

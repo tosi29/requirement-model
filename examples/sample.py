@@ -101,7 +101,6 @@ GOAL_HALVE_EFFORT = Goal(
     id="Goal-1",
     text="経費精算にかかる全社の工数を半減する",
     status="approved",
-    decomposition="AND",
     has_source=[SRC_FINANCE_HEAD],
 )
 GOAL_LESS_INPUT = Goal(

@@ -109,9 +109,6 @@ def _describe(
     attrs = [f"status={node.status}"]
     if isinstance(node, Source):
         attrs.append(f"kind={node.kind}")
-    decomposition = getattr(node, "decomposition", None)
-    if decomposition is not None and graph.in_edges(node.id, ("refines",)):
-        attrs.append(f"decomposition={decomposition}")
     lines.append(f"    ({', '.join(attrs)})")
     for item in getattr(node, "evidence", []) or []:
         lines.append(f"    根拠: {item}")

@@ -238,7 +238,7 @@ def _check_unused_sources(graph: RequirementGraph, findings: FindingList) -> Non
 
 
 # ---------------------------------------------------------------------------
-# Goal の AND/OR 分解
+# Goal の分解
 # ---------------------------------------------------------------------------
 
 
@@ -263,13 +263,8 @@ def _check_goal_decomposition(graph: RequirementGraph, findings: FindingList) ->
                 break
         if not result:
             children = _children_of(graph, goal_id)
-            node = graph.nodes.get(goal_id)
-            mode = node.decomposition if isinstance(node, Goal) else "AND"
             if children:
-                if mode == "AND":
-                    result = all(reaches_requirements(c) for c in children)
-                else:
-                    result = any(reaches_requirements(c) for c in children)
+                result = all(reaches_requirements(c) for c in children)
         in_progress.discard(goal_id)
         memo[goal_id] = result
         return result
@@ -293,28 +288,17 @@ def _check_goal_decomposition(graph: RequirementGraph, findings: FindingList) ->
         if not children:
             continue
 
-        if goal.decomposition == "AND":
-            unmet = [c for c in children if not reaches_requirements(c)]
-            if unmet:
-                findings.add(
-                    Finding(
-                        severity="warning",
-                        code="structure.goal_decomposition",
-                        layer=2,
-                        message=(
-                            "AND 分解だが要求群に到達しない子 Goal がある: "
-                            + ", ".join(sorted(unmet))
-                        ),
-                        node_id=goal.id,
-                    )
-                )
-        elif not any(reaches_requirements(c) for c in children):
+        unmet = [c for c in children if not reaches_requirements(c)]
+        if unmet:
             findings.add(
                 Finding(
                     severity="warning",
                     code="structure.goal_decomposition",
                     layer=2,
-                    message="OR 分解だが、要求群に到達する子 Goal が 1 つも無い",
+                    message=(
+                        "要求群に到達しない子 Goal がある: "
+                        + ", ".join(sorted(unmet))
+                    ),
                     node_id=goal.id,
                 )
             )

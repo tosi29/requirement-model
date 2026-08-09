@@ -195,8 +195,6 @@ class Goal(Sourced):
     「どの型に書くか」を参照)。
     """
 
-    #: この Goal を分解した子 Goal 群の結合方法。
-    decomposition: Literal["AND", "OR"] = "AND"
     #: 自分がどの親 Goal を詳細化しているか (子 → 親)。
     refines: list[Ref["Goal"]] = []
     motivates: list[Ref["Need"]] = []

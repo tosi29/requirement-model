@@ -834,31 +834,11 @@ test("nodeContext は対象・上流・下流・エッジを並べる", () => {
   assert.ok(text.endsWith("\n"));
 });
 
-test("nodeContext は kind / decomposition を属性行に出す", () => {
+test("nodeContext は kind を属性行に出す", () => {
   const text = nodeContext(viewOf(), "Goal-1");
 
   assert.match(text, /- \[Goal\] Goal-1: .*\n {4}\(status=approved\)/);
   assert.match(text, /- \[Source\] SRC-1: .*\n {4}\(status=proposed, kind=stakeholder\)/);
-  // Goal-1 は誰からも refines されていないので decomposition は出ない。
-  assert.ok(!text.includes("decomposition="));
-});
-
-test("子から refines されている Goal にだけ decomposition が付く", () => {
-  const data = fixture();
-  data.nodes.push({
-    type: "Goal",
-    id: "Goal-2",
-    text: "承認を速くする",
-    status: "proposed",
-    has_source: [],
-    decomposition: "AND",
-    refines: ["Goal-1"],
-    motivates: [],
-  });
-  data.edges.push({ source: "Goal-2", name: "refines", target: "Goal-1" });
-  const view = createView(data, allOn(data));
-
-  assert.match(nodeContext(view, "Goal-2"), /Goal-1: .*\n {4}\(status=approved, decomposition=AND\)/);
 });
 
 test("エッジを絞ると nodeContext にフィルタ行が出る", () => {

@@ -121,7 +121,7 @@ def test_quote_nobody_relies_on_is_reported_as_a_quote():
     assert "引用" in unused[0].message
 
 
-def test_and_decomposition_requires_every_child_to_reach_requirements():
+def test_goal_decomposition_requires_every_child_to_reach_requirements():
     s, n, g, f = traced_chain()
     reaching = goal("Goal-2", refines=[g], motivates=[n], has_source=[s])
     dangling = goal("Goal-3", refines=[g], has_source=[s])
@@ -130,15 +130,6 @@ def test_and_decomposition_requires_every_child_to_reach_requirements():
         f.message for f in findings if f.code == "structure.goal_decomposition"
     ]
     assert messages and "Goal-3" in messages[0]
-
-
-def test_or_decomposition_needs_only_one_child():
-    s, n, g, f = traced_chain()
-    root = goal("Goal-0", decomposition="OR", has_source=[s], status="approved")
-    reaching = goal("Goal-2", refines=[root], motivates=[n], has_source=[s])
-    dangling = goal("Goal-3", refines=[root], has_source=[s])
-    findings = validate_structure(build(s, n, root, f, reaching, dangling, g))
-    assert "structure.goal_decomposition" not in codes_for(findings, "Goal-0")
 
 
 def test_goal_without_children_or_needs_is_reported():

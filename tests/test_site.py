@@ -591,6 +591,21 @@ def test_page_has_the_export_buttons(tmp_path: Path):
     for element_id in ("export-svg", "export-mmd"):
         assert f'id="{element_id}"' in html
 
+    assert '<details class="export-menu">' in html
+    assert 'aria-label="図をダウンロード"' in html
+
+
+def test_page_uses_an_icon_button_to_copy_the_link(tmp_path: Path):
+    """URL コピーは狭いツールバーを圧迫せず、読み上げ可能なアイコンで示す。"""
+    index = build_site(chain(), FindingList(), tmp_path)
+    html = index.read_text(encoding="utf-8")
+
+    assert 'id="copy-link" class="icon-button"' in html
+    assert 'aria-label="表示中のページへのリンクをコピー"' in html
+    # 重なった四角形の「コピー」ではなく、リンクを表す鎖の 2 つの輪を描く。
+    assert 'M10 13a5 5 0 0 0 7.54.54' in html
+    assert 'M14 11a5 5 0 0 0-7.54-.54' in html
+
 
 def test_page_has_a_theme_toggle(tmp_path: Path):
     """テーマは手で固定できる (次回訪問時の復元は storableHash() のテストが見る)。"""

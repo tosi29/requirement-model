@@ -1477,9 +1477,12 @@ exportSvg.addEventListener("click", () => {
   const text = currentSvg();
   if (!text) return;
   download("graph.svg", text, "image/svg+xml;charset=utf-8");
+  exportSvg.closest("details").open = false;
 });
-document.getElementById("export-mmd").addEventListener("click", () => {
+const exportMmd = document.getElementById("export-mmd");
+exportMmd.addEventListener("click", () => {
   download("graph.mmd", mermaidText(view), "text/plain;charset=utf-8");
+  exportMmd.closest("details").open = false;
 });
 
 // --- キーボード --------------------------------------------------------------
@@ -1526,11 +1529,16 @@ copyLink.addEventListener("click", async () => {
   //: URL は writeHash() が常に最新にしているので、そのまま渡せばよい。
   try {
     await navigator.clipboard.writeText(location.href);
-    copyLink.textContent = "コピーした";
+    copyLink.title = "リンクをコピーしました";
+    copyLink.setAttribute("aria-label", "リンクをコピーしました");
   } catch {
-    copyLink.textContent = "コピーできなかった";
+    copyLink.title = "リンクをコピーできませんでした";
+    copyLink.setAttribute("aria-label", "リンクをコピーできませんでした");
   }
-  setTimeout(() => (copyLink.textContent = "リンクをコピー"), 1600);
+  setTimeout(() => {
+    copyLink.title = "表示中のページへのリンクをコピー";
+    copyLink.setAttribute("aria-label", "表示中のページへのリンクをコピー");
+  }, 1600);
 });
 
 window.addEventListener("popstate", applyHash);

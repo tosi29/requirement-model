@@ -169,6 +169,49 @@ main {
 .tabs { margin-right: 6px; }
 .tabs button { background: none; }
 .tabs button.active { background: var(--panel); border-color: var(--accent); font-weight: 600; }
+.icon-button, .export-menu > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 5px;
+}
+.icon-button svg, .export-menu > summary svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.export-menu { position: relative; }
+.export-menu > summary {
+  list-style: none;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.export-menu > summary::-webkit-details-marker { display: none; }
+.export-menu > summary:hover, .export-menu[open] > summary { border-color: var(--accent); }
+.export-options {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  right: 0;
+  display: grid;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+}
+.export-options button { border: 0; background: transparent; text-align: left; white-space: nowrap; }
+.export-options button:hover { background: var(--panel); }
 .table-frame { flex: 1; overflow: auto; min-height: 0; padding: 0 0 14px; }
 .table-note { padding: 8px 12px; color: var(--muted); font-size: 12px; }
 table.nodes { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -412,11 +455,18 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
         <button id="relayout" title="表示中のノードだけで並べ直す">整列</button>
       </span>
       <button id="clear">選択解除</button>
-      <button id="copy-link" title="いまの表示状態 (選択・絞り込み・表示) の URL をコピーする">リンクをコピー</button>
-      <span class="tool-group">
-        <button id="export-svg" title="いま図に描かれているものを SVG で保存する">SVG</button>
-        <button id="export-mmd" title="いま見えているノードとエッジを Mermaid (.mmd) で保存する">.mmd</button>
-      </span>
+      <button id="copy-link" class="icon-button" title="表示中のページへのリンクをコピー" aria-label="表示中のページへのリンクをコピー">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+      </button>
+      <details class="export-menu">
+        <summary title="図をダウンロード" aria-label="図をダウンロード">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5"></path><path d="M5 20h14"></path></svg>
+        </summary>
+        <span class="export-options">
+          <button id="export-svg" title="いま図に描かれているものを SVG で保存する">SVG をダウンロード</button>
+          <button id="export-mmd" title="いま見えているノードとエッジを Mermaid (.mmd) で保存する">Mermaid (.mmd) をダウンロード</button>
+        </span>
+      </details>
       <span class="legend graph-only" id="legend"></span>
     </div>
     <div class="graph-frame" id="graph-frame" role="tabpanel" aria-label="グラフ"><div id="graph"></div></div>

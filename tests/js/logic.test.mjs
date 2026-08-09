@@ -1172,7 +1172,7 @@ test("bandedLayout は Goal 帯 → Need 帯 → その他 の順に上から並
   assert.equal(fr.x, 100);
 });
 
-test("bandedLayout は帯の中の並び順を保ったまま中央へ寄せる", () => {
+test("bandedLayout は帯の中の並び順を保って不要な空白を詰める", () => {
   const placed = [
     placedNode("Goal-1", "Goal", 0, 0),
     placedNode("Goal-2", "Goal", 100, 0),
@@ -1183,8 +1183,8 @@ test("bandedLayout は帯の中の並び順を保ったまま中央へ寄せる"
   const first = positions.get("Goal-1");
   const second = positions.get("Goal-2");
   assert.ok(first.x < second.x, "帯の中の左右の並びは変わらない");
-  assert.equal(second.x - first.x, 100, "帯の中の間隔も変わらない");
-  // 図の全幅 (-30 〜 430) の中心 200 に、2 件の中心 (50) が寄る。
+  assert.equal(second.x - first.x, 86, "ノード幅と一定間隔まで詰める");
+  // 図の全幅の中心 200 に、詰め直した 2 件を寄せる。
   assert.equal((first.x + second.x) / 2, 200);
 });
 
@@ -1230,6 +1230,17 @@ test("bandedLayout は帯の中の重なりを副軸方向へ押して解消す�
   const right = positions.get("Need-2");
   assert.equal(left.y, right.y, "同じ行に並ぶ");
   assert.ok(right.x - left.x >= 60, "ノード幅ぶん以上離れる");
+});
+
+test("bandedLayout は多数の Goal を段の上限幅で折り返す", () => {
+  const placed = Array.from({ length: 6 }, (_, index) =>
+    placedNode(`Goal-${index}`, "Goal", index * 1000, 0),
+  );
+  const { positions, frames } = bandedLayout([BANDS[0]], placed, [], "TD", {
+    requirementsMaxWidth: 250,
+  });
+  assert.ok(new Set([...positions.values()].map((position) => position.y)).size > 1);
+  assert.ok(frames.get("Goal").w <= 250 + 28);
 });
 
 test("bandedLayout の LR は帯を左に積み、縦の並びを保つ", () => {
@@ -1304,9 +1315,15 @@ test("bandedLayout は多数の RequirementGroup を折り返さず同じ段に�
   const placed = bands.flatMap((band, group) =>
     band.members.map((id, node) => placedNode(id, "FunctionalRequirement", group * 1000 + node * 200, 0)),
   );
-  const { positions, frames } = bandedLayout(bands, placed, [], "TD", { groupMaxWidth: 250 });
+  const { positions, frames } = bandedLayout(bands, placed, [], "TD", {
+    requirementsMaxWidth: 1100,
+    groupMaxWidth: 250,
+  });
   const boxes = [...frames.values()];
   assert.equal(new Set(boxes.map((frame) => frame.y)).size, 1, "全グループが同じ段に残る");
+  assert.ok(Math.max(...boxes.map((frame) => frame.x + frame.w / 2)) -
+    Math.min(...boxes.map((frame) => frame.x - frame.w / 2)) <= 1100,
+  "段の幅は各グループへ分配した上限に収まる");
   assert.equal(positions.size, 32);
   for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
     const a = boxes[i]; const b = boxes[j];

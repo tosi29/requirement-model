@@ -1457,9 +1457,8 @@ function bandRows(members, edges) {
  * frames は型 → `{ x, y, w, h }` (枠の中心と大きさ) の Map。
  * 帯のノードが 1 つも無ければ両方とも空。
  *
- * Goal / Need は両者の中身に必要な幅だけを共通幅として中央へ寄せる。
- * RequirementGroup 自体は 1 行のまま保ち、グループ内のノードだけを指定された
- * 最大幅で折り返す。
+ * RequirementGroup 自体は 1 行のまま保ち、その全体幅を Goal / Need の共通幅にも
+ * 使う。グループ内のノードだけを指定された最大幅で折り返す。
  */
 export function bandedLayout(bands, placed, edges, direction, options = {}) {
   const positions = new Map();
@@ -1637,6 +1636,9 @@ export function bandedLayout(bands, placed, edges, direction, options = {}) {
     }
     typeSecSize = Math.max(typeSecSize, max - min + BAND_FRAME_PAD * 2);
   }
+  const commonSecSize = Number.isFinite(requirementSecMin)
+    ? requirementSecMax - requirementSecMin
+    : typeSecSize;
 
   // 4. 型帯は全幅の中央へ寄せ、RequirementGroup 枠は各グループの外接矩形に掛ける。
   for (let bandIndex = 0; bandIndex < bands.length; bandIndex++) {
@@ -1677,8 +1679,8 @@ export function bandedLayout(bands, placed, edges, direction, options = {}) {
     const framePriSize = span.to - span.from + BAND_FRAME_PAD * 2;
     frames.set(bands[bandIndex].type || bands[bandIndex].key, {
       ...at(bandMiddle, (span.from + span.to) / 2),
-      w: vertical ? typeSecSize : framePriSize,
-      h: vertical ? framePriSize : typeSecSize,
+      w: vertical ? commonSecSize : framePriSize,
+      h: vertical ? framePriSize : commonSecSize,
     });
   }
   return { positions, frames };

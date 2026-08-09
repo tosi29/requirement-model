@@ -1344,7 +1344,7 @@ test("bandedLayout は単一グループ内の同階層ノードを詰めて折�
     "dagre の大きな絶対座標を引き継がない");
 });
 
-test("bandedLayout は Goal・Need だけを中身に必要な共通幅へ揃える", () => {
+test("bandedLayout は Goal・Need を全 RequirementGroup の横幅へ揃える", () => {
   const bands = [
     ...BANDS,
     { key: "group:requirements", members: ["FR-1", "FR-2", "FR-3"] },
@@ -1366,11 +1366,14 @@ test("bandedLayout は Goal・Need だけを中身に必要な共通幅へ揃え
   const other = frames.get("group:other");
   assert.equal(goal.x - goal.w / 2, need.x - need.w / 2);
   assert.equal(goal.x + goal.w / 2, need.x + need.w / 2);
-  assert.ok(goal.w < requirements.w, "Requirements の全幅まで空の帯を広げない");
+  const requirementsLeft = requirements.x - requirements.w / 2;
+  const requirementsRight = other.x + other.w / 2;
   const requirementsMiddle = (
-    requirements.x - requirements.w / 2 + other.x + other.w / 2
+    requirementsLeft + requirementsRight
   ) / 2;
-  assert.equal(goal.x, requirementsMiddle, "幅が異なっても段の中心は揃える");
+  assert.equal(goal.x, requirementsMiddle, "全 Requirements の中心へ揃える");
+  assert.equal(goal.x - goal.w / 2, requirementsLeft);
+  assert.equal(goal.x + goal.w / 2, requirementsRight);
 });
 
 test("bandedLayout の枠内折り返しは refines 階層と LR の非重複を保つ", () => {

@@ -113,12 +113,15 @@ def test_quality_requirement_and_constraint_use_semantic_palette():
     assert types["Constraint"]["stroke"] == "#b94a48"
     assert types["Source"]["fill"] == "#ffffff"
     assert types["Source"]["stroke"] == "#999999"
+    assert types["QualityRequirement"]["dark_fill"] == "#2b1d3f"
+    assert types["Constraint"]["dark_fill"] == "#3b1f24"
+    assert types["Source"]["dark_fill"] == "#20262e"
     assert types["Constraint"]["stroke"] != meta["impact_colors"]["selected"]
 
 
-#: Cytoscape.js が持つノード形状の多角形 (外形の矩形に内接するよう正規化された座標)。
-#: 係数の検算をこの実物と突き合わせるための写しで、出典は cytoscape の
-#: ``nodeShapes`` (v3.34.0)。ellipse だけは多角形ではないので別に見る。
+#: ノード形状の多角形 (外形の矩形に内接するよう正規化された座標)。
+#: 係数の検算をこの形状と突き合わせるための写し。
+#: ellipse だけは多角形ではないので別に見る。
 _SHAPE_POINTS: dict[str, list[tuple[float, float]]] = {
     "hexagon": [(-0.5, -1), (-1, 0), (-0.5, 1), (0.5, 1), (1, 0), (0.5, -1)],
     "tag": [(-1, -1), (0.25, -1), (1, 0), (0.25, 1), (-1, 1)],
@@ -220,7 +223,120 @@ def test_page_links_the_search_box_to_the_graph(tmp_path: Path):
     assert 'id="search"' in html
     assert '"ArrowDown"' in html
     # ヒットの印は枠線ではなく暈し (影響範囲の色分けと衝突させない)。
-    assert '"underlay-color"' in html
+    assert "drop-shadow" in html
+
+
+def test_page_uses_svg_dom_and_dagre_without_cytoscape(tmp_path: Path):
+    """描画は SVG DOM、dagre は座標と経路の計算だけに使う。"""
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert 'createElementNS(SVG_NS, name)' in html
+    assert 'new dagre.graphlib.Graph({ multigraph: true })' in html
+    assert 'route?.points || []' in html
+    assert 'svgEl("path", { class: "edge-line"' in html
+    assert "cytoscape(" not in html
+    assert "cytoscape.min.js" not in html
+    assert "svg.dataset.initialRenderMs" in html
+
+
+def test_svg_nodes_keep_semantic_shapes_statuses_and_keyboard_access(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert '"data-node-id": item.data.id' in html
+    assert 'role: "button"' in html
+    assert 'if (event.key !== "Enter" && event.key !== " ")' in html
+    assert ".node.status-verified .node-status-ring" in html
+    assert 'statusMeta.border_style === "dashed"' in html
+    assert 'statusMeta.border_style === "dotted"' in html
+
+
+def test_svg_state_styles_do_not_erase_status_or_search_meaning(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    for state in ("sel", "up", "down", "rel"):
+        assert f"#graph .node.{state} .node-shape" in html
+    assert "#graph .hit .node-shape" in html
+    assert "#graph .dim.hit" in html
+    # status は別の内側リング/線種なので、強調の外枠と同時に読める。
+    assert "node-status-ring" in html
+
+
+def test_svg_type_palette_comes_from_render_meta(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert 'const typeMeta = types[item.data.type] || {}' in html
+    assert "const colors = typeColors(typeMeta, pal)" in html
+    assert "fill: colors.fill, stroke: colors.stroke" in html
+    assert '"dark_fill": "#17233a"' in html
+    assert 'shapeEl(typeMeta.shape)' in html
+
+
+def test_svg_preserves_four_distinct_status_patterns(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+    data = embedded_data(html)
+
+    assert {value["border_style"] for value in data["meta"]["statuses"].values()} == {
+        "dotted",
+        "dashed",
+        "solid",
+        "double",
+    }
+    assert ".status-verified .node-status-ring { display: block; }" in html
+
+
+def test_svg_edges_keep_labels_line_types_and_dagre_routes(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert 'const label = svgEl("text", { class: "edge-label"' in html
+    assert "#graph .dashed .edge-line { stroke-dasharray: 6 4; }" in html
+    assert "route?.points || []" in html
+    assert "tameRoute(moved)" in html
+    assert "setAttrs(edge.path, { d: roundedPath(points) })" in html
+
+
+def test_svg_parallel_edges_remain_distinguishable(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert "new dagre.graphlib.Graph({ multigraph: true })" in html
+    assert "item.parallelOffset" in html
+    assert "(index - (siblings.length - 1) / 2) * 8" in html
+
+
+def test_svg_theme_and_pan_zoom_use_shared_css_and_transform(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert "fill: var(--graph-fg, var(--fg))" in html
+    assert 'graphLayer.setAttribute("transform"' in html
+    assert "function zoomBy(factor)" in html
+    assert "if (ignoreClick)" in html
+    assert "if (Math.hypot(dx, dy) >= 3) drag.moved = true" in html
+
+
+def test_svg_bands_are_behind_nodes_and_do_not_capture_input(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert "graphLayer.replaceChildren(bandLayer, edgeLayer, nodeLayer)" in html
+    assert "#graph .node.band { cursor: default; pointer-events: none; }" in html
+    assert 'item.bandType === "RequirementGroup" ? pal.panel' in html
+
+
+def test_filter_changes_only_visibility_and_keeps_node_positions(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+    visibility = html.split("function applyVisibility()", 1)[1].split(
+        "function applyHighlight()", 1
+    )[0]
+
+    assert 'classed(item.group, "hidden"' in visibility
+    assert "moveItem(" not in visibility
+    assert "applyBanding(" not in visibility
+
+
+def test_svg_export_serializes_the_visible_dom(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert 'const copy = svg.cloneNode(true)' in html
+    assert 'copy.querySelectorAll(".hidden")' in html
+    assert 'new XMLSerializer().serializeToString(copy)' in html
 
 
 def test_build_site_writes_page_and_raw_outputs(tmp_path: Path):
@@ -487,10 +603,11 @@ def test_page_has_a_finding_tab_bar(tmp_path: Path):
 
 
 def test_page_is_operable_from_the_keyboard(tmp_path: Path):
-    """図 (canvas) 以外はキーボードで辿れ、フォーカス位置が見える。"""
+    """SVG ノードを含む操作要素をキーボードで辿れ、フォーカス位置が見える。"""
     index = build_site(chain(), FindingList(), tmp_path)
     html = index.read_text(encoding="utf-8")
 
     assert ":focus-visible" in html
+    assert '"data-node-id": item.data.id' in html
     # 指摘は div ではなく button なので、キーボードから押せる。
     assert "button.finding" in html

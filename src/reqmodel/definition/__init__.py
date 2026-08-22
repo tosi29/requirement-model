@@ -2,11 +2,11 @@
 
 from .nodes import (
     FR, QR, Constraint, FunctionalRequirement, Goal, Need, Node,
-    QualityRequirement, Ref, Requirement, Source, Sourced, Status, Waiver,
+    QualityRequirement, Ref, Reference, Requirement, Status, Waiver,
 )
 
 __all__ = [
-    "Node", "Sourced", "Requirement", "Goal", "Need",
-    "FunctionalRequirement", "QualityRequirement", "Constraint", "Source",
+    "Reference", "Node", "Requirement", "Goal", "Need",
+    "FunctionalRequirement", "QualityRequirement", "Constraint",
     "FR", "QR", "Ref", "Status", "Waiver",
 ]

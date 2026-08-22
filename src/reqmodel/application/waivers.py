@@ -1,6 +1,6 @@
 """指摘の抑制 (waiver)。
 
-ノード属性 ``suppress=[("structure.missing_source", "理由")]`` で、そのノードに
+ノード属性 ``suppress=[("structure.orphan_need", "理由")]`` で、そのノードに
 出る特定コードの指摘を黙らせる。抑制は「全か無か」の ``--strict`` を実用に
 するための仕組みであり、次の 2 点で形骸化を防ぐ。
 

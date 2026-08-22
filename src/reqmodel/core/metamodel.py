@@ -7,7 +7,7 @@ from typing import Annotated, Any, Union, get_args, get_origin, get_type_hints
 
 from ..definition.nodes import (
     Constraint, FunctionalRequirement, Goal, Need, Node, QualityRequirement,
-    RefMarker, Source,
+    RefMarker,
 )
 
 #: 出力順序を安定させるための型の並び。
@@ -17,7 +17,6 @@ TYPE_ORDER: tuple[type[Node], ...] = (
     FunctionalRequirement,
     QualityRequirement,
     Constraint,
-    Source,
 )
 
 NODE_TYPES: dict[str, type[Node]] = {t.__name__: t for t in TYPE_ORDER}

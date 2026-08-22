@@ -25,7 +25,7 @@ def test_validate_sample_is_clean(capsys):
 def test_validate_json_output(capsys):
     assert main(["validate", "-f", SAMPLE, "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["node_count"] == 21
+    assert payload["node_count"] == 14
     assert payload["structure_checked"] is True
     assert payload["findings"] == []
 
@@ -69,15 +69,15 @@ def test_no_lexicon_option(tmp_path: Path, capsys):
 
 #: 源泉付きの Need 1 つ。放っておくと structure.orphan_need だけが出る。
 WAIVER_HEADER = (
-    "from reqmodel import Need, Source\n"
-    's = Source(id="S-1", text="経理部長", kind="stakeholder")\n'
+    "from reqmodel import Need, Reference\n"
+    's = Reference(title="経理部長", url="about:blank#S-1")\n'
 )
 
 
 def waived(code: str) -> str:
     """指定コードを抑制した Need の定義ファイル。"""
     return (
-        WAIVER_HEADER + 'n = Need(id="Need-1", text="早く精算したい", has_source=[s],\n'
+        WAIVER_HEADER + 'n = Need(id="Need-1", text="早く精算したい", source=[s],\n'
         f'         suppress=[("{code}", "この版では FR を書かない")])\n'
     )
 
@@ -178,26 +178,20 @@ def test_explain_edge_filter_rejects_unknown_edge(capsys):
     assert "未知のエッジ種別" in capsys.readouterr().err
 
 
-def test_graph_with_sources_opts_the_sources_back_in(capsys):
-    assert main(["graph", SAMPLE]) == 0
-    default = capsys.readouterr().out
-    assert main(["graph", SAMPLE, "--with-sources"]) == 0
-    with_sources = capsys.readouterr().out
+def test_removed_with_sources_option_is_rejected():
+    with pytest.raises(SystemExit) as graph_exit:
+        main(["graph", SAMPLE, "--with-sources"])
+    assert graph_exit.value.code == 2
+    with pytest.raises(SystemExit) as explain_exit:
+        main(["explain", "FR-3", "-f", SAMPLE, "--with-sources"])
+    assert explain_exit.value.code == 2
 
-    assert "[Source]" not in default
-    assert "[Source]" in with_sources
 
-
-def test_explain_with_sources_opts_the_sources_back_in(capsys):
+def test_explain_shows_external_references_as_attributes(capsys):
     assert main(["explain", "FR-3", "-f", SAMPLE]) == 0
-    default = capsys.readouterr().out
-    assert main(["explain", "FR-3", "-f", SAMPLE, "--with-sources"]) == 0
-    with_sources = capsys.readouterr().out
-
-    #: 既定は「畳んで属性に出す」、--with-sources は「辿ってブロックに出す」。
-    assert "    源泉: SRC-POLICY-A12-3 " in default
-    assert "- [Source]" not in default
-    assert "- [Source] SRC-POLICY-A12-3" in with_sources
+    out = capsys.readouterr().out
+    assert "Source:" in out
+    assert "- [Source]" not in out
 
 
 def test_plan_command(tmp_path: Path, capsys, monkeypatch):
@@ -262,8 +256,8 @@ def test_stats_command(capsys):
     assert main(["stats", SAMPLE]) == 0
     out = capsys.readouterr().out
     assert out.startswith("# モデル統計\n")
-    assert "- 規模: 21 ノード / 36 エッジ" in out
-    assert "| FunctionalRequirement | 1 | 4 | 0 | 1 | 6 |" in out
+    assert "- 規模: 14 ノード / 16 エッジ" in out
+    assert "| FunctionalRequirement | 6 | 0 | 0 | 0 | 6 |" in out
     assert "- Need の充足率 (satisfies されている): 100.0% (3/3)" in out
 
 
@@ -271,12 +265,12 @@ def test_stats_json_output(capsys):
     assert main(["stats", "-f", SAMPLE, "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["files"] == [SAMPLE]
-    assert payload["totals"]["nodes"] == 21
+    assert payload["totals"]["nodes"] == 14
     assert payload["nodes"]["by_status"] == {
-        "proposed": 1,
-        "approved": 18,
+        "proposed": 14,
+        "approved": 0,
         "implemented": 0,
-        "verified": 2,
+        "verified": 0,
     }
     assert payload["ambiguity"]["findings"] == 0
 

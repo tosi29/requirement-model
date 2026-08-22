@@ -317,7 +317,7 @@ export function initialSelection(data, all, key) {
  * 選択中のエッジ種別が `req explain` のどの呼び方に当たるか。
  *
  * - `"default"` … 既定のまま (源泉エッジだけ外れている) → 引数なし
- * - `"all"`     … 源泉エッジも含めて全部 → `--with-sources`
+ * - `"all"`     … 全エッジ選択。外部参照はエッジではないので CLI 引数は不要
  * - 配列        … それ以外 → `--edges a,b,c`
  *
  * CLI 側 (`explain.traversed_edges()`) と対応が崩れると、ページが配る
@@ -909,108 +909,20 @@ export function nextTheme(theme) {
 // 以下は `explain.py` の explain_text() / _describe() / _all_edge_names() の写し。
 // 出力が 1 文字でもずれるとテストが落ちるので、片方を直したら両方を直すこと。
 
-//: 源泉の索引 (has_source / part_of) を data ごとに 1 回だけ作る。詳細ペインと
-//: コンテキスト生成の両方が使い、どちらも全ノードを走るので、呼ぶたびに
-//: data.edges を舐めると O(ノード数 × エッジ数) になる。
-//: 埋め込みデータはページ読み込み後は変わらない前提で、最初の 1 回を使い回す。
-const SOURCE_INDEX = new WeakMap();
-
-function sourceIndex(data) {
-  let index = SOURCE_INDEX.get(data);
-  if (index) return index;
-  index = { has: new Map(), partOf: new Map() };
-  for (const edge of data.edges) {
-    if (edge.name === "has_source") {
-      if (!index.has.has(edge.source)) index.has.set(edge.source, []);
-      index.has.get(edge.source).push(edge.target);
-    } else if (edge.name === "part_of" && !index.partOf.has(edge.source)) {
-      index.partOf.set(edge.source, edge.target);
-    }
-  }
-  SOURCE_INDEX.set(data, index);
-  return index;
-}
-
-/**
- * 源泉 1 件の表示 (`explain.py` の `source_label()` と同じ整形)。
- * `SRC-A (本文) [位置] < 親の源泉` の形で、`part_of` の鎖を 1 行に畳む。
- *
- * 絞り込みで Source が消えていても引けるように、view ではなく data を見る。
- */
-export function sourceLabel(data, sourceId) {
-  const byId = new Map(data.nodes.map((node) => [node.id, node]));
-  return sourceLabelFrom(byId, sourceIndex(data), sourceId);
-}
-
-function sourceLabelFrom(byId, index, sourceId) {
-  const parts = [];
-  const seen = new Set();
-  let current = sourceId;
-  while (current !== undefined && current !== null && !seen.has(current)) {
-    seen.add(current);
-    const node = byId.get(current);
-    if (!node) {
-      parts.push(current);
-      break;
-    }
-    let label = `${node.id} (${node.text})`;
-    if (node.locator) label += ` [${node.locator}]`;
-    parts.push(label);
-    current = index.partOf.get(current);
-  }
-  return parts.join(" < ");
-}
-
-/**
- * ノードの源泉一覧。詳細ペインの「源泉」欄に使う。
- * 絞り込みに関係なく出す (図から外しても属性としては読める、が要点)。
- */
-export function sourceItems(data, id) {
-  const byId = new Map(data.nodes.map((node) => [node.id, node]));
-  const index = sourceIndex(data);
-  return (index.has.get(id) || []).map((sourceId) => {
-    const node = byId.get(sourceId);
-    //: 引用は part_of で親の文書・人にぶら下がる。図に出さない以上、辿れる
-    //: のはここだけなので鎖を畳んで一緒に返す (親から順に並べる)。
-    const parents = [];
-    const seen = new Set([sourceId]);
-    let current = index.partOf.get(sourceId);
-    while (current !== undefined && current !== null && !seen.has(current)) {
-      seen.add(current);
-      const parent = byId.get(current);
-      parents.push({ id: current, text: parent ? parent.text : "" });
-      current = index.partOf.get(current);
-    }
-    return {
-      id: sourceId,
-      text: node ? node.text : "",
-      kind: node ? node.kind : "",
-      locator: node && node.locator ? node.locator : "",
-      parents,
-      label: sourceLabelFrom(byId, index, sourceId),
-    };
-  });
-}
-
 /** ノード 1 件の記述。`explain.py` の `_describe()` と同じ整形。 */
 function describe(view, id, inlineSources = true) {
   const node = view.byId.get(id);
   const attrs = [`status=${node.status}`];
-  if (node.type === "Source") attrs.push(`kind=${node.kind}`);
   const lines = [`- [${node.type}] ${node.id}: ${node.text}`, `    (${attrs.join(", ")})`];
-  for (const item of node.evidence || []) {
-    lines.push(`    根拠: ${item}`);
-  }
+  const pushReference = (label, item) => {
+    lines.push(`    ${label}: ${item.title} <${item.url}>`);
+    if (item.note) lines.push(`      note: ${item.note}`);
+  };
+  for (const item of node.source || []) pushReference("Source", item);
+  for (const item of node.realized_by || []) pushReference("Realized by", item);
+  for (const item of node.evidence || []) pushReference("Evidence", item);
   for (const criterion of node.acceptance_criteria || []) {
     lines.push(`    受け入れ基準: ${criterion}`);
-  }
-  // 源泉は辿らない代わりに属性として書き出す。ここも絞り込み前の全エッジを見る。
-  if (inlineSources) {
-    const byId = new Map(view.data.nodes.map((item) => [item.id, item]));
-    const index = sourceIndex(view.data);
-    for (const sourceId of index.has.get(id) || []) {
-      lines.push(`    源泉: ${sourceLabelFrom(byId, index, sourceId)}`);
-    }
   }
   return lines;
 }
@@ -1038,7 +950,6 @@ export function explainCommand(view, id, scope = null) {
   const selection = edgeSelection(view);
   const parts = [`req explain ${id}`];
   if (Array.isArray(selection)) parts.push(`--edges ${selection.join(",")}`);
-  else if (selection === "all") parts.push("--with-sources");
   if (depth !== null) parts.push(`--depth ${depth}`);
   if (undirected) parts.push("--undirected");
   return parts.join(" ");
@@ -1054,9 +965,7 @@ export function nodeContext(view, id, scope = null) {
   const settings = scope || impactScope(view.state);
   const selection = edgeSelection(view);
   const edgeFilter = Array.isArray(selection) ? selection : null;
-  //: 源泉を辿ったときは Source 自身がブロックで出るので、畳んだ表示はしない
-  //: (`explain.py` の include_sources / inline_sources と同じ対応)。
-  const includeSources = selection === "all";
+  const includeSources = false;
   const { upstream, downstream, whole, undirected } = impactSets(view, id, settings);
 
   const lines = [`# 影響部分グラフ: ${id}`, ""];
@@ -1073,12 +982,6 @@ export function nodeContext(view, id, scope = null) {
     );
   }
   if (edgeFilter) lines.push(`エッジ種別フィルタ: ${edgeFilter.join(", ")}`);
-  else if (!includeSources) {
-    lines.push(
-      `源泉エッジ (${[...hiddenByDefault(view.data, "edges")].sort().join(", ")}) は` +
-        "辿っていない。源泉は各ノードの「源泉:」行に畳んである",
-    );
-  }
   if (settings.depth !== null) lines.push(`探索深さ: ${settings.depth}`);
 
   const block = (title, ids) => {

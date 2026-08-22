@@ -23,8 +23,8 @@ def orphan_need_graph(*waivers: tuple[str, str]):
     s = source("S-1")
     return build(
         s,
-        need("Need-1", has_source=[s], suppress=list(waivers)),
-        need("Need-2", has_source=[s]),
+        need("Need-1", source=[s], suppress=list(waivers)),
+        need("Need-2", source=[s]),
     )
 
 
@@ -45,29 +45,23 @@ def test_suppresses_only_the_named_node_and_code():
 
 
 def test_other_codes_on_the_same_node_survive():
-    s = source("S-1")
-    graph = build(
-        s,
-        need("Need-1", suppress=[("structure.orphan_need", "FR は次版で書く")]),
-    )
+    graph = build(need("Need-1", suppress=[("structure.orphan_need", "FR は次版で書く")]))
     result = apply_waivers(graph, validate_structure(graph))
-
-    # 源泉が無い指摘は抑制していないので残る。
-    assert codes(result.findings) == {"structure.missing_source", "structure.unused_source"}
+    assert codes(result.findings) == set()
     assert result.count == 1
 
 
 def test_suppression_covers_lexical_findings():
     s = source("S-1")
-    n = need("Need-1", has_source=[s])
+    n = need("Need-1", source=[s])
     f = fr(
         "FR-1",
         text="領収書を高速に読み取ること",
         satisfies=[n],
-        has_source=[s],
+        source=[s],
         suppress=[("semantics.ambiguous_term", "計測条件は QR-1 側に書いた")],
     )
-    graph = build(s, n, goal("Goal-1", motivates=[n], has_source=[s]), f)
+    graph = build(s, n, goal("Goal-1", motivates=[n], source=[s]), f)
     result = apply_waivers(graph, validate_semantics_lexical(graph))
 
     assert list(result.findings) == []
@@ -111,8 +105,8 @@ def test_suppressed_finding_keeps_its_location():
 
 def test_stale_waiver_is_reported():
     s = source("S-1")
-    n = need("Need-1", has_source=[s], suppress=[("structure.orphan_qr", "QR は無い")])
-    graph = build(s, n, fr("FR-1", satisfies=[n], has_source=[s]))
+    n = need("Need-1", source=[s], suppress=[("structure.orphan_qr", "QR は無い")])
+    graph = build(s, n, fr("FR-1", satisfies=[n], source=[s]))
     result = apply_waivers(graph, validate_structure(graph))
 
     stale = [f for f in result.findings if f.code == "waiver.stale"]
@@ -180,7 +174,7 @@ def test_reason_is_stripped_and_kept_as_pairs():
 def test_suppress_is_not_an_edge():
     """suppress は (str, str) の組なので、エッジとして拾われてはならない。"""
     graph = orphan_need_graph(("structure.orphan_need", "既知"))
-    assert [e.name for e in graph.out_edges("Need-1")] == ["has_source"]
+    assert [e.name for e in graph.out_edges("Need-1")] == []
 
 
 # ---------------------------------------------------------------------------
@@ -210,4 +204,3 @@ def test_registered_codes_are_emitted_somewhere():
 def test_error_codes_are_not_suppressible():
     assert "structure.dangling_ref" not in SUPPRESSIBLE_CODES
     assert "waiver.stale" not in SUPPRESSIBLE_CODES
-    assert "structure.missing_source" in SUPPRESSIBLE_CODES

@@ -20,9 +20,9 @@ from reqmodel.application.validate import validate_semantics_lexical, validate_s
 def traced_chain():
     """Goal → Need → FR まで繋がった最小の健全なグラフ。"""
     s = source("S-1")
-    n = need("Need-1", has_source=[s], status="approved")
-    g = goal("Goal-1", motivates=[n], has_source=[s], status="approved")
-    f = fr("FR-1", satisfies=[n], has_source=[s], status="approved")
+    n = need("Need-1", source=[s], status="approved")
+    g = goal("Goal-1", motivates=[n], source=[s], status="approved")
+    f = fr("FR-1", satisfies=[n], source=[s], status="approved")
     return [s, n, g, f]
 
 
@@ -62,22 +62,22 @@ def test_refines_cycle_is_an_error():
 
 def test_fr_without_path_to_goal_is_reported():
     s, n, g, f = traced_chain()
-    orphan = fr("FR-9", has_source=[s], acceptance_criteria=["x"])
+    orphan = fr("FR-9", source=[s], acceptance_criteria=["x"])
     findings = validate_structure(build(s, n, g, f, orphan))
     assert codes_for(findings, "FR-9") == {"structure.orphan_fr"}
 
 
 def test_fr_reaches_goal_through_refines():
     s, n, g, f = traced_chain()
-    child = fr("FR-2", refines=[f], has_source=[s], acceptance_criteria=["x"])
+    child = fr("FR-2", refines=[f], source=[s], acceptance_criteria=["x"])
     findings = validate_structure(build(s, n, g, f, child))
     assert "structure.orphan_fr" not in codes_for(findings, "FR-2")
 
 
 def test_need_without_satisfies_is_reported():
     s = source("S-1")
-    n = need("Need-1", has_source=[s])
-    g = goal("Goal-1", motivates=[n], has_source=[s])
+    n = need("Need-1", source=[s])
+    g = goal("Goal-1", motivates=[n], source=[s])
     findings = validate_structure(build(s, n, g))
     assert "structure.orphan_need" in codes_for(findings, "Need-1")
 
@@ -87,44 +87,10 @@ def test_quality_requirement_without_qualifies_is_reported():
     assert "structure.orphan_qr" in codes_for(findings, "QR-1")
 
 
-def test_unused_source_is_information():
-    findings = validate_structure(build(source("S-1")))
-    unused = [f for f in findings if f.code == "structure.unused_source"]
-    assert unused and unused[0].severity == "info"
-
-
-def test_part_of_cycle_is_an_error():
-    graph = build(
-        source("S-1", part_of=["S-2"]),
-        source("S-2", part_of=["S-1"]),
-    )
-    cycles = [f for f in validate_structure(graph) if f.code == "structure.part_of_cycle"]
-    assert cycles and cycles[0].severity == "error"
-
-
-def test_quoted_source_is_not_unused_when_its_quote_is_used():
-    """引用が使われていれば、その親の文書を「未参照」とは言わない。"""
-    parent = source("S-1")
-    quote = source("S-2", part_of=[parent], locator="第12条第3項")
-    n = need("Need-1", has_source=[quote])
-    findings = validate_structure(build(parent, quote, n))
-    assert "structure.unused_source" not in codes(findings)
-
-
-def test_quote_nobody_relies_on_is_reported_as_a_quote():
-    """親は子の側で報告されるので二重に言わない。指摘は引用の側にだけ出る。"""
-    parent = source("S-1")
-    quote = source("S-2", part_of=[parent])
-    findings = validate_structure(build(parent, quote))
-    unused = [f for f in findings if f.code == "structure.unused_source"]
-    assert [f.node_id for f in unused] == ["S-2"]
-    assert "引用" in unused[0].message
-
-
 def test_goal_decomposition_requires_every_child_to_reach_requirements():
     s, n, g, f = traced_chain()
-    reaching = goal("Goal-2", refines=[g], motivates=[n], has_source=[s])
-    dangling = goal("Goal-3", refines=[g], has_source=[s])
+    reaching = goal("Goal-2", refines=[g], motivates=[n], source=[s])
+    dangling = goal("Goal-3", refines=[g], source=[s])
     findings = validate_structure(build(s, n, g, f, reaching, dangling))
     messages = [
         f.message for f in findings if f.code == "structure.goal_decomposition"
@@ -135,11 +101,6 @@ def test_goal_decomposition_requires_every_child_to_reach_requirements():
 def test_goal_without_children_or_needs_is_reported():
     findings = validate_structure(build(goal("Goal-1")))
     assert "structure.goal_leaf" in codes_for(findings, "Goal-1")
-
-
-def test_missing_source_is_reported():
-    findings = validate_structure(build(need("Need-1")))
-    assert "structure.missing_source" in codes_for(findings, "Need-1")
 
 
 def test_verified_without_evidence_is_reported():
@@ -167,9 +128,9 @@ def test_acceptance_criteria_are_optional():
 
 def test_approved_requirement_pointing_at_proposed_need_is_reported():
     s = source("S-1")
-    n = need("Need-1", has_source=[s], status="proposed")
-    g = goal("Goal-1", motivates=[n], has_source=[s])
-    f = fr("FR-1", satisfies=[n], has_source=[s], status="approved")
+    n = need("Need-1", source=[s], status="proposed")
+    g = goal("Goal-1", motivates=[n], source=[s])
+    f = fr("FR-1", satisfies=[n], source=[s], status="approved")
     findings = validate_structure(build(s, n, g, f))
     inconsistent = [
         f for f in findings if f.code == "structure.status_inconsistent"
@@ -180,10 +141,10 @@ def test_approved_requirement_pointing_at_proposed_need_is_reported():
 def test_approved_constraint_on_proposed_requirement_is_not_reported():
     # 制約は制約対象より先に決まりうるので、constrains は成熟度の逆転にしない
     s = source("S-1")
-    n = need("Need-1", has_source=[s], status="approved")
-    g = goal("Goal-1", motivates=[n], has_source=[s], status="approved")
-    f = fr("FR-1", satisfies=[n], has_source=[s], status="proposed")
-    c = constraint("Constraint-1", constrains=[f], has_source=[s], status="approved")
+    n = need("Need-1", source=[s], status="approved")
+    g = goal("Goal-1", motivates=[n], source=[s], status="approved")
+    f = fr("FR-1", satisfies=[n], source=[s], status="proposed")
+    c = constraint("Constraint-1", constrains=[f], source=[s], status="approved")
     findings = validate_structure(build(s, n, g, f, c))
     assert "structure.status_inconsistent" not in codes(findings)
 
@@ -217,18 +178,16 @@ def test_ambiguous_term_lookup_avoids_false_positives():
 
 
 def loaded(*lines: str):
-    header = "from reqmodel import Goal, Need, FunctionalRequirement, Source\n"
+    header = "from reqmodel import Goal, Need, FunctionalRequirement, Reference\n"
     return load_sources([("reqs.py", header + "".join(lines))]).graph
 
 
 def test_structure_findings_carry_the_definition_location():
     graph = loaded(
-        's = Source(id="S-1", text="経理部長", kind="stakeholder")\n',
         'n = Need(id="Need-1", text="早く精算したい")\n',
     )
     findings = {f.code: f for f in validate_structure(graph)}
-    assert findings["structure.orphan_need"].location == "reqs.py:3"
-    assert findings["structure.unused_source"].location == "reqs.py:2"
+    assert findings["structure.orphan_need"].location == "reqs.py:2"
 
 
 def test_lexical_findings_carry_the_definition_location():

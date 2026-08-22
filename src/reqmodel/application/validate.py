@@ -19,7 +19,6 @@ from ..definition import (
     Goal,
     Need,
     QualityRequirement,
-    Source,
 )
 
 __all__ = ["validate_structure", "validate_semantics_lexical", "attach_locations"]
@@ -37,13 +36,10 @@ def validate_structure(graph: RequirementGraph) -> FindingList:
     findings = FindingList()
     _check_edges(graph, findings)
     _check_refines_cycles(graph, findings)
-    _check_part_of_cycles(graph, findings)
     _check_orphan_requirements(graph, findings)
     _check_orphan_needs(graph, findings)
     _check_orphan_quality(graph, findings)
-    _check_unused_sources(graph, findings)
     _check_goal_decomposition(graph, findings)
-    _check_sources_present(graph, findings)
     _check_unverified_claims(graph, findings)
     _check_status_consistency(graph, findings)
     return attach_locations(graph, findings)
@@ -125,19 +121,6 @@ def _check_refines_cycles(graph: RequirementGraph, findings: FindingList) -> Non
         )
 
 
-def _check_part_of_cycles(graph: RequirementGraph, findings: FindingList) -> None:
-    for cycle in graph.cycles(("part_of",)):
-        findings.add(
-            Finding(
-                severity="error",
-                code="structure.part_of_cycle",
-                layer=2,
-                message="part_of に閉路がある (引用の包含関係の破綻): " + " → ".join(cycle),
-                node_id=cycle[0],
-            )
-        )
-
-
 # ---------------------------------------------------------------------------
 # 孤立検出
 # ---------------------------------------------------------------------------
@@ -207,34 +190,6 @@ def _check_orphan_quality(graph: RequirementGraph, findings: FindingList) -> Non
                     node_id=node.id,
                 )
             )
-
-
-def _check_unused_sources(graph: RequirementGraph, findings: FindingList) -> None:
-    """要求からも引用からも辿られない源泉を報告する。
-
-    引用 (part_of で子を持つ源泉) は、それ自体が要求から参照されていなくても
-    「未使用」ではない。使われているかどうかは子の側で個別に報告されるので、
-    親を重ねて報告すると同じことを二重に言うことになる。
-    """
-    for node in graph.by_type(Source):
-        if graph.in_edges(node.id, ("has_source",)):
-            continue
-        if graph.in_edges(node.id, ("part_of",)):
-            continue
-        message = (
-            "どの要求からも根拠にされていない引用"
-            if node.part_of
-            else "どの要求からも参照されていない源泉"
-        )
-        findings.add(
-            Finding(
-                severity="info",
-                code="structure.unused_source",
-                layer=2,
-                message=message,
-                node_id=node.id,
-            )
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -309,20 +264,6 @@ def _check_goal_decomposition(graph: RequirementGraph, findings: FindingList) ->
 # ---------------------------------------------------------------------------
 
 
-def _check_sources_present(graph: RequirementGraph, findings: FindingList) -> None:
-    types = (Goal, Need, FunctionalRequirement, QualityRequirement, Constraint)
-    for node in graph.by_type(*types):
-        if not graph.out_edges(node.id, ("has_source",)):
-            findings.add(
-                Finding(
-                    severity="warning",
-                    code="structure.missing_source",
-                    layer=2,
-                    message="源泉 (has_source) が無い",
-                    node_id=node.id,
-                )
-            )
-
 
 def _check_unverified_claims(graph: RequirementGraph, findings: FindingList) -> None:
     """``verified`` という主張に根拠が付いているかを見る。
@@ -383,7 +324,18 @@ def validate_semantics_lexical(graph: RequirementGraph) -> FindingList:
         texts = [node.text]
         #: 事前の基準と事後の根拠も本文と同じ辞書にかける。「十分高速だった」の類は
         #: 根拠の側にこそ出るため、evidence を対象から外すと検査の穴になる。
-        texts.extend(getattr(node, "evidence", []) or [])
+        for reference in getattr(node, "source", []) or []:
+            texts.extend([reference.title, reference.url])
+            if reference.note:
+                texts.append(reference.note)
+        for reference in getattr(node, "realized_by", []) or []:
+            texts.extend([reference.title, reference.url])
+            if reference.note:
+                texts.append(reference.note)
+        for reference in getattr(node, "evidence", []) or []:
+            texts.extend([reference.title, reference.url])
+            if reference.note:
+                texts.append(reference.note)
         texts.extend(getattr(node, "acceptance_criteria", []) or [])
         reported: set[str] = set()
         for text in texts:

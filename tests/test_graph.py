@@ -8,10 +8,10 @@ from reqmodel.core.graph import RequirementGraph
 
 def chain():
     s = source("S-1")
-    n = need("Need-1", has_source=[s])
-    g = goal("Goal-1", motivates=[n], has_source=[s])
-    f = fr("FR-1", satisfies=[n], has_source=[s])
-    q = qr("QR-1", qualifies=[f], has_source=[s])
+    n = need("Need-1", source=[s])
+    g = goal("Goal-1", motivates=[n], source=[s])
+    f = fr("FR-1", satisfies=[n], source=[s])
+    q = qr("QR-1", qualifies=[f], source=[s])
     return build(s, n, g, f, q)
 
 
@@ -26,9 +26,9 @@ def test_edges_are_derived_from_fields():
 
 def test_descendants_and_ancestors():
     graph = chain()
-    assert graph.descendants("FR-1") == {"Need-1", "S-1"}
+    assert graph.descendants("FR-1") == {"Need-1"}
     assert graph.ancestors("Need-1") == {"Goal-1", "FR-1", "QR-1"}
-    assert graph.impact("FR-1") == {"Need-1", "S-1", "QR-1"}
+    assert graph.impact("FR-1") == {"Need-1", "QR-1"}
 
 
 def test_edge_filter_narrows_traversal():
@@ -38,7 +38,7 @@ def test_edge_filter_narrows_traversal():
 
 def test_depth_limits_traversal():
     graph = chain()
-    assert graph.descendants("QR-1", depth=1) == {"FR-1", "S-1"}
+    assert graph.descendants("QR-1", depth=1) == {"FR-1"}
     assert "Need-1" in graph.descendants("QR-1", depth=2)
 
 
@@ -81,4 +81,4 @@ def test_locations_of_unknown_nodes_are_dropped():
 
 def test_node_order_is_deterministic():
     graph = build(qr("QR-1"), goal("Goal-2"), goal("Goal-1"), source("SRC-1"))
-    assert [n.id for n in graph.ordered_nodes()] == ["Goal-1", "Goal-2", "QR-1", "SRC-1"]
+    assert [n.id for n in graph.ordered_nodes()] == ["Goal-1", "Goal-2", "QR-1"]

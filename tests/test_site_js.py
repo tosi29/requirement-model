@@ -170,7 +170,4 @@ def test_mermaid_export_drops_filtered_out_nodes():
 
     assert not [line for line in lines if "[Source]" in line]
     assert not [line for line in lines if line.startswith("    class n_") and line.endswith(" Source")]
-    assert "has_source" not in text
-    # ノードとエッジだけが減る。classDef は全型ぶん残す (絞り込みで並びが変わらない)。
-    assert "    classDef Source" in text
-    assert "    classDef Source" in render_mermaid(graph)
+    assert "source" not in text

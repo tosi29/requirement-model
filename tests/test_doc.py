@@ -17,15 +17,15 @@ from reqmodel.application.doc import (
     render_matrices_markdown,
     render_spec,
 )
-from reqmodel.definition import FunctionalRequirement, Need, Source
+from reqmodel.definition import FunctionalRequirement, Need
 
 
 def sample():
     """Goal → Need → FR → QR が 1 本通った最小のグラフ。"""
+    ref = source("S-1")
     return build(
-        source("S-1"),
-        goal("Goal-1", motivates=["Need-1"], has_source=["S-1"]),
-        need("Need-1", has_source=["S-1"]),
+        goal("Goal-1", motivates=["Need-1"], source=[ref]),
+        need("Need-1", source=[ref]),
         fr("FR-1", satisfies=["Need-1"]),
         qr("QR-1", qualifies=["FR-1"]),
     )
@@ -38,11 +38,6 @@ def heading_of(text: str, node_id: str) -> str:
     raise AssertionError(f"{node_id} の見出しが無い")
 
 
-# ---------------------------------------------------------------------------
-# 仕様書
-# ---------------------------------------------------------------------------
-
-
 def test_spec_nests_goal_need_fr_qr():
     text = render_spec(sample())
     assert heading_of(text, "Goal-1") == "###"
@@ -52,14 +47,16 @@ def test_spec_nests_goal_need_fr_qr():
     assert text.index("### Goal-1") < text.index("#### Need-1") < text.index("##### FR-1")
 
 
-def test_spec_lists_attributes_criteria_and_traces():
+def test_spec_lists_attributes_criteria_and_references():
     text = render_spec(sample(), title="経費精算 仕様書", sources=["examples/x.py"])
     assert text.startswith("# 経費精算 仕様書\n")
     assert "- 生成元: examples/x.py" in text
     assert "種別: FunctionalRequirement / 状態: proposed" in text
     assert "- 充足するニーズ: Need-1" in text
-    assert "- 源泉: S-1 (経理部長)" in text
-    assert "    - 読み取り率 95% 以上" in text  # 受け入れ基準
+    assert "- Source:" in text
+    assert "    - **経理部長**:" in text
+    assert "      URL: about:blank#S-1" in text
+    assert "    - 読み取り率 95% 以上" in text
 
 
 def test_spec_shows_node_location_when_known():
@@ -76,25 +73,25 @@ def test_spec_repeats_shared_node_as_reference():
         fr("FR-1", satisfies=["Need-1", "Need-2"]),
     )
     text = render_spec(graph)
-    assert text.count("##### FR-1") == 1  # 本文は 1 か所だけ
+    assert text.count("##### FR-1") == 1
     assert "- (前掲) FR-1 領収書を読み取ること" in text
 
 
-def test_spec_sections_cover_constraint_and_source():
+def test_spec_sections_cover_constraint():
+    ref = source("S-1")
     graph = build(
-        source("S-1"),
         fr("FR-1"),
-        constraint("Constraint-1", constrains=["FR-1"], has_source=["S-1"]),
+        constraint("Constraint-1", constrains=["FR-1"], source=[ref]),
     )
     text = render_spec(graph)
     assert "### Constraint-1 国内リージョンにのみ保存すること" in text
     assert "- 制約する対象: FR-1" in text
-    assert "- **S-1** (stakeholder) 経理部長 — Constraint-1" in text
+    assert "- Source:" in text
 
 
 def test_spec_lists_nodes_that_no_section_reached():
-    text = render_spec(build(need("Need-9")))  # どの Goal からも動機づけられていない
-    assert "## 4. 上記に現れなかったノード" in text
+    text = render_spec(build(need("Need-9")))
+    assert "## 3. 上記に現れなかったノード" in text
     assert "- **Need-9** (Need) 早く精算したい" in text
 
 
@@ -112,18 +109,13 @@ def test_spec_orders_goals_by_refines_tree_and_survives_cycles():
     )
     text = render_spec(graph)
     assert text.index("### Goal-1") < text.index("### Goal-2")
-    for node_id in ("Goal-8", "Goal-9"):  # 閉路のゴールも落とさない
+    for node_id in ("Goal-8", "Goal-9"):
         assert f"### {node_id}" in text
 
 
 def test_spec_squashes_newlines_in_text():
     graph = build(goal("Goal-1", text="工数を\n半減する"))
     assert "### Goal-1 工数を 半減する" in render_spec(graph)
-
-
-# ---------------------------------------------------------------------------
-# トレーサビリティマトリクス
-# ---------------------------------------------------------------------------
 
 
 NEED_FR = MatrixSpec("Need × FR", "satisfies", (Need,), (FunctionalRequirement,), reverse=True)
@@ -160,7 +152,7 @@ def test_markdown_matrix_marks_links_and_reports_gaps():
     assert "| Need-1 早く精算したい | ✓ |  |" in text
     assert "- トレースの無い行: なし" in text
     assert "- トレースの無い列: FR-2" in text
-    assert "- FR-1 領収書を読み取ること" in text  # 列の凡例
+    assert "- FR-1 領収書を読み取ること" in text
 
 
 def test_markdown_matrix_escapes_pipe_in_text():
@@ -171,7 +163,7 @@ def test_markdown_matrix_escapes_pipe_in_text():
         if line.startswith("| Need-1")
     ][0]
     assert row == "| Need-1 A \\| B を見たい | ✓ |"
-    assert row.count("|") - row.count("\\|") == 3  # 表の区切りは 3 本のまま
+    assert row.count("|") - row.count("\\|") == 3
 
 
 def test_default_matrices_cover_the_main_edges():
@@ -179,7 +171,6 @@ def test_default_matrices_cover_the_main_edges():
         "motivates",
         "satisfies",
         "qualifies",
-        "has_source",
         "constrains",
     ]
 
@@ -205,27 +196,3 @@ def test_csv_is_one_row_per_link_and_keeps_uncovered_rows():
 def test_documents_end_with_a_single_newline(render):
     text = render(sample())
     assert text.endswith("\n") and not text.endswith("\n\n")
-
-
-def test_source_section_nests_quotes_under_their_origin():
-    """「この源泉のどこが、どの要求の根拠か」を 1 か所で読めること。"""
-    graph = build(
-        source("S-1"),
-        Source(
-            id="S-2",
-            text="領収書の添付を要する",
-            kind="document",
-            locator="第12条第3項",
-            part_of=["S-1"],
-        ),
-        need("Need-1", has_source=["S-2"]),
-        fr("FR-1", satisfies=["Need-1"], has_source=["S-2"]),
-    )
-    text = render_spec(graph)
-    assert "- **S-1** (stakeholder) 経理部長 — 引用のみ" in text
-    assert "  - **S-2** [第12条第3項] 領収書の添付を要する — Need-1, FR-1" in text
-
-
-def test_source_section_keeps_sources_that_have_no_quotes():
-    text = render_spec(sample())
-    assert "- **S-1** (stakeholder) 経理部長 — Goal-1, Need-1" in text

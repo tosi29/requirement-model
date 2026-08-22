@@ -3,7 +3,6 @@
 import { initialSelection } from "../../src/reqmodel/presentation/site_logic.js";
 
 export const EDGE_NAMES = [
-  "has_source",
   "refines",
   "motivates",
   "satisfies",
@@ -12,12 +11,11 @@ export const EDGE_NAMES = [
 ];
 
 export const EDGE_NAMES_BY_TYPE = {
-  Goal: ["has_source", "refines", "motivates"],
-  Need: ["has_source"],
-  FunctionalRequirement: ["has_source", "satisfies", "refines"],
-  QualityRequirement: ["has_source", "qualifies"],
-  Constraint: ["has_source", "constrains"],
-  Source: [],
+  Goal: ["refines", "motivates"],
+  Need: [],
+  FunctionalRequirement: ["satisfies", "refines"],
+  QualityRequirement: ["qualifies"],
+  Constraint: ["constrains"],
 };
 
 export const STATUS_RANK = {
@@ -33,18 +31,17 @@ export const TYPES = [
   "FunctionalRequirement",
   "QualityRequirement",
   "Constraint",
-  "Source",
 ];
 
 //: 図に既定で描かないもの (`site_data()` の hidden_by_default と同じ形)。
 export const HIDDEN_BY_DEFAULT = {
-  types: ["Source"],
-  edges: ["has_source", "part_of"],
+  types: [],
+  edges: [],
 };
 
 /**
  * Goal-1 --motivates--> Need-1 <--satisfies-- FR-1 <--qualifies-- QR-1
- * 全ノードが SRC-1 を has_source で参照する。
+ * 外部参照は source / evidence の Reference 値としてノードに直接持つ。
  */
 export function fixture(overrides = {}) {
   const nodes = [
@@ -53,7 +50,7 @@ export function fixture(overrides = {}) {
       id: "Goal-1",
       text: "経費精算を速くする",
       status: "approved",
-      has_source: ["SRC-1"],
+      source: [{ title: "申請者となる一般社員", url: "https://example.com/interviews/employee", note: "申請者ヒアリング" }],
       refines: [],
       motivates: ["Need-1"],
     },
@@ -62,15 +59,15 @@ export function fixture(overrides = {}) {
       id: "Need-1",
       text: "領収書を撮影するだけで申請したい",
       status: "approved",
-      has_source: ["SRC-1"],
+      source: [{ title: "申請者となる一般社員", url: "https://example.com/interviews/employee", note: "申請者ヒアリング" }],
     },
     {
       type: "FunctionalRequirement",
       id: "FR-1",
       text: "領収書画像から金額を抽出すること",
       status: "proposed",
-      has_source: ["SRC-1"],
-      evidence: ["受入テスト第 1 回で正解率 96% だった"],
+      source: [{ title: "申請者となる一般社員", url: "https://example.com/interviews/employee", note: "申請者ヒアリング" }],
+      evidence: [{ title: "受入テスト第 1 回", url: "https://example.com/tests/receipt-ocr", note: "正解率 96%" }],
       acceptance_criteria: ["正解率が 95% 以上である"],
       satisfies: ["Need-1"],
       refines: [],
@@ -80,25 +77,15 @@ export function fixture(overrides = {}) {
       id: "QR-1",
       text: "抽出は 3 秒以内に終わること",
       status: "proposed",
-      has_source: [],
+      source: [],
       evidence: [],
       acceptance_criteria: [],
       qualifies: ["FR-1"],
     },
-    {
-      type: "Source",
-      id: "SRC-1",
-      text: "申請者となる一般社員",
-      status: "proposed",
-      kind: "stakeholder",
-    },
   ];
 
   const edges = [
-    { source: "Goal-1", name: "has_source", target: "SRC-1" },
     { source: "Goal-1", name: "motivates", target: "Need-1" },
-    { source: "Need-1", name: "has_source", target: "SRC-1" },
-    { source: "FR-1", name: "has_source", target: "SRC-1" },
     { source: "FR-1", name: "satisfies", target: "Need-1" },
     { source: "QR-1", name: "qualifies", target: "FR-1" },
   ];
@@ -132,11 +119,12 @@ export const ELLIPSE_FIT = { wmul: 1.42, wpad: 14, hmul: 1.42, hpad: 10 };
  * スケール時の振る舞い (探索の計算量・フォーカスの効き) を、Python を通さずに
  * テストとベンチから使うためのもの。件数を渡せば任意の規模になる。
  */
-export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sources = 3 } = {}) {
+export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60 } = {}) {
   const nodes = [];
   const edges = [];
   const link = (source, name, target) => edges.push({ source, name, target });
   const pick = (index, count) => (index % count) + 1;
+  const reference = (index) => ({ title: `源泉 ${index}`, url: `https://example.com/source/${index}`, note: "合成データ" });
 
   for (let i = 1; i <= goals; i++) {
     const id = `G-${i}`;
@@ -148,15 +136,13 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
     });
     //: 二分木にして、Goal を何段かの refines で積む。
     if (i > 1) link(id, "refines", `G-${Math.floor(i / 2)}`);
-    link(id, "has_source", `SRC-${pick(i, sources)}`);
   }
 
   for (let i = 1; i <= needs; i++) {
     const id = `N-${i}`;
-    nodes.push({ type: "Need", id, text: `ニーズ ${i} を満たしたい`, status: "approved" });
+    nodes.push({ type: "Need", id, text: `ニーズ ${i} を満たしたい`, status: "approved", source: [reference(pick(i, 3))] });
     //: 葉に近い Goal (後半) から動機づける。
     link(`G-${goals - (i % Math.max(1, Math.floor(goals / 2)))}`, "motivates", id);
-    link(id, "has_source", `SRC-${pick(i, sources)}`);
   }
 
   for (let i = 1; i <= frs; i++) {
@@ -166,11 +152,11 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
       id,
       text: `機能 ${i} を提供すること`,
       status: i % 3 === 0 ? "implemented" : "approved",
-      evidence: [`機能 ${i} の受入テスト結果`],
+      source: [reference(pick(i, 3))],
+      evidence: [{ title: `機能 ${i} の受入テスト結果`, url: `https://example.com/tests/fr-${i}` }],
       acceptance_criteria: [`機能 ${i} の受け入れ基準`],
     });
     link(id, "satisfies", `N-${pick(i, needs)}`);
-    link(id, "has_source", `SRC-${pick(i, sources)}`);
     //: 一部は FR どうしで詳細化する (同じ段に並びきらない枝を作る)。
     if (i % 5 === 0) link(id, "refines", `FR-${i - 1}`);
   }
@@ -182,21 +168,11 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60, sour
       id,
       text: `品質 ${i} を保つこと`,
       status: "proposed",
-      evidence: [`品質 ${i} の計測結果`],
+      source: [reference(pick(i, 3))],
+      evidence: [{ title: `品質 ${i} の計測結果`, url: `https://example.com/tests/qr-${i}` }],
       acceptance_criteria: [`品質 ${i} の受け入れ基準`],
     });
     link(id, "qualifies", `FR-${pick(i, frs)}`);
-    link(id, "has_source", `SRC-${pick(i, sources)}`);
-  }
-
-  for (let i = 1; i <= sources; i++) {
-    nodes.push({
-      type: "Source",
-      id: `SRC-${i}`,
-      text: `源泉 ${i}`,
-      status: "approved",
-      kind: "stakeholder",
-    });
   }
 
   return {
@@ -240,7 +216,7 @@ export const META = {
     { type: "Goal", label: "Goal (最上位)" },
     { type: "Need", label: "Need (上位)" },
   ],
-  dashed_edges: ["has_source"],
+  dashed_edges: [],
   impact_colors: {
     selected: "#d93025",
     upstream: "#1a73e8",
@@ -250,7 +226,7 @@ export const META = {
   search: { hit: "#00b8d4" },
 };
 
-/** すべて表示した state (Source と源泉エッジも出す)。 */
+/** すべて表示した state。 */
 export function allOn(data) {
   return {
     types: new Set(data.types),
@@ -260,8 +236,8 @@ export function allOn(data) {
 }
 
 /**
- * ページの初期 state。`allOn()` との違いは Source と源泉エッジが外れていること
- * (`defaultState()` と同じ選択)。既定の振る舞いを見るテストはこちらを使う。
+ * ページの初期 state (`defaultState()` と同じ選択)。
+ * 既定の振る舞いを見るテストはこちらを使う。
  */
 export function defaultOn(data) {
   return {

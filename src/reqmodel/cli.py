@@ -115,11 +115,6 @@ def build_parser() -> argparse.ArgumentParser:
     graph_parser.add_argument(
         "--highlight", help="強調するノード ID をカンマ区切りで指定する"
     )
-    graph_parser.add_argument(
-        "--with-sources",
-        action="store_true",
-        help="Source ノードと源泉エッジも描く (既定では描かない)",
-    )
 
     explain_parser = subparsers.add_parser(
         "explain", help="影響部分グラフを LLM 向けテキストに整形する"
@@ -134,11 +129,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--undirected",
         action="store_true",
         help="エッジの向きを無視して辿る (FR から Goal などの文脈も集める)",
-    )
-    explain_parser.add_argument(
-        "--with-sources",
-        action="store_true",
-        help="源泉エッジも辿る (既定では辿らず、源泉は各ノードの属性として出す)",
     )
     explain_parser.add_argument("-o", "--output", help="出力先ファイル")
     explain_parser.add_argument(
@@ -366,7 +356,7 @@ def cmd_graph(args: argparse.Namespace) -> int:
             args.format,
             args.max_label,
             highlight,
-            args.with_sources,
+            False,
             result.requirement_groups,
         ),
         args.output,
@@ -391,7 +381,7 @@ def cmd_explain(args: argparse.Namespace) -> int:
             edges,
             args.depth,
             args.undirected,
-            args.with_sources,
+            False,
         )
         sub = RequirementGraph(
             [result.graph.nodes[i] for i in whole if i in result.graph.nodes],
@@ -413,7 +403,7 @@ def cmd_explain(args: argparse.Namespace) -> int:
                 edges,
                 args.depth,
                 args.undirected,
-                args.with_sources,
+                False,
             ),
             args.output,
         )

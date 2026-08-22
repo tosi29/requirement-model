@@ -1,9 +1,10 @@
-"""メタモデル: ノード型・エッジ型の定義。
+"""メタモデル: ノード型・外部参照型・エッジ型の定義。
 
 設計方針:
 - 意味内容 (text) は自然言語のまま保持し、形式化しない。
 - 構造 (型・エッジ) だけを Pydantic のフィールド型として形式化する。
-- エッジは ``list[Ref[T]]`` の形で宣言し、型規則をフィールド型そのもので表現する。
+- 外部情報へのトレースは ``Reference`` 値としてノードに直接保持する。
+- 要求間のエッジは ``list[Ref[T]]`` の形で宣言し、型規則をフィールド型そのもので表現する。
   これにより mypy と IDE 補完が記述時点から効く。
 """
 
@@ -22,15 +23,14 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, field_validator
 from ..codes import CHECK_CODES, SUPPRESSIBLE_CODES
 
 __all__ = [
+    "Reference",
     "Node",
-    "Sourced",
     "Requirement",
     "Goal",
     "Need",
     "FunctionalRequirement",
     "QualityRequirement",
     "Constraint",
-    "Source",
     "FR",
     "QR",
     "Ref",
@@ -38,7 +38,6 @@ __all__ = [
     "Waiver",
     "STATUS_RANK",
 ]
-
 
 # ---------------------------------------------------------------------------
 # 基本語彙
@@ -56,6 +55,35 @@ STATUS_RANK: dict[str, int] = {
 
 #: 指摘の抑制 1 件。(チェックコード, 理由)。理由は必須 (下の validator を参照)。
 Waiver = tuple[str, str]
+
+
+class Reference(BaseModel):
+    """要求の外側にある情報への参照。
+
+    ``source`` / ``realized_by`` / ``evidence`` の意味は、Reference 自身の種別ではなく、
+    それを保持するフィールド名で表す。``note`` は引用・要約・コメント・設計者の見解を
+    細分化せず、参照先を開かずに文脈を把握するための自由記述欄である。
+    """
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    title: str
+    url: str
+    note: str | None = None
+
+    @field_validator("title", "url")
+    @classmethod
+    def _check_required_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Reference の title / url は空にできない")
+        return value
+
+    @field_validator("note")
+    @classmethod
+    def _check_note(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Reference.note は空文字にできない (書かないなら省略する)")
+        return value
 
 
 class RefMarker:
@@ -97,7 +125,9 @@ class Node(BaseModel):
     id: str
     text: str
     status: Status = "proposed"
-    #: 既知・意図的な指摘を黙らせる waiver。``[("structure.missing_source", "理由")]``
+    #: なぜこのノードが存在するのかを示す外部参照。
+    source: list[Reference] = []
+    #: 既知・意図的な指摘を黙らせる waiver。``[("structure.orphan_fr", "理由")]``
     #: の形で、コードと理由の組を並べる。理由の無い抑制は書けない。
     suppress: list[Waiver] = []
 
@@ -117,14 +147,29 @@ class Node(BaseModel):
             raise ValueError("text は空にできない")
         return value
 
+    @field_validator("source", mode="before")
+    @classmethod
+    def _coerce_source_references(cls, value: Any) -> Any:
+        if value is None:
+            return []
+        if not isinstance(value, (list, tuple)):
+            return value
+        result = []
+        for item in value:
+            if isinstance(item, Reference):
+                result.append(item)
+            elif isinstance(item, Node):
+                result.append(Reference(title=item.text, url=f"about:blank#{item.id}"))
+            elif isinstance(item, str):
+                result.append(Reference(title=item, url=f"about:blank#{item}"))
+            else:
+                result.append(item)
+        return result
+
     @field_validator("suppress", mode="before")
     @classmethod
     def _check_suppress(cls, value: Any) -> Any:
-        """抑制の宣言を、書いた時点 (層1) で検査する。
-
-        抑制は「既知だと分かっている」という主張なので、対象コードが実在し、
-        抑制可能で、理由が書かれていることをここで担保する。
-        """
+        """抑制の宣言を、書いた時点 (層1) で検査する。"""
         if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
             raise ValueError("suppress は (コード, 理由) の組のリストで書くこと")
 
@@ -160,56 +205,35 @@ class Node(BaseModel):
         return waivers
 
 
-class Sourced(Node):
-    """源泉トレースを持つノード (Goal / Need / FR / QR / Constraint)。"""
+class Requirement(Node):
+    """FR と QR の共通部分。検証に関わる欄を持つ。"""
 
-    has_source: list[Ref["Source"]] = []
-
-
-class Requirement(Sourced):
-    """FR と QR の共通部分。検証に関わる 2 つの欄を持つ。
-
-    ``evidence`` が主で、``acceptance_criteria`` が従である。要求文が測定可能に
-    書けていれば「何をもって満たしたとするか」は text に入りきるので、事前の基準は
-    任意とし、検査は「``verified`` と主張したなら根拠を出せ」の側にだけ置いた
-    (docs/design/model.md の「検証可能性を evidence 側に置く」を参照)。
-    """
-
+    #: どこで・何によってこの要求が実現されているのか。
+    realized_by: list[Reference] = []
     #: 何をもって満たしたと判断したか。``status="verified"`` の根拠になる
     #: (``structure.unverified_claim``)。事後の事実を書く欄なので、テスト・計測・
     #: レビューのいずれでもよい。
-    evidence: list[str] = []
+    evidence: list[Reference] = []
     #: text が測定可能に書けないときだけ、事前の基準としてその操作化を書く。
     #: 書かなくても指摘は出ない。
     acceptance_criteria: list[str] = []
 
+    @field_validator("realized_by", "evidence", mode="before")
+    @classmethod
+    def _coerce_requirement_references(cls, value: Any) -> Any:
+        return Node._coerce_source_references(value)
 
-class Goal(Sourced):
-    """事業・ステークホルダーの意図 (なぜ)。
 
-    主語は世界・組織の側で、文には書かない。解決策が存在しなくても成り立つ文で
-    あることが条件で、システムを主語にした文 (「機械が〜する」) は Goal ではなく
-    要求である。願いの主を一つの役割として名指せるなら Goal ではなく Need。
-
-    Goal には text の規則が無く、この境界は機械が検査していない (README の
-    「どの型に書くか」を参照)。
-    """
+class Goal(Node):
+    """事業・ステークホルダーの意図 (なぜ)。"""
 
     #: 自分がどの親 Goal を詳細化しているか (子 → 親)。
     refines: list[Ref["Goal"]] = []
     motivates: list[Ref["Need"]] = []
 
 
-class Need(Sourced):
-    """何が満たされたいか。語尾は願望形「〜たい」。
-
-    主語となる役割を必ず書く (「申請者は、」)。主語を書くノード型はこれだけで、
-    Goal (主語は世界) と要求系 (主語はシステム) との境界はこの非対称にある。
-    ただし検査しているのは語尾だけで、主語は検査していない。
-
-    指示書の例示は「〜したい」だが、「気づきたい」「知りたい」のように
-    サ変以外の願望形も同じ語尾規則の対象とみなし、「〜たい」で判定する。
-    """
+class Need(Node):
+    """何が満たされたいか。語尾は願望形「〜たい」。"""
 
     @field_validator("text")
     @classmethod
@@ -220,15 +244,7 @@ class Need(Sourced):
 
 
 class FunctionalRequirement(Requirement):
-    """システムが提供すべき機能。語尾は「〜すること」。
-
-    主語はシステムなので書かない。Need (主語は役割) との境界はこの非対称にある。
-    QR / Constraint とは主語では分かれず、そちらは構造 (qualifies / constrains) で
-    決まる。
-
-    指示書の例示は「〜すること」だが、「読み取ること」「送ること」のように
-    サ変以外の動詞も同じ語尾規則の対象とみなし、「〜こと」で判定する。
-    """
+    """システムが提供すべき機能。語尾は「〜すること」。"""
 
     satisfies: list[Ref[Need]] = []
     refines: list[Ref["FunctionalRequirement"]] = []
@@ -249,34 +265,10 @@ class QualityRequirement(Requirement):
     qualifies: list[Ref["FunctionalRequirement"]] = []
 
 
-class Constraint(Sourced):
+class Constraint(Node):
     """解決策の自由度を制限する条件。要求ではない。"""
 
     constrains: list[Ref[Union["FunctionalRequirement", "QualityRequirement"]]] = []
-
-
-class Source(Node):
-    """要求の源泉。構造的振る舞いが同一なので単一型とし kind で分類する。
-
-    引用 (規程の条文、ヒアリングでの発言) も Source として書き、``part_of`` で
-    親の源泉にぶら下げる。引用は「要求から参照される」「要求を持たない」という点で
-    源泉と構造的振る舞いが同じなので、型は分けない (Goal の refines と同じ同一型内
-    階層)。引用がノードになることで id を持ち、複数の要求が同じ引用を根拠にできる。
-    """
-
-    kind: Literal["stakeholder", "document", "existing_system"]
-    #: 自分がどの源泉の一部か (子 → 親)。引用・抜粋を親の文書や人にぶら下げる。
-    part_of: list[Ref["Source"]] = []
-    #: 出典の位置 (「第12条第3項」「2026-03-12 第3回ヒアリング」)。
-    #: text は引用文そのものを書き、どこから引いたかはこちらに分ける。
-    locator: str | None = None
-
-    @field_validator("locator")
-    @classmethod
-    def _check_locator(cls, value: str | None) -> str | None:
-        if value is not None and not value.strip():
-            raise ValueError("locator は空文字にできない (書かないなら省略する)")
-        return value
 
 
 #: 短縮名 (指示書中の FR / QR 表記に対応)。

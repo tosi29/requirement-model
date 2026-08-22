@@ -18,11 +18,11 @@ def test_counts_nodes_by_type_and_status():
         )
     )
 
-    assert stats.nodes == 5
+    assert stats.nodes == 4
     assert stats.by_type["FunctionalRequirement"] == 1
     assert stats.by_type["Constraint"] == 0  # 存在しない型も 0 で並ぶ (分布として読む)
     assert stats.by_status == {
-        "proposed": 3,
+        "proposed": 2,
         "approved": 1,
         "implemented": 0,
         "verified": 1,
@@ -34,13 +34,12 @@ def test_counts_edges_by_name():
     stats = collect_stats(
         build(
             source(),
-            need(has_source=["S-1"]),
-            fr(satisfies=["Need-1"], has_source=["S-1"]),
+            need(source=["S-1"]),
+            fr(satisfies=["Need-1"], source=["S-1"]),
         )
     )
 
-    assert stats.edges == 3
-    assert stats.by_edge["has_source"] == 2
+    assert stats.edges == 1
     assert stats.by_edge["satisfies"] == 1
     assert stats.by_edge["qualifies"] == 0
 
@@ -70,37 +69,37 @@ def test_evidence_ratios_are_split_by_type():
     assert stats.ratio("evidence_qr").rate == 0.0
 
 
-def test_source_trace_ratio_covers_the_same_types_as_missing_source():
+def test_source_reference_ratio_counts_nodes_with_source():
     stats = collect_stats(
         build(
             source(),
-            goal(has_source=["S-1"]),
-            need(has_source=["S-1"]),
-            fr(has_source=["S-1"]),
+            goal(source=["S-1"]),
+            need(source=["S-1"]),
+            fr(source=["S-1"]),
             qr(),
             constraint(),
         )
     )
 
-    ratio = stats.ratio("source_traced")
+    ratio = stats.ratio("source_referenced")
     assert ratio.total == 5
     assert ratio.missing == ("QR-1", "Constraint-1")
 
 
 def test_ratio_without_population_has_no_rate():
-    ratio = collect_stats(build(source())).ratio("need_satisfied")
+    ratio = collect_stats(build()).ratio("need_satisfied")
 
     assert (ratio.total, ratio.rate) == (0, None)
     assert ratio.format_rate() == "-"
 
 
 def test_ambiguity_density_counts_lexicon_findings():
-    stats = collect_stats(build(need(text="適切に精算したい"), need("Need-2"), source()))
+    stats = collect_stats(build(need(text="適切に精算したい"), need("Need-2")))
 
     assert stats.ambiguity is not None
     assert stats.ambiguity.findings == 1
     assert stats.ambiguity.nodes_with_findings == 1
-    assert stats.ambiguity.density == 1 / 3
+    assert stats.ambiguity.density == 1 / 2
 
 
 def test_ambiguity_is_not_measured_without_lexicon():
@@ -132,7 +131,7 @@ def test_render_text_summary():
     assert "| Goal | 1 | 0 | 0 | 0 | 1 |" in text
     assert "| 計 | 3 | 0 | 0 | 0 | 3 |" in text
     assert "- Need の充足率 (satisfies されている): 100.0% (1/1)" in text
-    assert "- 源泉トレース率 (has_source を持つ要求): 0.0% (0/3) 未達: Goal-1, Need-1, FR-1" in text
+    assert "- 外部参照率 (source を持つノード): 0.0% (0/3) 未達: Goal-1, Need-1, FR-1" in text
 
 
 def test_render_truncates_a_long_list_of_uncovered_nodes():

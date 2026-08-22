@@ -13,7 +13,7 @@ from reqmodel.definition import (
     Goal,
     Need,
     QualityRequirement,
-    Source,
+    Reference,
 )
 
 
@@ -55,8 +55,7 @@ def test_goal_has_no_decomposition_mode():
 
 def test_reference_accepts_node_or_id_string():
     s = source("S-1")
-    assert need("Need-1", has_source=[s]).has_source == ["S-1"]
-    assert need("Need-2", has_source=["S-1"]).has_source == ["S-1"]
+    assert need("Need-1", source=[s]).source == [s]
 
 
 def test_status_default_is_proposed():
@@ -67,7 +66,7 @@ def test_edge_specs_are_derived_from_field_annotations():
     goal_edges = edge_specs_for(Goal)
     assert goal_edges["refines"].targets == (Goal,)
     assert goal_edges["motivates"].targets == (Need,)
-    assert goal_edges["has_source"].targets == (Source,)
+    assert "source" not in goal_edges
 
     fr_edges = edge_specs_for(FunctionalRequirement)
     assert fr_edges["satisfies"].targets == (Need,)
@@ -84,10 +83,10 @@ def test_edge_specs_are_derived_from_field_annotations():
     )
 
 
-def test_source_is_a_single_type_classified_by_kind():
-    assert Source(id="S", text="規程", kind="document").kind == "document"
+def test_reference_is_a_value_object_without_kind():
+    assert Reference(title="規程", url="https://example.com").note is None
     with pytest.raises(ValidationError):
-        Source(id="S", text="規程", kind="unknown")
+        Reference(title="規程", url="")
 
 
 def test_public_definition_package_has_no_internal_dependencies():

@@ -46,7 +46,6 @@ import {
   searchHits,
   severityTabs,
   sortRows,
-  sourceItems,
   sourceUrl,
   statusFilters,
   stepHit,
@@ -681,6 +680,19 @@ function zoomBy(factor) {
 
 // --- 詳細パネル ------------------------------------------------------------
 
+function pushReferenceSection(rows, title, references) {
+  if (!Array.isArray(references) || references.length === 0) return;
+  rows.push(`<h2>${escapeHtml(title)}</h2><ul class="sources">`);
+  for (const reference of references) {
+    const url = reference.url ? ` <a href="${escapeAttr(reference.url)}" target="_blank" rel="noreferrer">${escapeHtml(reference.url)}</a>` : "";
+    const note = reference.note ? `<span class="text">${escapeHtml(reference.note)}</span>` : "";
+    rows.push(
+      `<li><span class="id">${escapeHtml(reference.title || "(untitled)")}</span>${url}${note}</li>`,
+    );
+  }
+  rows.push("</ul>");
+}
+
 function renderDetail() {
   const panel = document.getElementById("detail");
   if (!state.selected || !view.byId.has(state.selected)) {
@@ -707,38 +719,14 @@ function renderDetail() {
   }
   rows.push("</dl>");
 
-  //: 根拠 (事後) を先、受け入れ基準 (事前) を後に置く。CLI の doc / explain と同じ順。
-  if ((node.evidence || []).length) {
-    rows.push("<h2>根拠</h2><ul>");
-    for (const item of node.evidence) rows.push(`<li>${escapeHtml(item)}</li>`);
-    rows.push("</ul>");
-  }
+  //: 外部参照はノードではなく Reference 値として各フィールドに直接保持する。
+  //: CLI の doc / explain と同じく、title / note / URL を読める形で出す。
+  pushReferenceSection(rows, "Source", node.source);
+  pushReferenceSection(rows, "Realized by", node.realized_by);
+  pushReferenceSection(rows, "Evidence", node.evidence);
   if ((node.acceptance_criteria || []).length) {
     rows.push("<h2>受け入れ基準</h2><ul>");
     for (const criterion of node.acceptance_criteria) rows.push(`<li>${escapeHtml(criterion)}</li>`);
-    rows.push("</ul>");
-  }
-
-  //: 源泉は図に描かない (`core.projection.SOURCE_EDGE_NAMES`) ので、ここが唯一の出口になる。
-  //: 絞り込みで Source を消していても読めるよう、view ではなく DATA から引く。
-  //: 飛び先にはしない。図に居ないノードへ飛ばすと選択が外れるだけになる。
-  const sources = sourceItems(DATA, node.id);
-  if (sources.length) {
-    rows.push("<h2>源泉</h2><ul class=\"sources\">");
-    for (const source of sources) {
-      const locator = source.locator ? ` <span class="locator">${escapeHtml(source.locator)}</span>` : "";
-      const kind = source.kind ? ` <span class="type">${escapeHtml(source.kind)}</span>` : "";
-      //: 引用元 (part_of の鎖) は「< 親」の形で 1 行に畳む。
-      const parents = source.parents
-        .map((parent) => ` &lt; ${escapeHtml(parent.id)} (${escapeHtml(truncate(parent.text, 30))})`)
-        .join("");
-      rows.push(
-        `<li><span class="id">${escapeHtml(source.id)}</span>${kind}${locator}` +
-          `<span class="text">${escapeHtml(source.text)}</span>` +
-          (parents ? `<span class="parents">${parents}</span>` : "") +
-          "</li>",
-      );
-    }
     rows.push("</ul>");
   }
 

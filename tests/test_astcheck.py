@@ -6,7 +6,7 @@ import pytest
 
 from reqmodel.astcheck import extract_source
 
-HEADER = "from reqmodel import Goal, Need, FunctionalRequirement, Source\n"
+HEADER = "from reqmodel import Goal, Need, FunctionalRequirement, Reference\n"
 
 
 def violations(source: str) -> list[str]:
@@ -17,14 +17,14 @@ def test_declaration_only_is_accepted():
     result = extract_source(
         HEADER
         + """
-src = Source(id="S-1", text="経理部長", kind="stakeholder")
-need = Need(id="Need-1", text="早く精算したい", has_source=[src])
+src = Reference(title="経理部長", url="about:blank#S-1")
+need = Need(id="Need-1", text="早く精算したい", source=[src])
 """
     )
     assert result.violations == []
-    assert [n.type_name for n in result.nodes] == ["Source", "Need"]
-    assert result.nodes[1].kwargs["has_source"] == ["S-1"]
-    assert result.nodes[1].var_name == "need"
+    assert [n.type_name for n in result.nodes] == ["Need"]
+    assert result.nodes[0].kwargs["source"][0]["title"] == "経理部長"
+    assert result.nodes[0].var_name == "need"
 
 
 @pytest.mark.parametrize(
@@ -94,7 +94,7 @@ def test_positional_arguments_are_rejected():
 def test_unknown_name_reference_is_rejected():
     assert any(
         "未定義の名前" in m
-        for m in violations('n = Need(id="Need-1", text="したい", has_source=[nope])\n')
+        for m in violations('n = Need(id="Need-1", text="したい", source=[nope])\n')
     )
 
 

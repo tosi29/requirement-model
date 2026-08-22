@@ -10,7 +10,7 @@
 
 - Goal は数段の refines で積まれた木 (13 件)
 - Need は葉の Goal から動機づけられる (24 件)
-- FR は Need に対して大量に並ぶ (196 件)。**同じ段に並ぶ幅**がそのまま
+- FR は Need に対して大量に並ぶ (202 件)。**同じ段に並ぶ幅**がそのまま
   図の横長さになる (#17 で問題にしているのはここ)
 - QR / Constraint / Source は現実的な比率で少数
 
@@ -28,6 +28,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+
 OUT_PATH = Path(__file__).resolve().parents[1] / "examples" / "bench.py"
 
 # --- 規模 -------------------------------------------------------------------
@@ -37,7 +38,7 @@ GOALS_LEAF = 8
 GOALS = 1 + GOALS_MID + GOALS_LEAF
 NEEDS = 24
 #: 全体で 300 ノード (tests/test_bench_example.py の MIN_NODES) に届く数。
-FRS = 196
+FRS = 202
 QRS = 51
 CONSTRAINTS = 10
 SOURCES = 6
@@ -120,7 +121,7 @@ def evidence_for(status: str, index: int) -> list[str]:
     """
     if status != "verified":
         return []
-    return [f"{area(index)}の受入テスト第 {index % 9 + 1} 回で、全項目が合格している"]
+    return [reference(f"EVIDENCE-{index % 9 + 1}", f"{area(index)}の受入テスト第 {index % 9 + 1} 回", "全項目が合格している")]
 
 
 def area(index: int) -> str:
@@ -131,8 +132,8 @@ def thing(index: int) -> str:
     return THINGS[index % len(THINGS)]
 
 
-def source_of(index: int) -> str:
-    return f"SRC-{index % SOURCES + 1}"
+def source_of(index: int) -> Any:
+    return reference(f"SRC-{index % SOURCES + 1}")
 
 
 HEADER = '''"""ベンチ用の大きいサンプル定義ファイル (物流管理システム)。
@@ -153,11 +154,25 @@ from reqmodel import (
     Goal,
     Need,
     QualityRequirement,
+    Reference,
     RequirementGroup,
-    Source,
 )
 '''
 
+
+
+class Raw:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
+def reference(key: str, note: str | None = None, detail: str | None = None) -> Raw:
+    title = note or key
+    url = f"https://github.com/tosi29/requirement-model/issues/123#{key}"
+    args = [f'title={literal(title)}', f'url={literal(url)}']
+    if detail:
+        args.append(f'note={literal(detail)}')
+    return Raw(f"Reference({', '.join(args)})")
 
 
 # --- 出力の組み立て ---------------------------------------------------------
@@ -165,6 +180,8 @@ from reqmodel import (
 
 def literal(value: Any) -> str:
     """定義ファイルに書ける形の値。書けるのは文字列・数・リスト・タプルだけ。"""
+    if isinstance(value, Raw):
+        return value.text
     if isinstance(value, str):
         return f'"{value}"'
     if isinstance(value, bool):  # pragma: no cover - 使わない
@@ -203,12 +220,6 @@ def render() -> str:
     """`examples/bench.py` の中身。"""
     parts: list[str] = [HEADER]
 
-    # 源泉 ------------------------------------------------------------------
-    parts.append(section("源泉"))
-    for index, (kind, text) in enumerate(SOURCE_KINDS, start=1):
-        parts.append(node("Source", id=f"SRC-{index}", text=text, kind=kind, status="approved"))
-
-
     # ゴール ----------------------------------------------------------------
     #
     # Goal-1 (根) → Goal-2..Goal-5 (中間) → Goal-6..Goal-13 (葉)。葉だけが Need を動機づける。
@@ -219,7 +230,7 @@ def render() -> str:
             id="Goal-1",
             text="物流業務全体の処理時間を 30% 削減する",
             status="approved",
-            has_source=["SRC-1"],
+            source=[reference("SRC-1")],
         )
     )
     for index in range(GOALS_MID):
@@ -230,7 +241,7 @@ def render() -> str:
                 id=f"Goal-{number}",
                 text=f"{area(index)}業務の手戻りを 20% 減らす",
                 status="approved",
-                has_source=[source_of(index)],
+                source=[source_of(index)],
                 refines=["Goal-1"],
             )
         )
@@ -243,7 +254,7 @@ def render() -> str:
                 id=f"Goal-{number}",
                 text=f"{area(index + GOALS_MID)}の入力と確認にかかる工数を減らす",
                 status="approved",
-                has_source=[source_of(index + 1)],
+                source=[source_of(index + 1)],
                 refines=[f"Goal-{parent}"],
                 motivates=[
                     f"Need-{need}"
@@ -264,7 +275,7 @@ def render() -> str:
                 id=f"Need-{number}",
                 text=f"{role}は、{area(index)}の{thing(index)}を{WANTS[index % len(WANTS)]}",
                 status="approved" if index % 3 else "implemented",
-                has_source=[source_of(index), source_of(index + 3)],
+                source=[source_of(index), source_of(index + 3)],
             )
         )
 
@@ -282,7 +293,7 @@ def render() -> str:
                 id=f"FR-{number}",
                 text=f"{area(index)}の{thing(index)}を{FR_VERBS[index % len(FR_VERBS)]}",
                 status=status,
-                has_source=[source_of(index)],
+                source=[source_of(index)],
                 satisfies=[] if refines_parent else [f"Need-{index % NEEDS + 1}"],
                 refines=[f"FR-{number - 1}"] if refines_parent else [],
                 evidence=evidence_for(status, index),
@@ -306,7 +317,7 @@ def render() -> str:
                 id=f"QR-{number}",
                 text=text,
                 status=status,
-                has_source=[source_of(index + 2)],
+                source=[source_of(index + 2)],
                 qualifies=[target],
                 evidence=evidence_for(status, index),
                 acceptance_criteria=[
@@ -325,7 +336,7 @@ def render() -> str:
                 id=f"Constraint-{number}",
                 text=f"{area(index)}の操作は社内ネットワークからのみ受け付けること",
                 status="approved" if index % 2 else "proposed",
-                has_source=[source_of(index + 4)],
+                source=[source_of(index + 4)],
                 constrains=[f"FR-{index * 17 % FRS + 1}"],
             )
         )

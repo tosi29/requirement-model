@@ -6,7 +6,6 @@ from typing import Any, Iterable
 
 from ..core.graph import Edge, RequirementGraph
 from ..core.metamodel import TYPE_ORDER
-from ..core.projection import SOURCE_EDGE_NAMES
 from ..definition import (
     Constraint,
     FunctionalRequirement,
@@ -14,7 +13,6 @@ from ..definition import (
     Need,
     Node,
     QualityRequirement,
-    Source,
 )
 from ..definition.nodes import STATUS_RANK
 
@@ -63,15 +61,11 @@ def _drawn(
 ) -> tuple[list[Node], list[Edge]]:
     """図に出すノードとエッジ。
 
-    既定では Source ノードと源泉エッジを落とす (理由は ``core.projection.SOURCE_EDGE_NAMES``)。
-    識別子はここで残ったノードに振るので、除外しても連番に穴は空かない。
+    ``include_sources`` は旧 CLI オプションとの内部互換のため受け取るが、
+    Source ノードはメタモデルから無くなったので描画対象は常に同じである。
     """
-    nodes = graph.ordered_nodes()
-    edges = list(graph.edges)
-    if include_sources:
-        return nodes, edges
-    nodes = [node for node in nodes if not isinstance(node, Source)]
-    return nodes, [edge for edge in edges if edge.name not in SOURCE_EDGE_NAMES]
+    _ = include_sources
+    return graph.ordered_nodes(), list(graph.edges)
 
 
 def _mermaid_shape(node: Node) -> tuple[str, str]:
@@ -299,8 +293,6 @@ def render_dot(
         if edge.source not in ids or edge.target not in ids:
             continue
         edge_attrs = [f'label="{edge.name}"']
-        if edge.name == "has_source":
-            edge_attrs.append("style=dashed")
         lines.append(
             f"    {ids[edge.source]} -> {ids[edge.target]} "
             f"[{', '.join(edge_attrs)}];"

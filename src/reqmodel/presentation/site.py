@@ -20,8 +20,6 @@ from typing import Any, Sequence
 from ..findings import FindingList
 from ..core.graph import RequirementGraph
 from ..core.metamodel import EDGE_NAMES, TYPE_ORDER, edge_specs_for
-from ..core.projection import SOURCE_EDGE_NAMES
-from ..definition import Source
 from ..definition.nodes import STATUS_RANK
 from .render import render_dot, render_meta, render_mermaid
 from .view import RequirementGroup
@@ -113,12 +111,8 @@ def site_data(
         "schema_version": graph.to_json_obj()["schema_version"],
         "types": [node_type.__name__ for node_type in TYPE_ORDER],
         "edge_names": list(EDGE_NAMES),
-        # 図に既定で描かないもの (Source と源泉エッジ)。初期表示の絞り込みが
-        # CLI の既定 (req graph / req explain) と揃うように Python から渡す。
-        "hidden_by_default": {
-            "types": [Source.__name__],
-            "edges": sorted(SOURCE_EDGE_NAMES),
-        },
+        # 図に既定で描かないもの。Source ノード廃止後は要求グラフの全ノードを描く。
+        "hidden_by_default": {"types": [], "edges": []},
         # status の成熟度。テーブルビューの status 列をこの順で並べる
         # (辞書順に並べても意味が無いので、順序は Python 側を唯一の出典とする)。
         "status_rank": dict(STATUS_RANK),

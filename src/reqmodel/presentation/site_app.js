@@ -27,6 +27,7 @@ import {
   escapeHtml,
   estimateTextWidth,
   explainCommand,
+  fieldLabel,
   focusSet,
   graphElements,
   groupFindings,
@@ -707,7 +708,7 @@ function renderDetail() {
   rows.push(`<h3>${node.id} <span class="node-btn type">[${node.type}]</span></h3>`);
   rows.push(`<p class="text">${escapeHtml(node.text)}</p>`);
   rows.push("<dl>");
-  rows.push(`<dt>status</dt><dd>${node.status}</dd>`);
+  rows.push(`<dt>${fieldLabel("status")}</dt><dd>${node.status}</dd>`);
   if (node.kind) rows.push(`<dt>kind</dt><dd>${node.kind}</dd>`);
   if (node.location) rows.push(`<dt>出所</dt><dd class="loc">${locationHtml(node.location)}</dd>`);
   //: 件数は影響範囲の設定 (深さ・向き) に従う。図の色分けと同じ範囲を数える。
@@ -721,9 +722,9 @@ function renderDetail() {
 
   //: 外部参照はノードではなく Reference 値として各フィールドに直接保持する。
   //: CLI の doc / explain と同じく、title / note / URL を読める形で出す。
-  pushReferenceSection(rows, "Source", node.source);
-  pushReferenceSection(rows, "Realized by", node.realized_by);
-  pushReferenceSection(rows, "Evidence", node.evidence);
+  pushReferenceSection(rows, fieldLabel("source"), node.source);
+  pushReferenceSection(rows, fieldLabel("realized_by"), node.realized_by);
+  pushReferenceSection(rows, fieldLabel("evidence"), node.evidence);
   if ((node.acceptance_criteria || []).length) {
     rows.push("<h2>受け入れ基準</h2><ul>");
     for (const criterion of node.acceptance_criteria) rows.push(`<li>${escapeHtml(criterion)}</li>`);

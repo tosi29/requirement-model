@@ -5,6 +5,7 @@ import { test } from "node:test";
 
 import {
   FOCUS_DEPTHS,
+  FIELD_LABELS,
   LABEL_FONT,
   LABEL_MAX_LENGTH,
   LABEL_WRAP_WIDTH,
@@ -24,6 +25,7 @@ import {
   escapeHtml,
   estimateTextWidth,
   explainCommand,
+  fieldLabel,
   focusSet,
   graphElements,
   graphSvg,
@@ -66,6 +68,22 @@ const viewOf = (state) => {
 };
 
 // --- 絞り込み --------------------------------------------------------------
+
+test("利用者向けフィールド名は日本語ラベルへ変換する", () => {
+  assert.equal(fieldLabel("source"), "出典");
+  assert.equal(fieldLabel("realized_by"), "実現手段");
+  assert.equal(fieldLabel("evidence"), "証跡");
+  assert.equal(fieldLabel("status"), "ステータス");
+  assert.equal(fieldLabel("id"), "id");
+  assert.deepEqual(Object.keys(FIELD_LABELS).sort(), ["evidence", "realized_by", "source", "status"]);
+});
+
+test("表と凡例の status 見出しは日本語で表示する", () => {
+  const statusColumn = TABLE_COLUMNS.find((column) => column.key === "status");
+  assert.equal(statusColumn.label, "ステータス");
+  assert.ok(legendGroups(fixture().meta).some((group) => group.title === "ステータス"));
+  assert.ok(!legendGroups(fixture().meta).some((group) => group.title === "status"));
+});
 
 test("既定ではすべてのノードとエッジが見える", () => {
   const view = viewOf();
@@ -960,7 +978,7 @@ test("legendGroups は実際のスタイル (配色・線種) から凡例を作
 
   assert.deepEqual(
     groups.map((group) => group.title),
-    ["種別", "status"],
+    ["種別", "ステータス"],
   );
   assert.equal(groups[0].items.length, fixture().types.length);
 

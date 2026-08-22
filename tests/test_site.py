@@ -198,6 +198,21 @@ def test_page_has_status_filters(tmp_path: Path):
         assert f'id="{element_id}"' in html
     # 表示層が状態を持ち、ロジック層が選択肢を作る。
     assert "statusFilters(DATA)" in html
+    assert "<h2>ステータス</h2>" in html
+    assert "<h2>status</h2>" not in html
+
+
+def test_detail_panel_uses_japanese_labels_for_external_references(tmp_path: Path):
+    """詳細ペインでは内部フィールド名ではなく利用者向けラベルを出す。"""
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert 'fieldLabel("status")' in html
+    assert 'fieldLabel("source")' in html
+    assert 'fieldLabel("realized_by")' in html
+    assert 'fieldLabel("evidence")' in html
+    assert 'pushReferenceSection(rows, "Source"' not in html
+    assert 'pushReferenceSection(rows, "Realized by"' not in html
+    assert 'pushReferenceSection(rows, "Evidence"' not in html
 
 
 def test_page_has_impact_depth_and_undirected_controls(tmp_path: Path):

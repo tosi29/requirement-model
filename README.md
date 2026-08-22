@@ -38,7 +38,7 @@ IREB の連鎖は Goal → Requirement で `Need` を持たず、INCOSE は `Goa
 ## インストール
 
 ```console
-$ pip install -e .          # Python 3.11 以上 / 依存は pydantic のみ
+$ pip install -e .          # Python 3.14 以上 / 依存は pydantic のみ
 $ req validate examples/sample.py
 ```
 

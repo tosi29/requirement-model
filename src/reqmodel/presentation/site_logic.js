@@ -289,6 +289,17 @@ const countBy = (nodes, keyOf) => {
   return counts;
 };
 
+/** 利用者向けに表示するフィールド名。内部フィールド名は変えない。 */
+export const FIELD_LABELS = Object.freeze({
+  source: "出典",
+  realized_by: "実現手段",
+  evidence: "証跡",
+  status: "ステータス",
+});
+
+/** 内部フィールド名を画面表示用ラベルに変換する。 */
+export const fieldLabel = (name) => FIELD_LABELS[name] || name;
+
 /** status の一覧。並びは成熟度 (`meta.statuses` の順 = `STATUS_RANK`)。 */
 const statusNames = (data) => Object.keys((data.meta || {}).statuses || {});
 
@@ -482,7 +493,7 @@ export const TABLE_COLUMNS = [
   { key: "id", label: "id" },
   { key: "type", label: "type" },
   { key: "text", label: "本文" },
-  { key: "status", label: "status" },
+  { key: "status", label: fieldLabel("status") },
   { key: "evidence", label: "根拠", numeric: true },
   { key: "findings", label: "指摘", numeric: true },
 ];
@@ -1194,7 +1205,7 @@ export function legendGroups(meta, colorScheme = "light") {
   const statuses = Object.entries(meta.statuses || {});
   if (statuses.length) {
     groups.push({
-      title: "status",
+      title: fieldLabel("status"),
       items: statuses.map(([status, statusMeta]) => ({
         label: status,
         swatch: {

@@ -5,7 +5,7 @@
 
 定義ファイルからはこのパッケージだけを import する::
 
-    from reqmodel import Goal, Need, FunctionalRequirement, Source
+    from reqmodel import Goal, Need, FunctionalRequirement, Reference
 
 なお本ツールは定義ファイルを実行しない。import 文は mypy と IDE 補完のために書く。
 """
@@ -26,9 +26,8 @@ from .definition import (
     Node,
     QualityRequirement,
     Ref,
+    Reference,
     Requirement,
-    Source,
-    Sourced,
     Status,
     Waiver,
 )
@@ -45,13 +44,12 @@ __all__ = [
     "FunctionalRequirement",
     "QualityRequirement",
     "Constraint",
-    "Source",
+    "Reference",
     "FR",
     "QR",
     "RequirementGroup",
     # 基底・補助型
     "Node",
-    "Sourced",
     "Requirement",
     "Ref",
     "Status",

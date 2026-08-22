@@ -75,7 +75,6 @@ $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (
 | `--edges a,b` | plan, explain | 辿るエッジ種別を限定する |
 | `--depth N` | explain | 探索の深さ上限 |
 | `--undirected` | explain | エッジの向きを無視して辿る |
-| `--with-sources` | graph, explain | 源泉を図に描く / 辿る ([既定では出さない](#源泉の扱い)) |
 | `--highlight ID,ID` | graph | 指定ノードを強調する |
 | `--matrix` | doc | 仕様書ではなくトレーサビリティマトリクスを出す |
 | `--format md\|csv` | doc | 出力形式 (既定は `-o` の拡張子から判定。`csv` は `--matrix` 専用) |
@@ -103,22 +102,28 @@ Python ファイルの diff とグラフの diff が一対一対応し、コー�
 (環境変数・現在時刻・乱数・ネットワークが入り込む余地がそもそも無い)。
 
 ```python
-from reqmodel import Goal, Need, FunctionalRequirement, RequirementGroup, Source
+from reqmodel import Goal, Need, FunctionalRequirement, Reference, RequirementGroup
 
-SRC_EMPLOYEE = Source(id="SRC-EMP", text="申請者となる一般社員", kind="stakeholder")
+SRC_EMPLOYEE = Reference(
+    title="申請者となる一般社員",
+    url="https://example.com/interviews/employee",
+    note="領収書撮影だけで申請したい、というヒアリング結果",
+)
 
 NEED_PHOTO_ONLY = Need(
     id="Need-1",
     text="申請者は、領収書を撮影するだけで経費を申請したい",
     status="approved",
-    has_source=[SRC_EMPLOYEE],
+    source=[SRC_EMPLOYEE],
 )
 
 FR_OCR = FunctionalRequirement(
     id="FR-1",
     text="領収書画像から金額と日付を抽出し、申請フォームの初期値として表示すること",
     satisfies=[NEED_PHOTO_ONLY],
-    has_source=[SRC_EMPLOYEE],
+    source=[SRC_EMPLOYEE],
+    realized_by=[Reference(title="OCR モジュール", url="https://example.com/src/ocr")],
+    evidence=[Reference(title="OCR 精度テスト", url="https://example.com/ci/ocr")],
     acceptance_criteria=["金額の抽出正解率が 95% 以上である"],
 )
 ```
@@ -159,7 +164,7 @@ GROUP_CAPTURE = RequirementGroup(
 
 ## メタモデル
 
-### ノード型 (6種)
+### ノード型 (5種 + 外部参照値)
 
 | 型 | 意味 | 備考 |
 |---|---|---|
@@ -168,30 +173,19 @@ GROUP_CAPTURE = RequirementGroup(
 | `FunctionalRequirement` (FR) | システムが提供すべき機能 | 語尾規則・根拠 / 受け入れ基準 |
 | `QualityRequirement` (QR) | 品質要求 (性能・可用性等) | 「非機能要求」の語は使わない |
 | `Constraint` | 解決策の自由度を制限する条件 | 要求ではない |
-| `Source` | 要求の源泉 (引用も含む) | `kind` で分類、`part_of` で引用を束ねる |
 
-`Source` は単一型とし、`kind: "stakeholder" | "document" | "existing_system"` で分類する。
-
-規程の条文やヒアリングでの発言といった**引用も Source として書く**。`part_of` で親の源泉に
-ぶら下げ、`text` に引用文そのもの、`locator` にどこから引いたか (「第12条第3項」
-「2026-03-12 第3回ヒアリング」) を書く。
+外部情報へのトレースはノード型ではなく、値オブジェクト `Reference(title, url, note)` として持つ。
+`source` は Goal / Need / FR / QR / Constraint の共通属性で、FR / QR にはさらに
+`realized_by` と `evidence` がある。`note` は引用・要約・コメント・設計者の見解を分けず、
+リンクを開かなくても重要部分が分かる程度の補足を書く。
 
 ```python
-SRC_POLICY = Source(id="SRC-POLICY", text="経費精算規程 第4版", kind="document")
-
-SRC_POLICY_RECEIPT = Source(
-    id="SRC-POLICY-A12-3",
-    text="1万円を超える支出には領収書の添付を要する",
-    kind="document",
-    locator="第12条第3項",
-    part_of=[SRC_POLICY],
+SRC_POLICY_RECEIPT = Reference(
+    title="1万円を超える支出には領収書の添付を要する",
+    url="https://example.com/policy#article-12-3",
+    note="経費精算規程 第4版 第12条第3項。領収書添付制約の根拠。",
 )
 ```
-
-引用が id を持つので**同じ条文を複数の要求が根拠にできる**。これにより「この規程のどこが、
-どの要求に効いているか」を引用単位で集約でき、`req doc` の源泉節がこの入れ子をそのまま出す。
-引用を書かず `has_source=[SRC_POLICY]` と文書ごと指してもよい。粒度は書き手が選ぶ
-([なぜノードにするか](docs/design/model.md#引用を-source-のノードにする))。
 
 FR と QR は型を分ける (qualifies を出せるのは QR のみ、孤立検出の規則が異なる)。
 型分割の一般原則は **型ごとに異なる構造規則が存在するときだけ型を分ける**
@@ -238,7 +232,8 @@ FR / QR には検証に関わる 2 つの欄が加わる。
 
 | 属性 | 何を書くか | 検査 |
 |---|---|---|
-| `evidence: list[str]` | 何をもって満たしたと判断したか (事後の事実) | `verified` なら必須 |
+| `evidence: list[Reference]` | 何をもって満たしたと判断したか (事後の事実) | `verified` なら必須 |
+| `realized_by: list[Reference]` | どこで・何によって実現されているか | 無し (任意) |
 | `acceptance_criteria: list[str]` | text が測定可能に書けないときの操作化 (事前の基準) | 無し (任意) |
 
 **主は `evidence` である。** 要求文が測定可能に書けていれば「何をもって満たしたと
@@ -257,13 +252,6 @@ FR / QR には検証に関わる 2 つの欄が加わる。
 | `satisfies` | FR→Need | 充足 |
 | `qualifies` | QR→FR | 品質の付与 |
 | `constrains` | Constraint→{FR, QR} | 制約 |
-| `has_source` | {Goal, Need, FR, QR, Constraint}→Source | 源泉トレース (図には描かない) |
-| `part_of` | Source→Source | 引用と、その引用元 (子 → 親。図には描かない) |
-
-**源泉の 2 本 (`has_source` / `part_of`) は図に描かない。** Source は数十件の要求から
-参照されるハブなので、ノードとして置くと近傍が一気に広がり、レイアウトが源泉に
-引っ張られる。源泉は「どの要求がどこから来たか」をノードの属性として読む情報で
-あって、要求どうしの関係を辿る経路ではない ([源泉の扱い](#源泉の扱い))。
 
 エッジは Pydantic のフィールドとして `satisfies: list[Ref[Need]]` の形で宣言してある。
 **型規則はフィールド型そのもの**であり、mypy と IDE 補完が記述時点から効く。
@@ -291,14 +279,11 @@ FR / QR には検証に関わる 2 つの欄が加わる。
 | `structure.dangling_ref` | error | 参照先ノードが存在しない |
 | `structure.self_reference` | error | 自分自身への参照 |
 | `structure.refines_cycle` | error | refines の閉路 (詳細化の破綻) |
-| `structure.part_of_cycle` | error | part_of の閉路 (引用の包含関係の破綻) |
 | `structure.orphan_fr` | warning | どの Goal にも到達できない FR |
 | `structure.orphan_need` | warning | どの FR からも satisfy されない Need |
 | `structure.orphan_qr` | warning | qualifies の張り先が無い QR |
-| `structure.unused_source` | info | どの要求からも参照されない Source (引用を持つ源泉は、子の側で報告するので除く) |
 | `structure.goal_decomposition` | warning | 要求群に到達しない子 Goal がある |
 | `structure.goal_leaf` | warning | 子 Goal も Need も持たない Goal |
-| `structure.missing_source` | warning | 源泉リンクの無い要求 |
 | `structure.unverified_claim` | warning | `verified` なのに `evidence` の無い FR / QR |
 | `structure.status_inconsistent` | warning | approved 以上のノードが proposed のノードを参照 (`constrains` を除く) |
 | `semantics.ambiguous_term` | warning | 曖昧語 (「高速に」「適切に」等) |
@@ -322,7 +307,7 @@ CONSTRAINT_VPN = Constraint(
     id="Constraint-9",
     text="社内 VPN の外からは接続させないこと",
     constrains=[FR_OCR],
-    suppress=[("structure.missing_source", "情報システム部との口頭合意。文書化は次版")],
+    suppress=[("structure.orphan_fr", "この版では Need と Goal を次PRで接続する")],
 )
 ```
 
@@ -354,7 +339,7 @@ impact(n) = ancestors(n) ∪ descendants(n)   # --edges でエッジ型を絞れ
 
 `req explain` は影響部分グラフの各ノードの `text` (自然言語) と根拠・受け入れ基準を含めて
 整形出力する。機械が網羅性を担保し、解釈は LLM に委ねるための入力を作る。
-源泉エッジは辿らず、各ノードの属性行に畳む ([源泉の扱い](#源泉の扱い))。
+外部参照はエッジとして辿らず、各ノードの属性行に畳む ([外部参照の扱い](#外部参照の扱い))。
 
 有向の到達可能性では「その FR がなぜ必要か (Goal)」までは辿れないため、
 `--undirected` で向きを無視した近傍も集められる。
@@ -386,7 +371,7 @@ Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`statu
 
 - 種別: FunctionalRequirement / 状態: approved
 - 充足するニーズ: Need-1
-- 源泉: SRC-EMP (申請者となる一般社員)
+- Source: 申請者となる一般社員 <https://example.com/interviews/employee>
 - 付与されている品質要求: QR-1
 - 受けている制約: Constraint-1
 - 受け入れ基準:
@@ -418,7 +403,7 @@ Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`statu
 |---|---|
 | 1. 要求階層 | Goal → Need → FR → QR。Goal の詳細化は DFS の並び順で表す |
 | 2. 制約 | Constraint と、その制約対象 |
-| 3. 源泉 | Source と、それを参照しているノード |
+| 3. 外部参照 | 各ノードの source / realized_by / evidence |
 | 4. 上記に現れなかったノード | どの節にも入らなかったもの (ゴール未接続の Need 等) |
 
 見出しの深さは Goal=h3 / Need=h4 / FR=h5 / QR=h6 に固定する。Goal の詳細化は
@@ -442,11 +427,10 @@ Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`statu
 - トレースの無い列: なし
 ```
 
-出る表は 5 枚 (`Goal × Need` / `Need × FR` / `FR × QR` / `Source × 要求` /
-`Constraint × 制約対象`)。表ごとに「トレースの無い行 / 列」を添えるので、
+出る表は 4 枚 (`Goal × Need` / `Need × FR` / `FR × QR` / `Constraint × 制約対象`)。表ごとに「トレースの無い行 / 列」を添えるので、
 どこが未カバーかがそのまま読める。表の定義は `src/reqmodel/doc.py` の `MATRICES`。
 
-CSV は「1 行 = 1 トレースリンク」の縦持ちにする。5 枚の格子を 1 ファイルに並べる
+CSV は「1 行 = 1 トレースリンク」の縦持ちにする。4 枚の格子を 1 ファイルに並べる
 わけにいかないためで、表計算ソフトのピボットで格子に戻せる。トレース先の無い行は
 列側を空欄にした 1 行として残るので、CSV だけを見ても未トレースが分かる。
 
@@ -477,7 +461,7 @@ $ req stats examples/sample.py
 - Need の充足率 (satisfies されている): 100.0% (3/3)
 - FR の根拠保有率 (evidence を持つ): 16.7% (1/6) 未達: FR-1, FR-3, FR-4, FR-5, FR-6
 - QR の根拠保有率 (evidence を持つ): 50.0% (1/2) 未達: QR-2
-- 源泉トレース率 (has_source を持つ要求): 100.0% (15/15)
+- 外部参照率 (source を持つノード): 100.0% (14/14)
 ```
 
 率が 100% に満たないときは、その行に未達のノード id が並ぶ
@@ -518,48 +502,26 @@ $ req stats examples/sample.py --json
 | DOT | `req graph --format dot` | Graphviz で画像に落とす |
 | 静的サイト | `req site` | ブラウザで探索する。GitHub Pages で公開する |
 
-### 源泉の扱い
+### 外部参照の扱い
 
-**Source は図に描かず、参照元ノードの属性として出す。** `req graph` / `req explain` /
-静的サイトの図のいずれも既定でそうなる。
+**外部情報は図のノードとして描かず、参照元ノードの属性として出す。** `req graph` /
+`req explain` / 静的サイトの図はいずれも Goal / Need / FR / QR / Constraint の要求構造だけを描く。
 
-理由は数にある。`requirements.py` は Source 6 件に対し `has_source` が 60 本あり、
-**全エッジ 116 本の過半が源泉**になっている (図に残るのは 56 本)。Source は 1 件が平均
-10 件の要求から参照されるハブなので、ノードとして置くとレイアウトがそこに引っ張られ、
-要求どうしの関係が読めなくなる。
+理由は、外部参照が要求間を辿るための経路ではなく、ノード 1 件について読む属性だからである。
+外部情報を Source ノードとして置くと、1 件の文書や条文が多数の要求から参照されるハブになり、
+近傍探索とレイアウトが外部参照に引っ張られて要求どうしの関係が読みにくくなる。
 
-情報は失われない。`req explain` は源泉を辿らない代わりに、各ノードの属性行に畳む。
-`part_of` の鎖 (引用 → 引用元) も 1 行に収める。
+情報は失われない。`req explain` は各ノードの属性行に `Source` / `Realized by` / `Evidence` を出す。
 
 ```
 - [FunctionalRequirement] FR-3: 申請内容を経費精算規程の各ルールに照合し、…
     (status=approved)
-    源泉: SRC-POLICY-A12-3 (1万円を超える支出には領収書の添付を要する) [第12条第3項] < SRC-POLICY (経費精算規程 第4版)
+    Source: 1万円を超える支出には領収書の添付を要する <https://example.com/policy#article-12-3>
+      note: 経費精算規程 第4版 第12条第3項
 ```
 
-これは `req doc` が最初からしていたこと (`- 源泉: SRC-EMP (申請者となる一般社員)`) で、
-図の側をそれに揃えたものである。静的サイトでは右ペインに**源泉**の欄が出る。
-
-源泉をハブとして見たいとき (この条文がどの要求に効いているか) は、集約する側の
-出力を使う。
-
-- `req doc` の源泉節
-- `req doc --matrix` の `Source × 要求` 表
-- 静的サイトのテーブルビュー
-
-図の上で見たいときは `--with-sources` を付ける。静的サイトでは左サイドバーで
-`Source` と `has_source` / `part_of` にチェックを入れると出る (この状態は既定では
-ないので URL に載り、そのまま共有できる)。
-
-```console
-$ req graph requirements.py --with-sources      # Source をノードとして描く
-$ req explain FR-3 -f requirements.py --with-sources   # 源泉エッジも辿る
-```
-
-**型としての `Source` は変わらない。** `has_source` / `part_of` フィールド、
-`structure.missing_source` / `structure.unused_source` / `structure.part_of_cycle`、
-源泉トレース率、トレーサビリティ表はすべてそのままで、変わるのは図に描くかどうか
-だけである。
+静的サイトでは右ペインに外部参照の title / note / URL が出る。集約して見たい場合は、
+正規化 JSON や表出力から `source` / `realized_by` / `evidence` を対象に検索・集計する。
 
 Mermaid / DOT のノード識別子は `n1`, `n2`, … の連番で、`ordered_nodes()` (型順 → id 順)
 の索引から振る (`presentation/render.py` の `_ids()`)。元の id を識別子に流用すると、非英数字を
@@ -578,9 +540,9 @@ Mermaid / DOT のノード識別子は `n1`, `n2`, … の連番で、`ordered_n
 - **status を枠線の線種で表示**する
 - ノード種別・status・エッジ種別の絞り込み。**絞り込みは影響範囲の計算にも効く**
   (`req explain --edges` と同じ考え方)
-- 本文・根拠・受け入れ基準・**源泉**・出所 (file:line)・出入りのエッジ・そのノードへの指摘を
+- 本文・根拠・受け入れ基準・**外部参照**・出所 (file:line)・出入りのエッジ・そのノードへの指摘を
   右ペインに表示。**出入りのエッジには相手ノードの本文を併記**する (飛ぶ前に何に
-  繋がっているか読める)。源泉は図に描かないぶんここに出る ([源泉の扱い](#源泉の扱い))
+  繋がっているか読める)。外部参照は図に描かないぶんここに出る ([外部参照の扱い](#外部参照の扱い))
 - `--repo-url` を渡して生成すると、**出所が定義ファイルへのリンク**になる
 - 「影響部分グラフをコピー」で `req explain` 相当のテキストをクリップボードへ (LLM 連携用)
 - 検証結果の一覧。**重大度で絞り、チェックコードごとにまとめて**表示する。

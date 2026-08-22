@@ -19,9 +19,11 @@ from pathlib import Path
 from typing import Any
 
 from .core.metamodel import NODE_TYPES
+from .definition import Reference
 from .presentation.view import RequirementGroup
 
 DECLARATION_TYPES = {**NODE_TYPES, "RequirementGroup": RequirementGroup}
+VALUE_TYPES = {"Reference": Reference}
 
 __all__ = ["RawNode", "ExtractResult", "extract_source", "extract_file", "ALLOWED_IMPORT_ROOTS"]
 
@@ -158,6 +160,9 @@ class _Extractor:
             if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
                 return  # docstring
             if isinstance(stmt.value, ast.Call):
+                if isinstance(stmt.value.func, ast.Name) and stmt.value.func.id in VALUE_TYPES:
+                    self._eval(stmt.value)
+                    return
                 self._visit_instantiation(stmt.value, var_name=None)
                 return
             self._violation("式文はノード型のインスタンス化のみ許される", stmt)
@@ -210,6 +215,15 @@ class _Extractor:
             names.append(target.id)
 
         if isinstance(value, ast.Call):
+            if isinstance(value.func, ast.Name) and value.func.id in VALUE_TYPES:
+                literal = self._eval(value)
+                if literal is _INVALID:
+                    return
+                for name in names:
+                    if name in self.env:
+                        self._violation(f"変数 {name} が再代入されている", stmt)
+                    self.env[name] = literal
+                return
             raw = self._visit_instantiation(value, var_name=names[0])
             if raw is None:
                 return
@@ -235,6 +249,9 @@ class _Extractor:
             return None
 
         type_name = call.func.id
+        if type_name in VALUE_TYPES:
+            self._violation(f"{type_name} は単独の宣言としては書けない", call)
+            return None
         if type_name not in DECLARATION_TYPES:
             self._violation(f"未知の型 {type_name} は呼び出せない", call)
             return None
@@ -297,11 +314,42 @@ class _Extractor:
             return self.env[expr.id]
 
         if isinstance(expr, ast.Call):
-            self._violation("ノード型以外の呼び出しは書けない", expr)
-            return _INVALID
+            return self._eval_value_call(expr)
 
         self._violation(f"{type(expr).__name__} は定義ファイルに書けない", expr)
         return _INVALID
+
+    def _eval_value_call(self, call: ast.Call) -> Any:
+        if not isinstance(call.func, ast.Name):
+            self._violation("呼び出せるのはノード型または値オブジェクト型のみ", call)
+            return _INVALID
+        type_name = call.func.id
+        value_type = VALUE_TYPES.get(type_name)
+        if value_type is None:
+            self._violation("ノード型以外の呼び出しは書けない", call)
+            return _INVALID
+        if type_name not in self.imported:
+            self._violation(f"{type_name} が import されていない", call)
+            return _INVALID
+        if call.args:
+            self._violation(
+                f"{type_name} の生成はキーワード引数のみ (位置引数は不可)", call
+            )
+            return _INVALID
+        kwargs: dict[str, Any] = {}
+        for keyword in call.keywords:
+            if keyword.arg is None:
+                self._violation("** による展開は書けない", call)
+                return _INVALID
+            evaluated = self._eval(keyword.value)
+            if evaluated is _INVALID:
+                return _INVALID
+            kwargs[keyword.arg] = evaluated
+        try:
+            return value_type(**kwargs).model_dump(mode="json")
+        except Exception as exc:
+            self._violation(f"{type_name} の値が規約に反する: {exc}", call)
+            return _INVALID
 
 
 class _Invalid:

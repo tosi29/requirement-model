@@ -34,20 +34,9 @@ __all__ = [
     "collect_stats",
     "render_stats",
     "DEFAULT_STATS_TITLE",
-    "SOURCED_TYPES",
 ]
 
 DEFAULT_STATS_TITLE = "モデル統計"
-
-#: 源泉トレース率の母数。``structure.missing_source`` が見る集合と同じにする
-#: (指摘の件数と率が食い違わないようにするため)。
-SOURCED_TYPES: tuple[type[Node], ...] = (
-    Goal,
-    Need,
-    FunctionalRequirement,
-    QualityRequirement,
-    Constraint,
-)
 
 #: 未達ノードを本文に並べる上限。超えた分は件数だけ出す。
 MISSING_SHOWN = 5
@@ -218,10 +207,10 @@ def _ratios(graph: RequirementGraph) -> tuple[Ratio, ...]:
             has_evidence,
         ),
         _ratio(
-            "source_traced",
-            "源泉トレース率 (has_source を持つ要求)",
-            graph.by_type(*SOURCED_TYPES),
-            lambda node: bool(graph.out_edges(node.id, ("has_source",))),
+            "source_referenced",
+            "外部参照率 (source を持つノード)",
+            graph.ordered_nodes(),
+            lambda node: bool(getattr(node, "source", [])),
         ),
     )
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..definition import (Constraint, FunctionalRequirement, Goal, Need, Node, QualityRequirement, Source)
+from ..definition import (Constraint, FunctionalRequirement, Goal, Need, Node, QualityRequirement)
 from ..core.metamodel import TYPE_ORDER
 from ..definition.nodes import STATUS_RANK
 
@@ -15,7 +15,6 @@ _MERMAID_SHAPE: dict[type[Node], tuple[str, str]] = {
     FunctionalRequirement: ("[", "]"),
     QualityRequirement: ("[", "]"),
     Constraint: ("[[", "]]"),
-    Source: ("[(", ")]"),
 }
 
 #: 型 → (塗り, 線) の配色。形状以外の見た目はここが唯一の出典。
@@ -25,7 +24,6 @@ _PALETTE: dict[str, tuple[str, str]] = {
     "FunctionalRequirement": ("#fff8e1", "#c9971c"),
     "QualityRequirement": ("#f3e8ff", "#7e57c2"),
     "Constraint": ("#fdecea", "#b94a48"),
-    "Source": ("#ffffff", "#999999"),
 }
 
 #: ダークテーマ用の (塗り, 線)。文字色 ``#e6edf3`` と淡色のライト用塗りを
@@ -36,7 +34,6 @@ _DARK_PALETTE: dict[str, tuple[str, str]] = {
     "FunctionalRequirement": ("#342b12", "#e3b341"),
     "QualityRequirement": ("#2b1d3f", "#bc8cff"),
     "Constraint": ("#3b1f24", "#ff7b72"),
-    "Source": ("#20262e", "#9198a1"),
 }
 
 _MERMAID_CLASSDEF = {
@@ -51,7 +48,6 @@ _SVG_SHAPE: dict[type[Node], str] = {
     FunctionalRequirement: "round-rectangle",
     QualityRequirement: "round-rectangle",
     Constraint: "cut-rectangle",
-    Source: "tag",
 }
 
 #: SVG の形状 → ラベルを内側に収めるための外形の係数。
@@ -122,13 +118,9 @@ _DOT_SHAPE: dict[type[Node], str] = {
     FunctionalRequirement: "box",
     QualityRequirement: "box",
     Constraint: "note",
-    Source: "cylinder",
 }
 
-_EDGE_STYLE_MERMAID = {
-    "has_source": "-.->",
-    "part_of": "-.->",
-}
+_EDGE_STYLE_MERMAID: dict[str, str] = {}
 
 
 def _fit_of(shape: str) -> dict[str, float]:

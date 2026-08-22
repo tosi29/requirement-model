@@ -17,7 +17,8 @@ __all__ = ["Edge", "RequirementGraph", "SCHEMA_VERSION", "LOCATION_KEY"]
 
 #: 2: ノードごとの出所 (location) を正規化 JSON に含めるようになった。
 #: 3: 全ノードが suppress (指摘の抑制) を持つようになった。
-SCHEMA_VERSION = 3
+#: 4: Source ノードと has_source/part_of を廃止し、外部参照を Reference 値にした。
+SCHEMA_VERSION = 4
 
 #: 正規化 JSON でノードの出所を入れる鍵。ノードの属性ではなくメタ情報である。
 LOCATION_KEY = "location"

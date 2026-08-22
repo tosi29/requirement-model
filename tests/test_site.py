@@ -29,9 +29,9 @@ SAMPLE = str(Path(__file__).resolve().parents[1] / "examples" / "sample.py")
 
 def chain():
     s = source("S-1")
-    n = need("Need-1", has_source=[s])
-    g = goal("Goal-1", motivates=[n], has_source=[s])
-    f = fr("FR-1", satisfies=[n], has_source=[s])
+    n = need("Need-1", source=[s])
+    g = goal("Goal-1", motivates=[n], source=[s])
+    f = fr("FR-1", satisfies=[n], source=[s])
     return build(s, n, g, f)
 
 
@@ -49,12 +49,12 @@ def test_site_data_contains_graph_findings_and_render_meta():
 
     assert data["title"] == "題名"
     assert data["generated_from"] == ["a.py"]
-    assert {n["id"] for n in data["nodes"]} == {"S-1", "Need-1", "Goal-1", "FR-1"}
+    assert {n["id"] for n in data["nodes"]} == {"Need-1", "Goal-1", "FR-1"}
     assert {"source": "FR-1", "name": "satisfies", "target": "Need-1"} in data["edges"]
-    assert data["stats"]["nodes"] == 4
+    assert data["stats"]["nodes"] == 3
     assert data["meta"]["types"]["Goal"]["shape"] == "hexagon"
     assert data["meta"]["types"]["Goal"]["fill"].startswith("#")
-    assert "has_source" in data["meta"]["dashed_edges"]
+    assert data["meta"]["dashed_edges"] == []
     assert set(data["meta"]["impact_colors"]) == {
         "selected",
         "upstream",
@@ -73,8 +73,7 @@ def test_site_data_contains_graph_findings_and_render_meta():
         "verified": 3,
     }
     # ページ側が「このグラフに現れうるエッジ」を CLI と同じ手順で数えるための材料。
-    assert data["edge_names_by_type"]["Goal"] == ["has_source", "refines", "motivates"]
-    assert data["edge_names_by_type"]["Source"] == ["part_of"]
+    assert data["edge_names_by_type"]["Goal"] == ["refines", "motivates"]
 
 
 def test_render_meta_maps_status_to_a_line_style():
@@ -111,11 +110,8 @@ def test_quality_requirement_and_constraint_use_semantic_palette():
     assert types["QualityRequirement"]["stroke"] == "#7e57c2"
     assert types["Constraint"]["fill"] == "#fdecea"
     assert types["Constraint"]["stroke"] == "#b94a48"
-    assert types["Source"]["fill"] == "#ffffff"
-    assert types["Source"]["stroke"] == "#999999"
     assert types["QualityRequirement"]["dark_fill"] == "#2b1d3f"
     assert types["Constraint"]["dark_fill"] == "#3b1f24"
-    assert types["Source"]["dark_fill"] == "#20262e"
     assert types["Constraint"]["stroke"] != meta["impact_colors"]["selected"]
 
 
@@ -182,8 +178,8 @@ def test_site_data_carries_status_of_every_node():
     """status フィルタの材料はノードにそのまま入っている。"""
     graph = build(
         source("S-1"),
-        need("Need-1", status="approved", has_source=[source("S-1")]),
-        fr("FR-1", status="verified", has_source=[source("S-1")]),
+        need("Need-1", status="approved", source=[source("S-1")]),
+        fr("FR-1", status="verified", source=[source("S-1")]),
     )
     data = site_data(graph, FindingList(), "題名", ["a.py"])
     by_id = {node["id"]: node for node in data["nodes"]}
@@ -362,7 +358,7 @@ def test_build_site_writes_page_and_raw_outputs(tmp_path: Path):
         assert placeholder not in html
     for asset in SITE_ASSETS:
         assert f'<script src="{asset.url}"></script>' in html
-    assert embedded_data(html)["stats"]["nodes"] == 4
+    assert embedded_data(html)["stats"]["nodes"] == 3
     assert json.loads((tmp_path / "model.json").read_text(encoding="utf-8"))["nodes"]
 
 
@@ -448,7 +444,7 @@ def test_suppressed_findings_are_dropped_but_counted(tmp_path: Path):
         s,
         qr(
             "QR-1",
-            has_source=[s],
+            source=[s],
             suppress=[("structure.orphan_qr", "この版では張らない")],
         ),
     )
@@ -469,16 +465,16 @@ def test_site_command_applies_waivers(tmp_path: Path, capsys):
         'QualityRequirement(id="QR-1", text="5 秒以内とすること",\n'
         '                   acceptance_criteria=["5.0 秒以下"],\n'
         '                   suppress=[("structure.orphan_qr", "この版では張らない"),\n'
-        '                             ("structure.missing_source", "源泉は次版で書く")])\n',
+        '                             ])\n',
         encoding="utf-8",
     )
     output = tmp_path / "site"
     assert main(["site", str(definition), "-o", str(output)]) == 0
-    assert "(抑制 2 件)" in capsys.readouterr().err
+    assert "(抑制 1 件)" in capsys.readouterr().err
 
     data = embedded_data((output / "index.html").read_text(encoding="utf-8"))
     assert data["findings"] == []
-    assert data["stats"]["suppressed"] == 2
+    assert data["stats"]["suppressed"] == 1
 
 
 def test_libraries_can_be_pointed_at_local_copies(tmp_path: Path):
@@ -506,7 +502,7 @@ def test_site_command(tmp_path: Path, capsys):
 
     html = (output / "index.html").read_text(encoding="utf-8")
     data = embedded_data(html)
-    assert data["stats"]["nodes"] == 21
+    assert data["stats"]["nodes"] == 14
     assert data["generated_from"] == [SAMPLE]
     assert data["findings"] == []
 
@@ -529,7 +525,6 @@ def test_render_meta_carries_the_mermaid_shape_of_every_type():
     types = render_meta()["types"]
 
     assert types["Goal"]["mermaid"] == {"open": "{{", "close": "}}"}
-    assert types["Source"]["mermaid"] == {"open": "[(", "close": ")]"}
     assert all(entry["mermaid"]["open"] and entry["mermaid"]["close"] for entry in types.values())
 
 

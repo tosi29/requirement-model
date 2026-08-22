@@ -1,8 +1,4 @@
-"""影響部分グラフの抽出とテキスト化 (LLM コンテキスト生成)。
-
-機械が網羅性を担保し、解釈は LLM と人間に委ねる。ここでは意味判断を一切せず、
-到達可能性で選んだノードの自然言語をそのまま並べる。
-"""
+"""影響部分グラフの抽出とテキスト化 (LLM コンテキスト生成)。"""
 
 from __future__ import annotations
 
@@ -10,25 +6,20 @@ from typing import Iterable, Sequence
 
 from ..core.graph import RequirementGraph
 from ..core.metamodel import edge_specs_for
-from ..core.projection import DEFAULT_GRAPH_EDGE_NAMES, SOURCE_EDGE_NAMES
-from ..definition import Source
+from ..core.projection import DEFAULT_GRAPH_EDGE_NAMES
+from ..definition import Reference
 
-__all__ = ["impact_set", "explain_text", "source_label", "subgraph_edges", "traversed_edges"]
+__all__ = ["impact_set", "explain_text", "subgraph_edges", "traversed_edges"]
 
 
 def traversed_edges(
     edge_names: Iterable[str] | None, include_sources: bool
 ) -> list[str] | None:
-    """実際に辿るエッジ種別。``None`` は「全種別」。
-
-    ``edge_names`` (``--edges``) は書き手の明示指定なのでそのまま通す。指定が
-    無いときだけ、源泉エッジを既定で外す (理由は ``core.projection.SOURCE_EDGE_NAMES``)。
-    源泉を辿らなければ Source ノードは要求から到達できなくなるので、
-    ノード側を落とす処理は要らない。
-    """
+    """実際に辿るエッジ種別。``None`` は「全種別」。"""
+    _ = include_sources
     if edge_names is not None:
         return list(edge_names)
-    return None if include_sources else list(DEFAULT_GRAPH_EDGE_NAMES)
+    return list(DEFAULT_GRAPH_EDGE_NAMES)
 
 
 def impact_set(
@@ -39,11 +30,7 @@ def impact_set(
     undirected: bool = False,
     include_sources: bool = False,
 ) -> tuple[set[str], set[str], set[str]]:
-    """(上流, 下流, 全体) を返す。全体には対象ノード自身を含む。
-
-    undirected=True のときは向きを無視して集め、全件を「下流」側に入れる
-    (呼び出し側は 1 つの「関連ノード」ブロックとして扱う)。
-    """
+    """(上流, 下流, 全体) を返す。全体には対象ノード自身を含む。"""
     names = traversed_edges(edge_names, include_sources)
     known = set(targets) & set(graph.nodes)
 
@@ -73,53 +60,25 @@ def subgraph_edges(graph: RequirementGraph, node_ids: set[str]) -> list:
     ]
 
 
-def source_label(graph: RequirementGraph, source_id: str) -> str:
-    """源泉 1 件の表示。``SRC-A (本文) [位置] < 親の源泉`` の形。
-
-    源泉はノードとして図に出さないので (``core.projection.SOURCE_EDGE_NAMES``)、引用元を辿る
-    ``part_of`` の鎖もここで畳んで 1 行に収める。閉路があっても止まるように
-    通過済みを持つ (``structure.part_of_cycle`` が別途エラーにする)。
-    """
-    parts: list[str] = []
-    seen: set[str] = set()
-    current: str | None = source_id
-    while current is not None and current not in seen:
-        seen.add(current)
-        node = graph.nodes.get(current)
-        if node is None:
-            parts.append(current)
-            break
-        label = f"{node.id} ({node.text})"
-        locator = getattr(node, "locator", None)
-        if locator:
-            label += f" [{locator}]"
-        parts.append(label)
-        parents = graph.out_edges(current, ("part_of",))
-        current = parents[0].target if parents else None
-    return " < ".join(parts)
+def _reference_line(label: str, reference: Reference) -> list[str]:
+    lines = [f"    {label}: {reference.title} <{reference.url}>"]
+    if reference.note:
+        lines.append(f"      note: {reference.note}")
+    return lines
 
 
-def _describe(
-    graph: RequirementGraph, node_id: str, inline_sources: bool = True
-) -> list[str]:
+def _describe(graph: RequirementGraph, node_id: str) -> list[str]:
     node = graph.nodes[node_id]
     type_name = type(node).__name__
-    head = f"- [{type_name}] {node.id}: {node.text}"
-    lines = [head]
-    attrs = [f"status={node.status}"]
-    if isinstance(node, Source):
-        attrs.append(f"kind={node.kind}")
-    lines.append(f"    ({', '.join(attrs)})")
-    for item in getattr(node, "evidence", []) or []:
-        lines.append(f"    根拠: {item}")
+    lines = [f"- [{type_name}] {node.id}: {node.text}", f"    (status={node.status})"]
+    for reference in getattr(node, "source", []) or []:
+        lines.extend(_reference_line("Source", reference))
+    for reference in getattr(node, "realized_by", []) or []:
+        lines.extend(_reference_line("Realized by", reference))
+    for reference in getattr(node, "evidence", []) or []:
+        lines.extend(_reference_line("Evidence", reference))
     for criterion in getattr(node, "acceptance_criteria", []) or []:
         lines.append(f"    受け入れ基準: {criterion}")
-    #: 源泉は辿らない代わりに、参照元ノードの属性として書き出す。図から外しても
-    #: 「この要求がどこから来たか」は LLM に渡る文脈に残る。源泉を辿った
-    #: ときは Source 自身がブロックとして出るので、こちらは畳む。
-    if inline_sources:
-        for edge in graph.out_edges(node.id, ("has_source",)):
-            lines.append(f"    源泉: {source_label(graph, edge.target)}")
     return lines
 
 
@@ -136,8 +95,6 @@ def explain_text(
     ancestors, descendants, whole = impact_set(
         graph, targets, edge_names, depth, undirected, include_sources
     )
-    #: 源泉を辿ったときは Source 自身がブロックで出るので、畳んだ表示はしない。
-    inline_sources = not include_sources
 
     lines: list[str] = []
     lines.append("# 影響部分グラフ: " + ", ".join(targets))
@@ -159,11 +116,6 @@ def explain_text(
         )
     if edge_names is not None:
         lines.append("エッジ種別フィルタ: " + ", ".join(edge_names))
-    elif not include_sources:
-        lines.append(
-            "源泉エッジ (" + ", ".join(sorted(SOURCE_EDGE_NAMES)) + ") は辿っていない。"
-            "源泉は各ノードの「源泉:」行に畳んである"
-        )
     if depth is not None:
         lines.append(f"探索深さ: {depth}")
 
@@ -176,7 +128,7 @@ def explain_text(
         lines.append("")
         lines.append(f"## {title} ({len(sorted_ids)} 件)")
         for node_id in sorted_ids:
-            lines.extend(_describe(graph, node_id, inline_sources))
+            lines.extend(_describe(graph, node_id))
 
     block("対象ノード", [t for t in targets if t in graph.nodes])
     if undirected:
@@ -194,14 +146,10 @@ def explain_text(
         ):
             lines.append(f"- {edge.source} --{edge.name}--> {edge.target}")
 
-    #: 既定で外した源泉エッジは「現れなかった」に混ぜない。除外は上で明記して
-    #: あり、両方に出すと「モデルに無い」のか「辿っていない」のか読み分けられない。
-    #: --edges で明示されたときは書き手の指定なので、この畳み込みはしない。
-    hidden = frozenset() if (include_sources or edge_names is not None) else SOURCE_EDGE_NAMES
     unused = [
         name
         for name in _all_edge_names(graph)
-        if name not in hidden and not any(e.name == name for e in edges)
+        if not any(e.name == name for e in edges)
     ]
     if unused:
         lines.append("")

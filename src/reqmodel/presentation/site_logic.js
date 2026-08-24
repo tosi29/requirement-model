@@ -291,9 +291,12 @@ const countBy = (nodes, keyOf) => {
 
 /** 利用者向けに表示するフィールド名。内部フィールド名は変えない。 */
 export const FIELD_LABELS = Object.freeze({
+  text: "本文",
   source: "出典",
   realized_by: "実現手段",
   evidence: "証跡",
+  acceptance_criteria: "受け入れ基準",
+  suppress: "指摘の抑制",
   status: "ステータス",
 });
 
@@ -635,6 +638,211 @@ export function edgeItems(view, id) {
     out: view.edges.filter((edge) => edge.source === id).map((edge) => item(edge, "out")),
     in: view.edges.filter((edge) => edge.target === id).map((edge) => item(edge, "in")),
   };
+}
+
+// --- 編集と semantic diff -------------------------------------------------
+
+/** JSON として埋め込まれた base graph から、参照を共有しない draft を作る。 */
+export function cloneSiteData(data) {
+  return JSON.parse(JSON.stringify(data));
+}
+
+/** 選択したノード型で編集できるフィールド。定義は Python 側のメタモデル由来。 */
+export function editorFields(data, node) {
+  return (((data || {}).editor || {}).fields_by_type || {})[node.type] || [];
+}
+
+/** relation フィールドに接続可能な既存ノード。自己参照は候補に出さない。 */
+export function relationCandidates(data, node, spec) {
+  const allowed = new Set(spec.target_types || []);
+  return (data.nodes || []).filter(
+    (candidate) => candidate.id !== node.id && allowed.has(candidate.type),
+  );
+}
+
+/** source から target へ張れる relation フィールド。型から一意に決まる。 */
+export function relationSpecForTarget(data, source, target) {
+  if (!source || !target || source.id === target.id) return null;
+  return editorFields(data, source).find(
+    (spec) => spec.kind === "relation" &&
+      (spec.target_types || []).includes(target.type),
+  ) || null;
+}
+
+const parseJsonList = (raw, label) => {
+  let value;
+  try {
+    value = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return { error: `${label} は JSON 配列で入力する` };
+  }
+  return Array.isArray(value) ? { value } : { error: `${label} は JSON 配列で入力する` };
+};
+
+/**
+ * 編集欄の値を正規化し、ブラウザで判定できるフィールド型だけを検査する。
+ * 意味上の validator は再実装せず、最終的な正は req validate とする。
+ */
+export function parseEditorValue(data, node, spec, raw) {
+  if (spec.kind === "text") {
+    const value = String(raw);
+    return value.trim() ? { value } : { error: `${spec.name} は空にできない` };
+  }
+  if (spec.kind === "choice") {
+    return (spec.choices || []).includes(raw)
+      ? { value: raw }
+      : { error: `${spec.name} の値が不正` };
+  }
+  if (spec.kind === "relation") {
+    if (!Array.isArray(raw)) return { error: `${spec.name} はノードのリストで指定する` };
+    const candidates = new Set(relationCandidates(data, node, spec).map((item) => item.id));
+    if (raw.some((id) => typeof id !== "string" || !candidates.has(id))) {
+      return { error: `${spec.name} に接続できないノードが含まれている` };
+    }
+    return { value: [...new Set(raw)] };
+  }
+
+  const parsed = parseJsonList(raw, spec.name);
+  if (parsed.error) return parsed;
+  const value = parsed.value;
+  if (spec.kind === "string_list" && value.some((item) => typeof item !== "string")) {
+    return { error: `${spec.name} の各要素は文字列にする` };
+  }
+  if (spec.kind === "reference_list") {
+    const valid = value.every((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+      if (Object.keys(item).some((key) => !["title", "url", "note"].includes(key))) return false;
+      if (typeof item.title !== "string" || !item.title.trim()) return false;
+      if (typeof item.url !== "string" || !item.url.trim()) return false;
+      return item.note === undefined || item.note === null ||
+        (typeof item.note === "string" && Boolean(item.note.trim()));
+    });
+    if (!valid) return { error: `${spec.name} は title / url / 任意の note を持つ参照の配列にする` };
+  }
+  if (spec.kind === "pair_list") {
+    const valid = value.every(
+      (item) => Array.isArray(item) && item.length === 2 && item.every((part) => typeof part === "string"),
+    );
+    if (!valid) return { error: `${spec.name} は文字列 2 要素の組の配列にする` };
+  }
+  return { value };
+}
+
+/** relation フィールドから表示用 edge 配列を再構築する。 */
+function rebuildDraftEdges(data) {
+  const existing = new Set(data.nodes.map((node) => node.id));
+  const edges = [];
+  for (const node of data.nodes) {
+    for (const spec of editorFields(data, node)) {
+      if (spec.kind !== "relation") continue;
+      for (const target of node[spec.name] || []) {
+        if (existing.has(target)) edges.push({ source: node.id, name: spec.name, target });
+      }
+    }
+  }
+  data.edges = edges;
+  if (data.stats) data.stats.edges = edges.length;
+}
+
+/** 1 フィールドだけを変更した新しい draft を返す。入力 data は変更しない。 */
+export function updateDraftField(data, nodeId, field, value) {
+  const draft = cloneSiteData(data);
+  const node = draft.nodes.find((item) => item.id === nodeId);
+  if (!node) return draft;
+  node[field] = value;
+  rebuildDraftEdges(draft);
+  return draft;
+}
+
+/** キャンバス上で relation を追加する。既存の線は重複させない。 */
+export function addDraftRelation(data, sourceId, targetId) {
+  const source = data.nodes.find((node) => node.id === sourceId);
+  const target = data.nodes.find((node) => node.id === targetId);
+  const spec = relationSpecForTarget(data, source, target);
+  if (!spec) return data;
+  const current = source[spec.name] || [];
+  if (current.includes(targetId)) return data;
+  return updateDraftField(data, sourceId, spec.name, [...current, targetId]);
+}
+
+/** 選択した線に対応する relation 値を削除する。 */
+export function removeDraftRelation(data, sourceId, field, targetId) {
+  const source = data.nodes.find((node) => node.id === sourceId);
+  const spec = source && editorFields(data, source).find(
+    (item) => item.kind === "relation" && item.name === field,
+  );
+  if (!spec) return data;
+  return updateDraftField(
+    data,
+    sourceId,
+    field,
+    (source[field] || []).filter((id) => id !== targetId),
+  );
+}
+
+const comparableNode = (node) => Object.fromEntries(
+  Object.entries(node).filter(([key]) => key !== "location"),
+);
+const sameValue = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+
+/** req plan / GraphDiff と同じく、出所を除外してノード・フィールド単位で比較する。 */
+export function semanticDiff(base, draft) {
+  const before = new Map(base.nodes.map((node) => [node.id, comparableNode(node)]));
+  const after = new Map(draft.nodes.map((node) => [node.id, comparableNode(node)]));
+  const changed = [];
+  for (const id of [...before.keys()].filter((item) => after.has(item)).sort()) {
+    const oldNode = before.get(id);
+    const newNode = after.get(id);
+    const fields = [...new Set([...Object.keys(oldNode), ...Object.keys(newNode)])]
+      .filter((field) => field !== "type" && !sameValue(oldNode[field], newNode[field]))
+      .sort()
+      .map((field) => ({ field, before: oldNode[field] ?? null, after: newNode[field] ?? null }));
+    if (fields.length) changed.push({ id, type: newNode.type, text: newNode.text, fields });
+  }
+  return { changed, count: changed.length };
+}
+
+function semanticValue(value) {
+  if (value === null || value === undefined) return "なし";
+  if (Array.isArray(value)) return `[${value.map(semanticValue).join(", ")}]`;
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+/** Clipboard にそのまま渡せる、req plan と用語を揃えた semantic diff。 */
+export function formatSemanticDiff(base, draft) {
+  const diff = semanticDiff(base, draft);
+  const lines = ["# 構造 diff (base → draft)", ""];
+  if (!diff.count) return `${lines.join("\n")}グラフに構造上の変更はない。\n`;
+  lines.push(`追加 0 / 削除 0 / 変更 ${diff.count} / 型変更 0`, "");
+  for (const node of diff.changed) {
+    lines.push(`~ [${node.type}] ${node.id} ${node.text}`);
+    for (const change of node.fields) {
+      lines.push(`  ${change.field}:`);
+      lines.push(`- ${semanticValue(change.before)}`);
+      lines.push(`+ ${semanticValue(change.after)}`, "");
+    }
+  }
+  return `${lines.join("\n").trimEnd()}\n`;
+}
+
+/** semantic diff を埋めた GitHub の新規 Issue 編集画面 URL。 */
+export function githubIssueUrl(data, base, draft) {
+  const repoUrl = (((data || {}).repo || {}).url || "").replace(/\/+$/, "");
+  if (!repoUrl) return null;
+  const diff = semanticDiff(base, draft);
+  if (!diff.count) return null;
+  const title = `要求モデルの変更案 (${diff.count}件)`;
+  const body = [
+    "## 変更案",
+    "",
+    "```diff",
+    formatSemanticDiff(base, draft).trimEnd(),
+    "```",
+    "",
+    "> Web 編集モードで作成した semantic diff。定義ファイルへ反映後、req validate で検証する。",
+  ].join("\n");
+  return `${repoUrl}/issues/new?${new URLSearchParams({ title, body })}`;
 }
 
 /**

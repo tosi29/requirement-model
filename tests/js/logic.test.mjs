@@ -11,22 +11,27 @@ import {
   LABEL_WRAP_WIDTH,
   TABLE_COLUMNS,
   ALL_SEVERITIES,
+  addDraftRelation,
   activeEdgeNames,
   allEdgeNames,
   bandDefs,
   bandId,
   bandedLayout,
+  cloneSiteData,
   createView,
   decodeHash,
   defaultState,
   edgeControl,
   edgeItems,
+  editorFields,
   encodeHash,
   escapeHtml,
   estimateTextWidth,
   explainCommand,
   fieldLabel,
   focusSet,
+  formatSemanticDiff,
+  githubIssueUrl,
   graphElements,
   graphSvg,
   groupFindings,
@@ -44,11 +49,16 @@ import {
   nodeContext,
   nodeSize,
   normalizeTheme,
+  parseEditorValue,
   reach,
   quadraticPath,
   quadraticPoint,
+  relationCandidates,
+  relationSpecForTarget,
+  removeDraftRelation,
   related,
   searchHits,
+  semanticDiff,
   severityTabs,
   sortRows,
   sourceUrl,
@@ -57,6 +67,7 @@ import {
   storableHash,
   tableRows,
   truncate,
+  updateDraftField,
   visibleBandKeys,
   wrapLabel,
 } from "../../src/reqmodel/presentation/site_logic.js";
@@ -75,7 +86,9 @@ test("利用者向けフィールド名は日本語ラベルへ変換する", ()
   assert.equal(fieldLabel("evidence"), "証跡");
   assert.equal(fieldLabel("status"), "ステータス");
   assert.equal(fieldLabel("id"), "id");
-  assert.deepEqual(Object.keys(FIELD_LABELS).sort(), ["evidence", "realized_by", "source", "status"]);
+  assert.deepEqual(Object.keys(FIELD_LABELS).sort(), [
+    "acceptance_criteria", "evidence", "realized_by", "source", "status", "suppress", "text",
+  ]);
 });
 
 test("表と凡例の status 見出しは日本語で表示する", () => {
@@ -137,6 +150,122 @@ test("statuses を渡さない state は絞り込み無し扱い", () => {
 
   assert.equal(view.nodes.length, 4);
   assert.equal(view.edges.length, 3);
+});
+
+// --- 編集と semantic diff -------------------------------------------------
+
+test("base と draft は参照を共有しない", () => {
+  const base = fixture();
+  const draft = cloneSiteData(base);
+  draft.nodes[0].text = "変更後";
+  draft.nodes[0].source[0].title = "変更した出典";
+
+  assert.equal(base.nodes[0].text, "経費精算を速くする");
+  assert.equal(base.nodes[0].source[0].title, "申請者となる一般社員");
+});
+
+test("編集フィールドと relation 候補はメタモデル由来の型制約に従う", () => {
+  const data = fixture();
+  const fr = data.nodes.find((node) => node.id === "FR-1");
+  const fields = editorFields(data, fr);
+  const satisfies = fields.find((field) => field.name === "satisfies");
+
+  assert.equal(fields.find((field) => field.name === "text").kind, "text");
+  assert.deepEqual(relationCandidates(data, fr, satisfies).map((node) => node.id), ["Need-1"]);
+  assert.deepEqual(parseEditorValue(data, fr, satisfies, ["Need-1"]), { value: ["Need-1"] });
+  assert.match(parseEditorValue(data, fr, satisfies, ["Goal-1"]).error, /接続できない/);
+});
+
+test("通常フィールドはブラウザで判定できる型だけを検査する", () => {
+  const data = fixture();
+  const fr = data.nodes.find((node) => node.id === "FR-1");
+  const fields = editorFields(data, fr);
+
+  assert.match(parseEditorValue(data, fr, fields.find((f) => f.name === "text"), "  ").error, /空/);
+  assert.deepEqual(
+    parseEditorValue(data, fr, fields.find((f) => f.name === "acceptance_criteria"), '["基準 A"]'),
+    { value: ["基準 A"] },
+  );
+  assert.match(
+    parseEditorValue(data, fr, fields.find((f) => f.name === "acceptance_criteria"), '[1]').error,
+    /文字列/,
+  );
+});
+
+test("relation の編集は draft のノードと edge を同時に更新する", () => {
+  const data = fixture();
+  const draft = updateDraftField(data, "FR-1", "satisfies", []);
+
+  assert.deepEqual(data.nodes.find((node) => node.id === "FR-1").satisfies, ["Need-1"]);
+  assert.deepEqual(draft.nodes.find((node) => node.id === "FR-1").satisfies, []);
+  assert.ok(!draft.edges.some((edge) => edge.source === "FR-1" && edge.name === "satisfies"));
+  assert.equal(draft.stats.edges, 2);
+});
+
+test("キャンバスの接続候補は source と target の型から relation を決める", () => {
+  const data = fixture();
+  const fr = data.nodes.find((node) => node.id === "FR-1");
+  const need = data.nodes.find((node) => node.id === "Need-1");
+  const goal = data.nodes.find((node) => node.id === "Goal-1");
+
+  assert.equal(relationSpecForTarget(data, fr, need).name, "satisfies");
+  assert.equal(relationSpecForTarget(data, fr, goal), null);
+  assert.equal(relationSpecForTarget(data, fr, fr), null);
+});
+
+test("キャンバスから relation を追加・削除しても base を変更しない", () => {
+  const data = fixture();
+  data.nodes.push({
+    type: "Need",
+    id: "Need-2",
+    text: "もう一つのニーズ",
+    status: "approved",
+    source: [],
+  });
+  data.stats.nodes += 1;
+
+  const added = addDraftRelation(data, "FR-1", "Need-2");
+  assert.deepEqual(data.nodes.find((node) => node.id === "FR-1").satisfies, ["Need-1"]);
+  assert.deepEqual(added.nodes.find((node) => node.id === "FR-1").satisfies, ["Need-1", "Need-2"]);
+  assert.ok(added.edges.some((edge) => edge.source === "FR-1" && edge.target === "Need-2"));
+  assert.equal(addDraftRelation(added, "FR-1", "Need-2"), added);
+
+  const removed = removeDraftRelation(added, "FR-1", "satisfies", "Need-1");
+  assert.deepEqual(removed.nodes.find((node) => node.id === "FR-1").satisfies, ["Need-2"]);
+  assert.ok(!removed.edges.some((edge) => edge.source === "FR-1" && edge.target === "Need-1"));
+});
+
+test("semantic diff は location を除外しフィールド単位で表示する", () => {
+  const base = fixture();
+  base.nodes[2].location = "before.py:10";
+  let draft = updateDraftField(base, "FR-1", "text", "領収書を自動で読み取ること");
+  draft = updateDraftField(draft, "FR-1", "status", "approved");
+  draft.nodes[2].location = "after.py:99";
+
+  const diff = semanticDiff(base, draft);
+  assert.equal(diff.count, 1);
+  assert.deepEqual(diff.changed[0].fields.map((field) => field.field), ["status", "text"]);
+  assert.equal(
+    formatSemanticDiff(base, draft),
+    "# 構造 diff (base → draft)\n\n" +
+      "追加 0 / 削除 0 / 変更 1 / 型変更 0\n\n" +
+      "~ [FunctionalRequirement] FR-1 領収書を自動で読み取ること\n" +
+      "  status:\n- proposed\n+ approved\n\n" +
+      "  text:\n- 領収書画像から金額を抽出すること\n+ 領収書を自動で読み取ること\n",
+  );
+});
+
+test("GitHub Issue URL は title と semantic diff 本文を編集画面へ渡す", () => {
+  const base = fixture({ repo: { url: "https://github.com/acme/requirements/" } });
+  const draft = updateDraftField(base, "FR-1", "text", "金額を自動抽出すること");
+  const url = new URL(githubIssueUrl(draft, base, draft));
+
+  assert.equal(url.origin + url.pathname, "https://github.com/acme/requirements/issues/new");
+  assert.equal(url.searchParams.get("title"), "要求モデルの変更案 (1件)");
+  assert.match(url.searchParams.get("body"), /```diff\n# 構造 diff/);
+  assert.match(url.searchParams.get("body"), /金額を自動抽出すること/);
+  assert.equal(githubIssueUrl(fixture(), base, draft), null);
+  assert.equal(githubIssueUrl(base, base, base), null);
 });
 
 test("エッジ種別を外すと、そのエッジだけが消える", () => {

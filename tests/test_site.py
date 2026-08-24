@@ -74,6 +74,18 @@ def test_site_data_contains_graph_findings_and_render_meta():
     }
     # ページ側が「このグラフに現れうるエッジ」を CLI と同じ手順で数えるための材料。
     assert data["edge_names_by_type"]["Goal"] == ["refines", "motivates"]
+    editor = data["editor"]["fields_by_type"]
+    assert {field["name"] for field in editor["FunctionalRequirement"]} >= {
+        "text", "status", "source", "satisfies", "refines", "acceptance_criteria",
+    }
+    satisfies = next(
+        field for field in editor["FunctionalRequirement"] if field["name"] == "satisfies"
+    )
+    assert satisfies == {
+        "name": "satisfies",
+        "kind": "relation",
+        "target_types": ["Need"],
+    }
 
 
 def test_render_meta_maps_status_to_a_line_style():
@@ -302,7 +314,9 @@ def test_svg_edges_keep_labels_line_types_and_use_final_node_positions(tmp_path:
     assert 'const label = svgEl("text", { class: "edge-label"' in html
     assert "#graph .dashed .edge-line { stroke-dasharray: 6 4; }" in html
     assert "edgeControl(source, target, state.direction, offset)" in html
-    assert "setAttrs(edge.path, { d: quadraticPath(from, control, to) })" in html
+    assert "const path = quadraticPath(from, control, to)" in html
+    assert "setAttrs(edge.path, { d: path })" in html
+    assert "setAttrs(edge.hit, { d: path })" in html
     assert "quadraticPoint(from, control, to)" in html
 
 
@@ -411,6 +425,31 @@ def test_page_has_both_the_graph_and_the_table_view(tmp_path: Path):
 
     for element_id in ("tab-graph", "tab-table", "graph-frame", "table-frame", "node-table"):
         assert f'id="{element_id}"' in html
+
+
+def test_page_has_the_static_semantic_diff_editor(tmp_path: Path):
+    index = build_site(chain(), FindingList(), tmp_path)
+    html = index.read_text(encoding="utf-8")
+
+    for element_id in (
+        "edit-toggle",
+        "edit-status",
+        "review-changes",
+        "discard-changes",
+        "diff-dialog",
+        "diff-output",
+        "copy-diff",
+        "canvas-edit-hint",
+        "create-issue",
+        "issue-link-note",
+    ):
+        assert f'id="{element_id}"' in html
+    assert "BASE_DATA" in html
+    assert "formatSemanticDiff(BASE_DATA, DATA)" in html
+    assert "connector-handle" in html
+    assert "addDraftRelation(DATA, sourceId, targetId)" in html
+    assert "removeDraftRelation(DATA, edge.source, edge.name, edge.target)" in html
+    assert "githubIssueUrl(DATA, BASE_DATA, DATA)" in html
 
 
 def test_page_puts_the_view_state_in_the_url(tmp_path: Path):

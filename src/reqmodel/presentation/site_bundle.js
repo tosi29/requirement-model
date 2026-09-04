@@ -3,11 +3,14 @@
   function truncate(text, limit = 42) {
     return text.length > limit ? text.slice(0, limit - 1) + "\u2026" : text;
   }
-  function escapeHtml(text) {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-  function escapeAttr(text) {
-    return escapeHtml(String(text)).replace(/"/g, "&quot;");
+  function safeHref(value) {
+    if (!value) return null;
+    try {
+      const url = new URL(String(value));
+      return ["https:", "http:", "about:"].includes(url.protocol) ? String(value) : null;
+    } catch {
+      return null;
+    }
   }
   var LABEL_FONT = {
     size: 10,
@@ -1133,6 +1136,18 @@ ${text}`;
     }
     return element;
   }
+  function htmlEl(name, attrs = {}, ...children) {
+    const element = document.createElement(name);
+    for (const [key, value] of Object.entries(attrs)) {
+      if (value === void 0 || value === null || value === false) continue;
+      if (key === "class") element.className = String(value);
+      else if (key === "checked") element.checked = Boolean(value);
+      else if (key === "value") element.value = String(value);
+      else element.setAttribute(key, String(value));
+    }
+    element.append(...children.filter((child) => child !== void 0 && child !== null));
+    return element;
+  }
   function setAttrs(element, attrs) {
     for (const [key, value] of Object.entries(attrs)) {
       if (value === void 0 || value === null || value === "") element.removeAttribute(key);
@@ -1228,7 +1243,15 @@ ${text}`;
   }
   function initGraph() {
     if (!dagre) {
-      graphEl.innerHTML = '<p class="empty">\u63CF\u753B\u30E9\u30A4\u30D6\u30E9\u30EA (dagre) \u3092\u8AAD\u307F\u8FBC\u3081\u306A\u304B\u3063\u305F\u3002\u56F3\u306E\u5143\u30C7\u30FC\u30BF\u306F <a href="graph.mmd">graph.mmd</a> / <a href="graph.dot">graph.dot</a> \u306B\u3042\u308B\u3002</p>';
+      graphEl.replaceChildren(htmlEl(
+        "p",
+        { class: "empty" },
+        "\u63CF\u753B\u30E9\u30A4\u30D6\u30E9\u30EA (dagre) \u3092\u8AAD\u307F\u8FBC\u3081\u306A\u304B\u3063\u305F\u3002\u56F3\u306E\u5143\u30C7\u30FC\u30BF\u306F ",
+        htmlEl("a", { href: "graph.mmd" }, "graph.mmd"),
+        " / ",
+        htmlEl("a", { href: "graph.dot" }, "graph.dot"),
+        " \u306B\u3042\u308B\u3002"
+      ));
       return;
     }
     graph = graphElements(DATA, labelMeasurer());
@@ -1616,78 +1639,101 @@ ${text}`;
     pan = { x: cx - mx * zoom, y: cy - my * zoom };
     setTransform();
   }
-  function pushReferenceSection(rows, title, references) {
+  function appendReferenceSection(panel, title, references) {
     if (!Array.isArray(references) || references.length === 0) return;
-    rows.push(`<h2>${escapeHtml(title)}</h2><ul class="sources">`);
+    panel.append(htmlEl("h2", {}, title));
+    const list = htmlEl("ul", { class: "sources" });
     for (const reference of references) {
-      const url = reference.url ? ` <a href="${escapeAttr(reference.url)}" target="_blank" rel="noreferrer">${escapeHtml(reference.url)}</a>` : "";
-      const note = reference.note ? `<span class="text">${escapeHtml(reference.note)}</span>` : "";
-      rows.push(
-        `<li><span class="id">${escapeHtml(reference.title || "(untitled)")}</span>${url}${note}</li>`
-      );
+      const item = htmlEl("li", {}, htmlEl("span", { class: "id" }, reference.title || "(untitled)"));
+      const href = safeHref(reference.url);
+      if (href) {
+        item.append(" ", htmlEl("a", { href, target: "_blank", rel: "noopener noreferrer" }, reference.url));
+      } else if (reference.url) {
+        item.append(" ", reference.url);
+      }
+      if (reference.note) item.append(htmlEl("span", { class: "text" }, reference.note));
+      list.append(item);
     }
-    rows.push("</ul>");
+    panel.append(list);
+  }
+  function appendTerm(list, term, value, className = null) {
+    list.append(htmlEl("dt", {}, term), htmlEl("dd", className ? { class: className } : {}, value));
   }
   function renderDetail() {
     const panel = document.getElementById("detail");
+    panel.replaceChildren();
     if (!state.selected || !view.byId.has(state.selected)) {
-      panel.innerHTML = '<p class="empty">\u30B0\u30E9\u30D5\u306E\u30CE\u30FC\u30C9\u3092\u30AF\u30EA\u30C3\u30AF\u3059\u308B\u3068\u3001\u672C\u6587\u30FB\u6839\u62E0\u30FB\u5F71\u97FF\u7BC4\u56F2\u3092\u8868\u793A\u3059\u308B\u3002</p>';
+      panel.append(htmlEl("p", { class: "empty" }, "\u30B0\u30E9\u30D5\u306E\u30CE\u30FC\u30C9\u3092\u30AF\u30EA\u30C3\u30AF\u3059\u308B\u3068\u3001\u672C\u6587\u30FB\u6839\u62E0\u30FB\u5F71\u97FF\u7BC4\u56F2\u3092\u8868\u793A\u3059\u308B\u3002"));
       return;
     }
     const node = view.byId.get(state.selected);
     const impact = impactSets(view, node.id);
-    const rows = [];
-    rows.push(`<h3>${node.id} <span class="node-btn type">[${node.type}]</span></h3>`);
-    rows.push(`<p class="text">${escapeHtml(node.text)}</p>`);
-    rows.push("<dl>");
-    rows.push(`<dt>${fieldLabel("status")}</dt><dd>${node.status}</dd>`);
-    if (node.kind) rows.push(`<dt>kind</dt><dd>${node.kind}</dd>`);
-    if (node.location) rows.push(`<dt>\u51FA\u6240</dt><dd class="loc">${locationHtml(node.location)}</dd>`);
-    if (impact.undirected) {
-      rows.push(`<dt>\u95A2\u9023</dt><dd>${impact.downstream.size} \u4EF6</dd>`);
-    } else {
-      rows.push(`<dt>\u4E0A\u6D41</dt><dd>${impact.upstream.size} \u4EF6</dd>`);
-      rows.push(`<dt>\u4E0B\u6D41</dt><dd>${impact.downstream.size} \u4EF6</dd>`);
+    panel.append(
+      htmlEl("h3", {}, node.id, " ", htmlEl("span", { class: "node-btn type" }, `[${node.type}]`)),
+      htmlEl("p", { class: "text" }, node.text)
+    );
+    const details = htmlEl("dl");
+    appendTerm(details, fieldLabel("status"), node.status);
+    if (node.kind) appendTerm(details, "kind", node.kind);
+    if (node.location) appendTerm(details, "\u51FA\u6240", locationElement(node.location), "loc");
+    if (impact.undirected) appendTerm(details, "\u95A2\u9023", `${impact.downstream.size} \u4EF6`);
+    else {
+      appendTerm(details, "\u4E0A\u6D41", `${impact.upstream.size} \u4EF6`);
+      appendTerm(details, "\u4E0B\u6D41", `${impact.downstream.size} \u4EF6`);
     }
-    rows.push("</dl>");
-    pushReferenceSection(rows, fieldLabel("source"), node.source);
-    pushReferenceSection(rows, fieldLabel("realized_by"), node.realized_by);
-    pushReferenceSection(rows, fieldLabel("evidence"), node.evidence);
+    panel.append(details);
+    appendReferenceSection(panel, fieldLabel("source"), node.source);
+    appendReferenceSection(panel, fieldLabel("realized_by"), node.realized_by);
+    appendReferenceSection(panel, fieldLabel("evidence"), node.evidence);
     if ((node.acceptance_criteria || []).length) {
-      rows.push("<h2>\u53D7\u3051\u5165\u308C\u57FA\u6E96</h2><ul>");
-      for (const criterion of node.acceptance_criteria) rows.push(`<li>${escapeHtml(criterion)}</li>`);
-      rows.push("</ul>");
+      panel.append(htmlEl("h2", {}, "\u53D7\u3051\u5165\u308C\u57FA\u6E96"));
+      panel.append(htmlEl("ul", {}, ...node.acceptance_criteria.map((criterion) => htmlEl("li", {}, criterion))));
     }
     if ((node.suppress || []).length) {
-      rows.push("<h2>\u6291\u5236\u4E2D\u306E\u6307\u6458</h2><ul>");
-      for (const [code, reason] of node.suppress) {
-        rows.push(`<li><code>${escapeHtml(code)}</code>: ${escapeHtml(reason)}</li>`);
-      }
-      rows.push("</ul>");
+      panel.append(htmlEl("h2", {}, "\u6291\u5236\u4E2D\u306E\u6307\u6458"));
+      panel.append(htmlEl("ul", {}, ...node.suppress.map(([code, reason]) => htmlEl("li", {}, htmlEl("code", {}, code), `: ${reason}`))));
     }
-    const edgeList = (items) => items.map(
-      (item) => `<li class="edge"><button class="node-btn" data-goto="${escapeAttr(item.id)}">
-          <span class="arrow">${escapeHtml(item.arrow)}</span> <span class="id">${escapeHtml(item.id)}</span>
-          <span class="type">${escapeHtml(item.type)}</span>
-          <span class="text">${escapeHtml(truncate(item.text, 40))}</span></button></li>`
-    ).join("");
+    const appendEdges = (title, items) => {
+      if (!items.length) return;
+      const list = htmlEl("ul", { class: "plain" });
+      for (const item of items) {
+        const button = htmlEl(
+          "button",
+          { class: "node-btn", "data-goto": item.id },
+          htmlEl("span", { class: "arrow" }, item.arrow),
+          " ",
+          htmlEl("span", { class: "id" }, item.id),
+          " ",
+          htmlEl("span", { class: "type" }, item.type),
+          " ",
+          htmlEl("span", { class: "text" }, truncate(item.text, 40))
+        );
+        list.append(htmlEl("li", { class: "edge" }, button));
+      }
+      panel.append(htmlEl("h2", {}, title), list);
+    };
     const links = edgeItems(view, node.id);
-    if (links.out.length) rows.push(`<h2>\u51FA\u308B\u30A8\u30C3\u30B8</h2><ul class="plain">${edgeList(links.out)}</ul>`);
-    if (links.in.length) rows.push(`<h2>\u5165\u308B\u30A8\u30C3\u30B8</h2><ul class="plain">${edgeList(links.in)}</ul>`);
+    appendEdges("\u51FA\u308B\u30A8\u30C3\u30B8", links.out);
+    appendEdges("\u5165\u308B\u30A8\u30C3\u30B8", links.in);
     const nodeFindings = DATA.findings.filter((finding) => finding.node_id === node.id);
     if (nodeFindings.length) {
-      rows.push('<h2 id="node-findings">\u3053\u306E\u30CE\u30FC\u30C9\u3078\u306E\u6307\u6458</h2>');
-      for (const finding of nodeFindings) rows.push(findingHtml(finding, false));
+      panel.append(htmlEl("h2", { id: "node-findings" }, "\u3053\u306E\u30CE\u30FC\u30C9\u3078\u306E\u6307\u6458"));
+      for (const finding of nodeFindings) panel.append(findingElement(finding, false));
     }
-    rows.push('<h2>LLM \u9023\u643A</h2><button id="copy-context">\u5F71\u97FF\u90E8\u5206\u30B0\u30E9\u30D5\u3092\u30B3\u30D4\u30FC</button>');
-    rows.push(
-      `<p class="hint"><code>${escapeHtml(explainCommand(view, node.id))}</code> \u3068\u540C\u3058\u5185\u5BB9\u3092\u30AF\u30EA\u30C3\u30D7\u30DC\u30FC\u30C9\u306B\u5165\u308C\u308B\u3002</p>`
+    const copyButton = htmlEl("button", { id: "copy-context" }, "\u5F71\u97FF\u90E8\u5206\u30B0\u30E9\u30D5\u3092\u30B3\u30D4\u30FC");
+    panel.append(
+      htmlEl("h2", {}, "LLM \u9023\u643A"),
+      copyButton,
+      htmlEl(
+        "p",
+        { class: "hint" },
+        htmlEl("code", {}, explainCommand(view, node.id)),
+        " \u3068\u540C\u3058\u5185\u5BB9\u3092\u30AF\u30EA\u30C3\u30D7\u30DC\u30FC\u30C9\u306B\u5165\u308C\u308B\u3002"
+      )
     );
-    panel.innerHTML = rows.join("");
     panel.querySelectorAll("button[data-goto]").forEach((button) => {
       button.addEventListener("click", () => selectNode(button.dataset.goto));
     });
-    const copyButton = document.getElementById("copy-context");
     copyButton.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(nodeContext(view, node.id));
@@ -1698,46 +1744,57 @@ ${text}`;
       setTimeout(() => copyButton.textContent = "\u5F71\u97FF\u90E8\u5206\u30B0\u30E9\u30D5\u3092\u30B3\u30D4\u30FC", 1600);
     });
   }
-  function locationHtml(location2) {
-    const url = sourceUrl(DATA, location2);
-    if (!url) return escapeHtml(location2);
-    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener"
-    title="GitHub \u3067\u3053\u306E\u5B9A\u7FA9\u3092\u958B\u304F">${escapeHtml(location2)} \u2197</a>`;
+  function locationElement(location2) {
+    const href = safeHref(sourceUrl(DATA, location2));
+    return href ? htmlEl("a", { href, target: "_blank", rel: "noopener", title: "GitHub \u3067\u3053\u306E\u5B9A\u7FA9\u3092\u958B\u304F" }, `${location2} \u2197`) : document.createTextNode(location2);
   }
-  function findingHtml(finding, interactive = true) {
+  function findingElement(finding, interactive = true) {
     const where = finding.node_id ? ` (${finding.node_id})` : "";
-    const head = `<div class="code">${finding.severity.toUpperCase()} \xB7 L${finding.layer} \xB7 ${escapeHtml(finding.code)}${escapeHtml(where)}</div>
-    <div>${escapeHtml(finding.message)}</div>`;
+    const content = [
+      htmlEl("div", { class: "code" }, `${finding.severity.toUpperCase()} \xB7 L${finding.layer} \xB7 ${finding.code}${where}`),
+      htmlEl("div", {}, finding.message)
+    ];
     if (interactive && finding.node_id) {
-      const at2 = finding.location ? `<div class="loc">${escapeHtml(finding.location)}</div>` : "";
-      return `<button type="button" class="finding ${finding.severity}" data-id="${escapeAttr(finding.node_id)}">
-      ${head}${at2}</button>`;
+      if (finding.location) content.push(htmlEl("div", { class: "loc" }, finding.location));
+      return htmlEl("button", {
+        type: "button",
+        class: `finding ${finding.severity}`,
+        "data-id": finding.node_id
+      }, ...content);
     }
-    const at = finding.location ? `<div class="loc">${locationHtml(finding.location)}</div>` : "";
-    return `<div class="finding ${finding.severity}">${head}${at}</div>`;
+    if (finding.location) content.push(htmlEl("div", { class: "loc" }, locationElement(finding.location)));
+    return htmlEl("div", { class: `finding ${finding.severity}` }, ...content);
   }
   function renderNodeList() {
     const list = document.getElementById("node-list");
     const matched = view.nodes.filter((node) => matchesQuery(node, state.query));
-    list.innerHTML = matched.map((node) => {
-      const marks = [
-        node.id === state.selected ? "active" : "",
-        //: ↑↓ で送っている最中の候補。図の暈しと同じものを指す。
-        node.id === cursor ? "cursor" : ""
-      ].join(" ");
-      return `<li><button class="node-btn ${marks}" data-id="${node.id}">
-        <span class="id">${node.id}</span> <span class="type">${node.type}</span><br>${escapeHtml(truncate(node.text, 34))}
-      </button></li>`;
-    }).join("");
+    list.replaceChildren(...matched.map((node) => {
+      const marks = [node.id === state.selected ? "active" : "", node.id === cursor ? "cursor" : ""].filter(Boolean).join(" ");
+      return htmlEl("li", {}, htmlEl(
+        "button",
+        {
+          class: `node-btn ${marks}`.trim(),
+          "data-id": node.id
+        },
+        htmlEl("span", { class: "id" }, node.id),
+        " ",
+        htmlEl("span", { class: "type" }, node.type),
+        htmlEl("br"),
+        truncate(node.text, 34)
+      ));
+    }));
     list.querySelectorAll("button[data-id]").forEach((button) => {
       button.addEventListener("click", () => selectNode(button.dataset.id));
     });
   }
   function renderToggles(containerId, attribute, items, set) {
-    document.getElementById(containerId).innerHTML = items.map(
-      (item) => `<label class="toggle"><input type="checkbox" data-${attribute}="${item.key}"${set.has(item.key) ? " checked" : ""}>
-        ${escapeHtml(item.label)}<span class="count">${item.count}</span></label>`
-    ).join("");
+    document.getElementById(containerId).replaceChildren(...items.map((item) => htmlEl(
+      "label",
+      { class: "toggle" },
+      htmlEl("input", { type: "checkbox", [`data-${attribute}`]: item.key, checked: set.has(item.key) }),
+      ` ${item.label}`,
+      htmlEl("span", { class: "count" }, String(item.count))
+    )));
   }
   function bindToggles(attribute, key) {
     document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
@@ -1778,10 +1835,10 @@ ${text}`;
     }
   }
   function renderFocusOptions() {
-    document.getElementById("focus").innerHTML = [
-      '<option value="0">\u30D5\u30A9\u30FC\u30AB\u30B9: \u5207</option>',
-      ...FOCUS_DEPTHS.map((depth) => `<option value="${depth}">\u8FD1\u508D ${depth} \u30DB\u30C3\u30D7</option>`)
-    ].join("");
+    document.getElementById("focus").replaceChildren(
+      htmlEl("option", { value: 0 }, "\u30D5\u30A9\u30FC\u30AB\u30B9: \u5207"),
+      ...FOCUS_DEPTHS.map((depth) => htmlEl("option", { value: depth }, `\u8FD1\u508D ${depth} \u30DB\u30C3\u30D7`))
+    );
   }
   function renderImpactControls() {
     const slider = document.getElementById("depth");
@@ -1806,35 +1863,36 @@ ${text}`;
   function renderStats() {
     const counts = DATA.stats.findings;
     const chips = [
-      `<span class="chip">${DATA.stats.nodes} \u30CE\u30FC\u30C9</span>`,
-      `<span class="chip">${DATA.stats.edges} \u30A8\u30C3\u30B8</span>`
+      htmlEl("span", { class: "chip" }, `${DATA.stats.nodes} \u30CE\u30FC\u30C9`),
+      htmlEl("span", { class: "chip" }, `${DATA.stats.edges} \u30A8\u30C3\u30B8`)
     ];
     for (const severity of ["error", "severe", "warning", "info"]) {
-      if (counts[severity]) chips.push(`<span class="chip ${severity}">${severity} ${counts[severity]}</span>`);
+      if (counts[severity]) chips.push(htmlEl("span", { class: `chip ${severity}` }, `${severity} ${counts[severity]}`));
     }
     if (!counts.error && !counts.severe && !counts.warning && !counts.info) {
-      chips.push('<span class="chip">\u6307\u6458\u306A\u3057</span>');
+      chips.push(htmlEl("span", { class: "chip" }, "\u6307\u6458\u306A\u3057"));
     }
-    if (DATA.stats.suppressed) chips.push(`<span class="chip">\u6291\u5236 ${DATA.stats.suppressed} \u4EF6</span>`);
-    document.getElementById("stats").innerHTML = chips.join("");
+    if (DATA.stats.suppressed) chips.push(htmlEl("span", { class: "chip" }, `\u6291\u5236 ${DATA.stats.suppressed} \u4EF6`));
+    document.getElementById("stats").replaceChildren(...chips);
     document.getElementById("sources").textContent = DATA.generated_from.join(", ");
     renderLegend();
     renderFindings();
   }
   function renderLegend() {
     const scheme = palette().dark ? "dark" : "light";
-    document.getElementById("legend").innerHTML = legendGroups(DATA.meta, scheme).map((group) => {
-      const items = group.items.map(({ label, swatch }) => {
-        const style = [
-          `background:${swatch.background}`,
-          `border-color:${swatch.borderColor || "currentColor"}`,
-          `border-style:${swatch.borderStyle}`,
-          `border-width:${swatch.borderWidth}px`
-        ].join(";");
-        return `<span><i class="swatch" style="${style}"></i>${escapeHtml(label)}</span>`;
-      }).join("");
-      return `<span class="legend-group"><b>${escapeHtml(group.title)}</b>${items}</span>`;
-    }).join("");
+    const groups = legendGroups(DATA.meta, scheme).map((group) => {
+      const container = htmlEl("span", { class: "legend-group" }, htmlEl("b", {}, group.title));
+      for (const { label, swatch } of group.items) {
+        const mark = htmlEl("i", { class: "swatch" });
+        mark.style.background = swatch.background;
+        mark.style.borderColor = swatch.borderColor || "currentColor";
+        mark.style.borderStyle = swatch.borderStyle;
+        mark.style.borderWidth = `${swatch.borderWidth}px`;
+        container.append(htmlEl("span", {}, mark, label));
+      }
+      return container;
+    });
+    document.getElementById("legend").replaceChildren(...groups);
   }
   var findingSeverity = ALL_SEVERITIES;
   function showSeverity(tab) {
@@ -1846,13 +1904,15 @@ ${text}`;
     if (!tabs.some((tab) => tab.key === findingSeverity)) findingSeverity = ALL_SEVERITIES;
     const tabBar = document.getElementById("finding-tabs");
     const refocus = tabBar.contains(document.activeElement);
-    tabBar.innerHTML = tabs.map(
-      (tab) => `<button type="button" role="tab" aria-controls="findings" data-severity="${escapeAttr(tab.key)}"
-        class="${tab.key === findingSeverity ? "active" : ""}"
-        aria-selected="${tab.key === findingSeverity}"
-        tabindex="${tab.key === findingSeverity ? 0 : -1}"
-        >${escapeHtml(tab.label)}<span class="count">${tab.count}</span></button>`
-    ).join("");
+    tabBar.replaceChildren(...tabs.map((tab) => htmlEl("button", {
+      type: "button",
+      role: "tab",
+      "aria-controls": "findings",
+      "data-severity": tab.key,
+      class: tab.key === findingSeverity ? "active" : "",
+      "aria-selected": tab.key === findingSeverity,
+      tabindex: tab.key === findingSeverity ? 0 : -1
+    }, tab.label, htmlEl("span", { class: "count" }, String(tab.count)))));
     tabBar.querySelectorAll("button[data-severity]").forEach((button) => {
       button.addEventListener("click", () => showSeverity(button));
     });
@@ -1860,11 +1920,20 @@ ${text}`;
     if (refocus) tabBar.querySelector("button.active")?.focus();
     const groups = groupFindings(DATA.findings, findingSeverity);
     const panel = document.getElementById("findings");
-    panel.innerHTML = groups.length ? groups.map(
-      (group) => `<div class="code-head"><span>${escapeHtml(group.code)}</span>
-            <span>${group.items.length} \u4EF6</span></div>
-            ${group.items.map((finding) => findingHtml(finding)).join("")}`
-    ).join("") : '<p class="empty">\u6307\u6458\u306F\u7121\u3044\u3002</p>';
+    if (!groups.length) panel.replaceChildren(htmlEl("p", { class: "empty" }, "\u6307\u6458\u306F\u7121\u3044\u3002"));
+    else {
+      const children = [];
+      for (const group of groups) {
+        children.push(htmlEl(
+          "div",
+          { class: "code-head" },
+          htmlEl("span", {}, group.code),
+          htmlEl("span", {}, `${group.items.length} \u4EF6`)
+        ));
+        children.push(...group.items.map((finding) => findingElement(finding)));
+      }
+      panel.replaceChildren(...children);
+    }
     panel.querySelectorAll("button.finding[data-id]").forEach((button) => {
       button.addEventListener("click", () => selectNode(button.dataset.id));
     });
@@ -1872,33 +1941,53 @@ ${text}`;
   function renderTable() {
     if (state.mode !== "table") return;
     const rows = sortRows(view, tableRows(view, state.query), state.sort);
-    const head = TABLE_COLUMNS.map((column) => {
+    const headRow = htmlEl("tr");
+    for (const column of TABLE_COLUMNS) {
       const active = state.sort.key === column.key;
       const order = active ? state.sort.asc ? "ascending" : "descending" : "none";
       const arrow = active ? state.sort.asc ? "\u25B2" : "\u25BC" : "";
-      return `<th class="${column.numeric ? "num" : ""}" aria-sort="${order}">
-      <button data-key="${column.key}" title="\u3053\u306E\u5217\u3067\u4E26\u3079\u66FF\u3048\u308B">${column.label}<span class="arrow">${arrow}</span></button></th>`;
-    }).join("");
-    const DASH = '<td class="num dash">\u2014</td>';
+      headRow.append(htmlEl(
+        "th",
+        { class: column.numeric ? "num" : "", "aria-sort": order },
+        htmlEl(
+          "button",
+          { "data-key": column.key, title: "\u3053\u306E\u5217\u3067\u4E26\u3079\u66FF\u3048\u308B" },
+          column.label,
+          htmlEl("span", { class: "arrow" }, arrow)
+        )
+      ));
+    }
     const cell = (row, key) => {
-      switch (key) {
-        case "text":
-          return `<td class="text">${escapeHtml(row.text)}</td>`;
-        case "findings":
-          return row.findings ? `<td class="num"><button class="finding-count ${row.severity || ""}" data-findings="${row.id}" title="\u3053\u306E\u30CE\u30FC\u30C9\u3078\u306E\u6307\u6458\u3092\u898B\u308B">${row.findings}</button></td>` : DASH;
-        case "evidence":
-          return row.evidence ? `<td class="num">${row.evidence}</td>` : DASH;
-        default:
-          return `<td class="${key}">${escapeHtml(row[key])}</td>`;
+      if (key === "text") return htmlEl("td", { class: "text" }, row.text);
+      if (key === "findings") {
+        return row.findings ? htmlEl("td", { class: "num" }, htmlEl("button", {
+          class: `finding-count ${row.severity || ""}`.trim(),
+          "data-findings": row.id,
+          title: "\u3053\u306E\u30CE\u30FC\u30C9\u3078\u306E\u6307\u6458\u3092\u898B\u308B"
+        }, String(row.findings))) : htmlEl("td", { class: "num dash" }, "\u2014");
       }
+      if (key === "evidence") {
+        return row.evidence ? htmlEl("td", { class: "num" }, String(row.evidence)) : htmlEl("td", { class: "num dash" }, "\u2014");
+      }
+      return htmlEl("td", { class: key }, String(row[key] ?? ""));
     };
-    const body = rows.length ? rows.map(
-      (row) => `<tr data-id="${escapeAttr(row.id)}" tabindex="0"
-            class="${row.id === state.selected ? "sel" : ""}">
-            ${TABLE_COLUMNS.map((column) => cell(row, column.key)).join("")}</tr>`
-    ).join("") : `<tr><td class="empty" colspan="${TABLE_COLUMNS.length}">\u6761\u4EF6\u306B\u5408\u3046\u30CE\u30FC\u30C9\u306F\u7121\u3044\u3002</td></tr>`;
+    const body = htmlEl("tbody");
+    if (rows.length) {
+      for (const row of rows) {
+        body.append(htmlEl("tr", {
+          "data-id": row.id,
+          tabindex: 0,
+          class: row.id === state.selected ? "sel" : ""
+        }, ...TABLE_COLUMNS.map((column) => cell(row, column.key))));
+      }
+    } else {
+      body.append(htmlEl("tr", {}, htmlEl("td", {
+        class: "empty",
+        colspan: TABLE_COLUMNS.length
+      }, "\u6761\u4EF6\u306B\u5408\u3046\u30CE\u30FC\u30C9\u306F\u7121\u3044\u3002")));
+    }
     const table = document.getElementById("node-table");
-    table.innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
+    table.replaceChildren(htmlEl("thead", {}, headRow), body);
     document.getElementById("table-note").textContent = `${rows.length} \u4EF6\u3092\u8868\u793A\u4E2D (\u5168 ${DATA.nodes.length} \u4EF6)\u3002 \u884C\u3092\u30AF\u30EA\u30C3\u30AF (\u30AD\u30FC\u30DC\u30FC\u30C9\u306A\u3089 Enter) \u3059\u308B\u3068\u53F3\u30DA\u30A4\u30F3\u306B\u8A73\u7D30\u304C\u51FA\u308B\u3002\u5217\u898B\u51FA\u3057\u3067\u4E26\u3079\u66FF\u3048\u308B\u3002`;
     table.querySelectorAll("thead button[data-key]").forEach((button) => {
       button.addEventListener("click", () => {

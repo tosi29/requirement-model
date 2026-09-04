@@ -22,20 +22,21 @@ flowchart TD
             direction TB
             n12["<b>FR-1</b> [FunctionalRequirement]<br/>定義ファイルを実行せず、AST からノード集合を復元すること"]
             n23["<b>FR-2</b> [FunctionalRequirement]<br/>ノードの必須属性・id の重複・語尾規則の違反を、定義した行番号とともに報告す…"]
-            n31["<b>FR-3</b> [FunctionalRequirement]<br/>型規則に違反するエッジ・参照切れ・階層エッジ (refines / part_…"]
-            n32["<b>FR-4</b> [FunctionalRequirement]<br/>どの Goal にも到達できない FR・satisfies されない Need…"]
-            n33["<b>FR-5</b> [FunctionalRequirement]<br/>辞書に載っている曖昧語を含む本文を warning として報告すること"]
-            n34["<b>FR-6</b> [FunctionalRequirement]<br/>ノード属性 suppress に書いた (チェックコード, 理由) の組で、そ…"]
-            n35["<b>FR-7</b> [FunctionalRequirement]<br/>指摘の重大度に応じた終了コードを返し、CI にそのまま置けるようにすること"]
-            n41[["<b>Constraint-1</b> [Constraint]<br/>定義ファイルを実行しないこと"]]
+            n32["<b>FR-3</b> [FunctionalRequirement]<br/>型規則に違反するエッジ・参照切れ・階層エッジ (refines / part_…"]
+            n34["<b>FR-4</b> [FunctionalRequirement]<br/>どの Goal にも到達できない FR・satisfies されない Need…"]
+            n35["<b>FR-5</b> [FunctionalRequirement]<br/>辞書に載っている曖昧語を含む本文を warning として報告すること"]
+            n36["<b>FR-6</b> [FunctionalRequirement]<br/>ノード属性 suppress に書いた (チェックコード, 理由) の組で、そ…"]
+            n37["<b>FR-7</b> [FunctionalRequirement]<br/>指摘の重大度に応じた終了コードを返し、CI にそのまま置けるようにすること"]
+            n31["<b>FR-27</b> [FunctionalRequirement]<br/>ノード型ごとに意味のある status だけを許可し、合意状態の参照整合を検査…"]
+            n43[["<b>Constraint-1</b> [Constraint]<br/>定義ファイルを実行しないこと"]]
         end
         subgraph group_analysis[影響分析・LLM連携]
             direction TB
-            n36["<b>FR-8</b> [FunctionalRequirement]<br/>指定したノードの上流と下流を辿り、影響部分グラフを抽出すること"]
-            n37["<b>FR-9</b> [FunctionalRequirement]<br/>影響部分グラフの本文と根拠を、LLM に渡せる書式に整形して出力すること"]
+            n38["<b>FR-8</b> [FunctionalRequirement]<br/>指定したノードの上流と下流を辿り、影響部分グラフを抽出すること"]
+            n39["<b>FR-9</b> [FunctionalRequirement]<br/>影響部分グラフの本文と根拠を、LLM に渡せる書式に整形して出力すること"]
             n13["<b>FR-10</b> [FunctionalRequirement]<br/>git の前版の定義ファイルを読み、ノード単位とフィールド単位の構造差分と、変…"]
-            n43[["<b>Constraint-3</b> [Constraint]<br/>履歴とレビューの基盤を Git に置き、RDB と外部ストレージを持たないこと"]]
-            n45[["<b>Constraint-5</b> [Constraint]<br/>LLM API を直接呼ばず、LLM に渡す文脈の生成までに留めること"]]
+            n45[["<b>Constraint-3</b> [Constraint]<br/>履歴とレビューの基盤を Git に置き、RDB と外部ストレージを持たないこと"]]
+            n47[["<b>Constraint-5</b> [Constraint]<br/>LLM API を直接呼ばず、LLM に渡す文脈の生成までに留めること"]]
         end
         subgraph group_presentation[出力と閲覧]
             direction TB
@@ -44,22 +45,23 @@ flowchart TD
             n16["<b>FR-13</b> [FunctionalRequirement]<br/>図の初期表示でグラフ全体を 1 画面に収め、この表示は俯瞰の用途に限ること"]
             n17["<b>FR-14</b> [FunctionalRequirement]<br/>閲覧用サイトに表形式の一覧を設け、列見出しで並べ替えられるようにし、同値の行の…"]
             n18["<b>FR-15</b> [FunctionalRequirement]<br/>選択したノードと表示の絞り込みを URL に載せ、同じ画面を相手にも出せるよう…"]
+            n33["<b>FR-31</b> [FunctionalRequirement]<br/>閲覧用サイトはモデル由来の値をHTMLとして解釈せず、安全なURLだけをリンク…"]
             n19["<b>FR-16</b> [FunctionalRequirement]<br/>ノード数・エッジ数・充足率・曖昧語密度を数え、判定を伴わない形で出すこと"]
             n24["<b>FR-20</b> [FunctionalRequirement]<br/>MCP サーバとして validate / explain / impact …"]
             n27["<b>FR-23</b> [FunctionalRequirement]<br/>Graphviz のレイアウトを用いて SVG の図を書き出すこと"]
             n28["<b>FR-24</b> [FunctionalRequirement]<br/>記号だけが異なる id を持つノードを、図の上でも別のノードとして描き分けること"]
             n29["<b>FR-25</b> [FunctionalRequirement]<br/>源泉を図に描かず、参照元ノードの属性として引用文・位置・引用元まで出すこと"]
             n30["<b>FR-26</b> [FunctionalRequirement]<br/>選択したノードの近傍だけを図に描くフォーカス表示を設けること"]
-            n38["<b>QR-1</b> [QualityRequirement]<br/>図に描かれるノードのラベルが読める倍率 (0.5 倍以上) を保つこと"]
-            n39["<b>QR-3</b> [QualityRequirement]<br/>閲覧用サイトが書き出す図と CLI が出す図を、一字一句一致させること"]
-            n40["<b>QR-4</b> [QualityRequirement]<br/>閲覧用サイトのすべての操作要素を、キーボードだけで辿れるようにすること"]
-            n42[["<b>Constraint-2</b> [Constraint]<br/>実行時の依存を pydantic だけに保つこと"]]
-            n44[["<b>Constraint-4</b> [Constraint]<br/>公開する閲覧用サイトを、外部への通信なしで表示できるようにすること"]]
+            n40["<b>QR-1</b> [QualityRequirement]<br/>図に描かれるノードのラベルが読める倍率 (0.5 倍以上) を保つこと"]
+            n41["<b>QR-3</b> [QualityRequirement]<br/>閲覧用サイトが書き出す図と CLI が出す図を、一字一句一致させること"]
+            n42["<b>QR-4</b> [QualityRequirement]<br/>閲覧用サイトのすべての操作要素を、キーボードだけで辿れるようにすること"]
+            n44[["<b>Constraint-2</b> [Constraint]<br/>実行時の依存を pydantic だけに保つこと"]]
+            n46[["<b>Constraint-4</b> [Constraint]<br/>公開する閲覧用サイトを、外部への通信なしで表示できるようにすること"]]
         end
         subgraph group___unclassified__[未分類]
             direction TB
             n20["<b>FR-17</b> [FunctionalRequirement]<br/>正規化 JSON と Mermaid / DOT の図を出力すること"]
-            n21["<b>FR-18</b> [FunctionalRequirement]<br/>構造差分を Markdown で出力し、PR コメントに貼れる形にすること"]
+            n21["<b>FR-18</b> [FunctionalRequirement]<br/>構造差分と影響範囲を Mermaid 図付き Markdown で出力し、PR…"]
             n22["<b>FR-19</b> [FunctionalRequirement]<br/>プロジェクト固有の曖昧語と、検査ごとの有効・無効を設定ファイルで宣言できるよう…"]
             n25["<b>FR-21</b> [FunctionalRequirement]<br/>測定不能な QR・status の後退・id の命名規則違反を検査すること"]
             n26["<b>FR-22</b> [FunctionalRequirement]<br/>指摘を SARIF 形式で出力し、GitHub Code Scanning に…"]
@@ -99,32 +101,34 @@ flowchart TD
     n29 -->|satisfies| n8
     n30 -->|satisfies| n9
     n30 -->|refines| n15
-    n31 -->|satisfies| n5
+    n31 -->|satisfies| n4
     n32 -->|satisfies| n5
-    n33 -->|satisfies| n4
-    n34 -->|satisfies| n11
-    n35 -->|satisfies| n11
-    n36 -->|satisfies| n6
-    n37 -->|satisfies| n8
-    n37 -->|refines| n36
-    n38 -->|qualifies| n30
-    n39 -->|qualifies| n15
-    n40 -->|qualifies| n15
-    n41 -->|constrains| n12
-    n41 -->|constrains| n13
-    n42 -->|constrains| n24
-    n42 -->|constrains| n27
+    n33 -->|satisfies| n9
+    n33 -->|refines| n15
+    n34 -->|satisfies| n5
+    n35 -->|satisfies| n4
+    n36 -->|satisfies| n11
+    n37 -->|satisfies| n11
+    n38 -->|satisfies| n6
+    n39 -->|satisfies| n8
+    n39 -->|refines| n38
+    n40 -->|qualifies| n30
+    n41 -->|qualifies| n15
+    n42 -->|qualifies| n15
+    n43 -->|constrains| n12
     n43 -->|constrains| n13
-    n44 -->|constrains| n15
-    n45 -->|constrains| n37
-    n45 -->|constrains| n24
+    n44 -->|constrains| n24
+    n44 -->|constrains| n27
+    n45 -->|constrains| n13
+    n46 -->|constrains| n15
+    n47 -->|constrains| n39
+    n47 -->|constrains| n24
 
     classDef Goal fill:#e8f0fe,stroke:#3b6fd4
     classDef Need fill:#e9f7ef,stroke:#2f9e5f
     classDef FunctionalRequirement fill:#fff8e1,stroke:#c9971c
     classDef QualityRequirement fill:#f3e8ff,stroke:#7e57c2
     classDef Constraint fill:#fdecea,stroke:#b94a48
-    classDef Source fill:#ffffff,stroke:#999999
     class n1 Goal
     class n2 Goal
     class n3 Goal
@@ -162,11 +166,13 @@ flowchart TD
     class n35 FunctionalRequirement
     class n36 FunctionalRequirement
     class n37 FunctionalRequirement
-    class n38 QualityRequirement
-    class n39 QualityRequirement
+    class n38 FunctionalRequirement
+    class n39 FunctionalRequirement
     class n40 QualityRequirement
-    class n41 Constraint
-    class n42 Constraint
+    class n41 QualityRequirement
+    class n42 QualityRequirement
     class n43 Constraint
     class n44 Constraint
     class n45 Constraint
+    class n46 Constraint
+    class n47 Constraint

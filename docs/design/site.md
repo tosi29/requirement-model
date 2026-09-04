@@ -266,6 +266,14 @@ SVG の書き出しは、画面にある SVG DOM を複製し、非表示要素�
 | `site_app.js` | DOM・SVG・dagre を扱う UI entrypoint |
 | `site_bundle.js` | esbuild で生成し wheel に同梱する配布物 |
 
+### 動的 DOM の安全性
+
+モデル、検証結果、表示メタデータに由来する値は HTML 文字列へ連結せず、
+`createElement()` と `append()` / `replaceChildren()` で組み立てる。文字列は Text ノードとして
+挿入されるため、ノード id や本文に HTML 特殊文字が含まれても要素として解釈されない。
+`Reference.url` と出所リンクは URL を解析し、`http:` / `https:` の場合だけ `href` を設定する。
+それ以外の scheme や不正な URL はリンクにせず、表示文字列だけを残す。
+
 `npm run build` は `site_app.js` を entrypoint として esbuild で bundle する。
 `req site` は同梱済みの `site_bundle.js` を読むだけなので、実行環境に Node.js は不要である。
 生成 HTML には bundle をインライン化するため、従来どおり単一ファイルで完結する。

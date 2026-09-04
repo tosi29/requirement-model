@@ -79,6 +79,15 @@ def test_js_modules_are_syntactically_valid_on_their_own():
         assert result.returncode == 0, result.stderr
 
 
+def test_ui_source_does_not_use_html_parsing_sinks():
+    """動的 UI は HTML 文字列を DOM として再解釈する API を使わない。"""
+    source = (ROOT / "src" / "reqmodel" / "presentation" / "site_app.js").read_text()
+
+    assert "innerHTML" not in source
+    assert "outerHTML" not in source
+    assert "insertAdjacentHTML" not in source
+
+
 def test_js_unit_tests_pass():
     result = run_node(["--test", str(JS_TESTS / "logic.test.mjs")])
     assert result.returncode == 0, result.stdout + result.stderr

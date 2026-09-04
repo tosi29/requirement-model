@@ -22,8 +22,6 @@ import {
   edgeItems,
   edgeControl,
   encodeHash,
-  escapeAttr,
-  escapeHtml,
   estimateTextWidth,
   explainCommand,
   fieldLabel,
@@ -60,6 +58,29 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 
 const DATA = JSON.parse(document.getElementById("model-data").textContent);
 const METRICS = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
+
+/** DOM 要素を組み立てる。文字列は append() により常に Text ノードになる。 */
+function htmlEl(tag, attrs = {}, ...children) {
+  const element = document.createElement(tag);
+  for (const [name, value] of Object.entries(attrs)) {
+    if (value === null || value === undefined || value === false) continue;
+    if (name === "checked") element.checked = Boolean(value);
+    else if (name === "style") Object.assign(element.style, value);
+    else element.setAttribute(name, value === true ? "" : String(value));
+  }
+  element.append(...children.flat().filter((child) => child !== null && child !== undefined));
+  return element;
+}
+
+/** 外部リンクは HTTP(S) のみ許可する。無効・危険な URL はリンクにしない。 */
+function safeExternalUrl(value) {
+  try {
+    const url = new URL(String(value));
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
 
 // --- 保存 (localStorage) ----------------------------------------------------
 //
@@ -232,7 +253,10 @@ function updateShape(element, shape, box) {
 
 function initGraph() {
   if (!dagre) {
-    graphEl.innerHTML = '<p class="empty">描画ライブラリ (dagre) を読み込めなかった。図の元データは <a href="graph.mmd">graph.mmd</a> / <a href="graph.dot">graph.dot</a> にある。</p>';
+    graphEl.replaceChildren(htmlEl("p", { class: "empty" },
+      "描画ライブラリ (dagre) を読み込めなかった。図の元データは ",
+      htmlEl("a", { href: "graph.mmd" }, "graph.mmd"), " / ",
+      htmlEl("a", { href: "graph.dot" }, "graph.dot"), " にある。"));
     return;
   }
   graph = graphElements(DATA, labelMeasurer());
@@ -680,97 +704,118 @@ function zoomBy(factor) {
 
 // --- 詳細パネル ------------------------------------------------------------
 
-function pushReferenceSection(rows, title, references) {
+function heading(level, text, attrs = {}) {
+  return htmlEl(`h${level}`, attrs, text);
+}
+
+function externalLink(url, text, title = null) {
+  const safe = safeExternalUrl(url);
+  if (!safe) return String(text);
+  return htmlEl("a", { href: safe, target: "_blank", rel: "noopener noreferrer", title }, text);
+}
+
+function appendReferenceSection(panel, title, references) {
   if (!Array.isArray(references) || references.length === 0) return;
-  rows.push(`<h2>${escapeHtml(title)}</h2><ul class="sources">`);
+  panel.append(heading(2, title));
+  const list = htmlEl("ul", { class: "sources" });
   for (const reference of references) {
-    const url = reference.url ? ` <a href="${escapeAttr(reference.url)}" target="_blank" rel="noreferrer">${escapeHtml(reference.url)}</a>` : "";
-    const note = reference.note ? `<span class="text">${escapeHtml(reference.note)}</span>` : "";
-    rows.push(
-      `<li><span class="id">${escapeHtml(reference.title || "(untitled)")}</span>${url}${note}</li>`,
-    );
+    const item = htmlEl("li", {}, htmlEl("span", { class: "id" }, reference.title || "(untitled)"));
+    if (reference.url) item.append(" ", externalLink(reference.url, reference.url));
+    if (reference.note) item.append(htmlEl("span", { class: "text" }, reference.note));
+    list.append(item);
   }
-  rows.push("</ul>");
+  panel.append(list);
+}
+
+function locationNode(location) {
+  const url = sourceUrl(DATA, location);
+  return url ? externalLink(url, `${location} ↗`, "GitHub でこの定義を開く") : String(location);
+}
+
+function findingNode(finding, interactive = true) {
+  const where = finding.node_id ? ` (${finding.node_id})` : "";
+  const attrs = { class: `finding ${finding.severity}` };
+  let root;
+  if (interactive && finding.node_id) {
+    root = htmlEl("button", { ...attrs, type: "button", "data-id": finding.node_id });
+  } else {
+    root = htmlEl("div", attrs);
+  }
+  root.append(
+    htmlEl("div", { class: "code" }, `${finding.severity.toUpperCase()} · L${finding.layer} · ${finding.code}${where}`),
+    htmlEl("div", {}, finding.message),
+  );
+  if (finding.location) {
+    root.append(htmlEl("div", { class: "loc" }, interactive && finding.node_id
+      ? finding.location : locationNode(finding.location)));
+  }
+  return root;
+}
+
+function edgeList(items) {
+  const list = htmlEl("ul", { class: "plain" });
+  for (const item of items) {
+    const button = htmlEl("button", { class: "node-btn", "data-goto": item.id },
+      htmlEl("span", { class: "arrow" }, item.arrow), " ",
+      htmlEl("span", { class: "id" }, item.id), " ",
+      htmlEl("span", { class: "type" }, item.type),
+      htmlEl("span", { class: "text" }, truncate(item.text, 40)));
+    list.append(htmlEl("li", { class: "edge" }, button));
+  }
+  return list;
 }
 
 function renderDetail() {
   const panel = document.getElementById("detail");
   if (!state.selected || !view.byId.has(state.selected)) {
-    panel.innerHTML =
-      '<p class="empty">グラフのノードをクリックすると、本文・根拠・影響範囲を表示する。</p>';
+    panel.replaceChildren(htmlEl("p", { class: "empty" }, "グラフのノードをクリックすると、本文・根拠・影響範囲を表示する。"));
     return;
   }
   const node = view.byId.get(state.selected);
   const impact = impactSets(view, node.id);
-
-  const rows = [];
-  rows.push(`<h3>${node.id} <span class="node-btn type">[${node.type}]</span></h3>`);
-  rows.push(`<p class="text">${escapeHtml(node.text)}</p>`);
-  rows.push("<dl>");
-  rows.push(`<dt>${fieldLabel("status")}</dt><dd>${node.status}</dd>`);
-  if (node.kind) rows.push(`<dt>kind</dt><dd>${node.kind}</dd>`);
-  if (node.location) rows.push(`<dt>出所</dt><dd class="loc">${locationHtml(node.location)}</dd>`);
-  //: 件数は影響範囲の設定 (深さ・向き) に従う。図の色分けと同じ範囲を数える。
-  if (impact.undirected) {
-    rows.push(`<dt>関連</dt><dd>${impact.downstream.size} 件</dd>`);
-  } else {
-    rows.push(`<dt>上流</dt><dd>${impact.upstream.size} 件</dd>`);
-    rows.push(`<dt>下流</dt><dd>${impact.downstream.size} 件</dd>`);
+  panel.replaceChildren();
+  panel.append(htmlEl("h3", {}, node.id, " ", htmlEl("span", { class: "node-btn type" }, `[${node.type}]`)));
+  panel.append(htmlEl("p", { class: "text" }, node.text));
+  const details = htmlEl("dl");
+  const addDetail = (label, value, attrs = {}) => details.append(htmlEl("dt", {}, label), htmlEl("dd", attrs, value));
+  addDetail(fieldLabel("status"), node.status);
+  if (node.kind) addDetail("kind", node.kind);
+  if (node.location) addDetail("出所", locationNode(node.location), { class: "loc" });
+  if (impact.undirected) addDetail("関連", `${impact.downstream.size} 件`);
+  else {
+    addDetail("上流", `${impact.upstream.size} 件`);
+    addDetail("下流", `${impact.downstream.size} 件`);
   }
-  rows.push("</dl>");
+  panel.append(details);
 
-  //: 外部参照はノードではなく Reference 値として各フィールドに直接保持する。
-  //: CLI の doc / explain と同じく、title / note / URL を読める形で出す。
-  pushReferenceSection(rows, fieldLabel("source"), node.source);
-  pushReferenceSection(rows, fieldLabel("realized_by"), node.realized_by);
-  pushReferenceSection(rows, fieldLabel("evidence"), node.evidence);
+  appendReferenceSection(panel, fieldLabel("source"), node.source);
+  appendReferenceSection(panel, fieldLabel("realized_by"), node.realized_by);
+  appendReferenceSection(panel, fieldLabel("evidence"), node.evidence);
   if ((node.acceptance_criteria || []).length) {
-    rows.push("<h2>受け入れ基準</h2><ul>");
-    for (const criterion of node.acceptance_criteria) rows.push(`<li>${escapeHtml(criterion)}</li>`);
-    rows.push("</ul>");
+    panel.append(heading(2, "受け入れ基準"), htmlEl("ul", {},
+      node.acceptance_criteria.map((criterion) => htmlEl("li", {}, criterion))));
   }
-
   if ((node.suppress || []).length) {
-    rows.push("<h2>抑制中の指摘</h2><ul>");
-    for (const [code, reason] of node.suppress) {
-      rows.push(`<li><code>${escapeHtml(code)}</code>: ${escapeHtml(reason)}</li>`);
-    }
-    rows.push("</ul>");
+    panel.append(heading(2, "抑制中の指摘"), htmlEl("ul", {}, node.suppress.map(([code, reason]) =>
+      htmlEl("li", {}, htmlEl("code", {}, code), `: ${reason}`))));
   }
-
-  //: 相手の id だけでなく本文も出す。飛ぶ前に「何に繋がっているか」が読める。
-  const edgeList = (items) =>
-    items
-      .map(
-        (item) => `<li class="edge"><button class="node-btn" data-goto="${escapeAttr(item.id)}">
-          <span class="arrow">${escapeHtml(item.arrow)}</span> <span class="id">${escapeHtml(item.id)}</span>
-          <span class="type">${escapeHtml(item.type)}</span>
-          <span class="text">${escapeHtml(truncate(item.text, 40))}</span></button></li>`,
-      )
-      .join("");
-
   const links = edgeItems(view, node.id);
-  if (links.out.length) rows.push(`<h2>出るエッジ</h2><ul class="plain">${edgeList(links.out)}</ul>`);
-  if (links.in.length) rows.push(`<h2>入るエッジ</h2><ul class="plain">${edgeList(links.in)}</ul>`);
+  if (links.out.length) panel.append(heading(2, "出るエッジ"), edgeList(links.out));
+  if (links.in.length) panel.append(heading(2, "入るエッジ"), edgeList(links.in));
 
   const nodeFindings = DATA.findings.filter((finding) => finding.node_id === node.id);
   if (nodeFindings.length) {
-    rows.push('<h2 id="node-findings">このノードへの指摘</h2>');
-    //: 選択中のノード自身への指摘なので、飛び先が無い (button にしない)。
-    for (const finding of nodeFindings) rows.push(findingHtml(finding, false));
+    panel.append(heading(2, "このノードへの指摘", { id: "node-findings" }));
+    for (const finding of nodeFindings) panel.append(findingNode(finding, false));
   }
-
-  rows.push('<h2>LLM 連携</h2><button id="copy-context">影響部分グラフをコピー</button>');
-  rows.push(
-    `<p class="hint"><code>${escapeHtml(explainCommand(view, node.id))}</code>` +
-      " と同じ内容をクリップボードに入れる。</p>",
-  );
-  panel.innerHTML = rows.join("");
+  const copyButton = htmlEl("button", { id: "copy-context" }, "影響部分グラフをコピー");
+  panel.append(heading(2, "LLM 連携"), copyButton,
+    htmlEl("p", { class: "hint" }, htmlEl("code", {}, explainCommand(view, node.id)),
+      " と同じ内容をクリップボードに入れる。"));
 
   panel.querySelectorAll("button[data-goto]").forEach((button) => {
     button.addEventListener("click", () => selectNode(button.dataset.goto));
   });
-  const copyButton = document.getElementById("copy-context");
   copyButton.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(nodeContext(view, node.id));
@@ -782,77 +827,30 @@ function renderDetail() {
   });
 }
 
-/**
- * 出所 (`examples/sample.py:42`)。`req site --repo-url` を渡して生成した
- * ページでは、定義そのもの (blob URL + 行番号) へのリンクになる。
- */
-function locationHtml(location) {
-  const url = sourceUrl(DATA, location);
-  if (!url) return escapeHtml(location);
-  return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener"
-    title="GitHub でこの定義を開く">${escapeHtml(location)} ↗</a>`;
-}
-
-/**
- * 指摘 1 件。ノードに紐づくものは押すとそのノードへ飛ぶので button で出す
- * (キーボードで辿れる)。
- *
- * 出所をリンクにできるのは button にしない側だけ。button の中にリンクを
- * 入れると入れ子の操作子になり、キーボードでも読み上げでも辿れなくなる。
- * 紐づくノードがあるなら、詳細ペインの「出所」からリンクを開ける。
- */
-function findingHtml(finding, interactive = true) {
-  const where = finding.node_id ? ` (${finding.node_id})` : "";
-  const head = `<div class="code">${finding.severity.toUpperCase()} · L${finding.layer} · ${escapeHtml(finding.code)}${escapeHtml(where)}</div>
-    <div>${escapeHtml(finding.message)}</div>`;
-  if (interactive && finding.node_id) {
-    const at = finding.location ? `<div class="loc">${escapeHtml(finding.location)}</div>` : "";
-    return `<button type="button" class="finding ${finding.severity}" data-id="${escapeAttr(finding.node_id)}">
-      ${head}${at}</button>`;
-  }
-  const at = finding.location ? `<div class="loc">${locationHtml(finding.location)}</div>` : "";
-  return `<div class="finding ${finding.severity}">${head}${at}</div>`;
-}
-
 // --- 左サイドバー ----------------------------------------------------------
 
 function renderNodeList() {
   const list = document.getElementById("node-list");
   const matched = view.nodes.filter((node) => matchesQuery(node, state.query));
-  list.innerHTML = matched
-    .map((node) => {
-      const marks = [
-        node.id === state.selected ? "active" : "",
-        //: ↑↓ で送っている最中の候補。図の暈しと同じものを指す。
-        node.id === cursor ? "cursor" : "",
-      ].join(" ");
-      return `<li><button class="node-btn ${marks}" data-id="${node.id}">
-        <span class="id">${node.id}</span> <span class="type">${node.type}</span><br>${escapeHtml(truncate(node.text, 34))}
-      </button></li>`;
-    })
-    .join("");
+  list.replaceChildren(...matched.map((node) => {
+    const marks = [node.id === state.selected ? "active" : "", node.id === cursor ? "cursor" : ""].join(" ");
+    const button = htmlEl("button", { class: `node-btn ${marks}`, "data-id": node.id },
+      htmlEl("span", { class: "id" }, node.id), " ", htmlEl("span", { class: "type" }, node.type),
+      htmlEl("br"), truncate(node.text, 34));
+    return htmlEl("li", {}, button);
+  }));
   list.querySelectorAll("button[data-id]").forEach((button) => {
     button.addEventListener("click", () => selectNode(button.dataset.id));
   });
 }
 
-/**
- * チェックボックス 1 群。`items` は `{ key, label, count }` の配列。
- * チェックの有無は state の集合から取る (ハッシュ付きの URL で開いたとき用)。
- */
 function renderToggles(containerId, attribute, items, set) {
-  document.getElementById(containerId).innerHTML = items
-    .map(
-      (item) => `<label class="toggle"><input type="checkbox" data-${attribute}="${item.key}"${set.has(item.key) ? " checked" : ""}>
-        ${escapeHtml(item.label)}<span class="count">${item.count}</span></label>`,
-    )
-    .join("");
+  document.getElementById(containerId).replaceChildren(...items.map((item) => {
+    const input = htmlEl("input", { type: "checkbox", [`data-${attribute}`]: item.key, checked: set.has(item.key) });
+    return htmlEl("label", { class: "toggle" }, input, ` ${item.label}`, htmlEl("span", { class: "count" }, item.count));
+  }));
 }
 
-/**
- * チェックの付け外しを state の集合に写す。集合は押されたときに引き直す
- * (`applyHash()` が state ごと差し替えるので、ここで掴んでおくと古い集合が残る)。
- */
 function bindToggles(attribute, key) {
   document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
     const value = input.dataset[attribute];
@@ -864,13 +862,7 @@ function bindToggles(attribute, key) {
   });
 }
 
-//: 絞り込み 1 群の [チェックボックスの属性名, state のキー]。置き場所は
-//: `<属性名>-filters`。描画・イベント・URL からの復元がこの並びを共有する。
-const FILTER_SETS = [
-  ["type", "types"],
-  ["status", "statuses"],
-  ["edge", "edges"],
-];
+const FILTER_SETS = [["type", "types"], ["status", "statuses"], ["edge", "edges"]];
 
 function renderFilters() {
   const countBy = (keyOf) => {
@@ -878,41 +870,27 @@ function renderFilters() {
     for (const node of DATA.nodes) counts[keyOf(node)] = (counts[keyOf(node)] || 0) + 1;
     return counts;
   };
-
   const typeCounts = countBy((node) => node.type);
   const edgeCounts = {};
   for (const edge of DATA.edges) edgeCounts[edge.name] = (edgeCounts[edge.name] || 0) + 1;
   const items = {
     types: DATA.types.map((type) => ({ key: type, label: type, count: typeCounts[type] || 0 })),
     statuses: statusFilters(DATA),
-    edges: DATA.edge_names.map((name) => ({
-      key: name,
-      label: name,
-      count: edgeCounts[name] || 0,
-    })),
+    edges: DATA.edge_names.map((name) => ({ key: name, label: name, count: edgeCounts[name] || 0 })),
   };
-
   for (const [attribute, key] of FILTER_SETS) {
     renderToggles(`${attribute}-filters`, attribute, items[key], state[key]);
     bindToggles(attribute, key);
   }
 }
 
-/** 近傍の深さの選択肢。深さの一覧は `FOCUS_DEPTHS` を唯一の出典とする。 */
 function renderFocusOptions() {
-  document.getElementById("focus").innerHTML = [
-    '<option value="0">フォーカス: 切</option>',
-    ...FOCUS_DEPTHS.map((depth) => `<option value="${depth}">近傍 ${depth} ホップ</option>`),
-  ].join("");
+  document.getElementById("focus").replaceChildren(
+    htmlEl("option", { value: "0" }, "フォーカス: 切"),
+    ...FOCUS_DEPTHS.map((depth) => htmlEl("option", { value: depth }, `近傍 ${depth} ホップ`)),
+  );
 }
 
-/**
- * 影響範囲の探索設定。深さの上限は `IMPACT_DEPTHS` を唯一の出典とする。
- *
- * ここはグラフの描画ではなく**影響範囲そのもの**の設定なので、図のツールバー
- * (フォーカス) ではなく絞り込みと同じ左サイドバーに置く。色分け・詳細ペインの
- * 件数・コピー本文の 3 つに同じだけ効く。
- */
 function renderImpactControls() {
   const slider = document.getElementById("depth");
   slider.min = "0";
@@ -920,10 +898,8 @@ function renderImpactControls() {
   slider.step = "1";
 }
 
-/** 深さスライダの現在値の表示。0 は上限無し。 */
 const depthLabel = () => (state.depth ? `${state.depth} ホップ` : "無制限");
 
-/** 入力欄・チェック・タブを state に合わせ直す。ハッシュから復元したとき用。 */
 function syncControls() {
   document.getElementById("search").value = state.query;
   document.getElementById("direction").value = state.direction;
@@ -940,55 +916,39 @@ function syncControls() {
 
 function renderStats() {
   const counts = DATA.stats.findings;
-  const chips = [
-    `<span class="chip">${DATA.stats.nodes} ノード</span>`,
-    `<span class="chip">${DATA.stats.edges} エッジ</span>`,
-  ];
+  const stats = document.getElementById("stats");
+  const chips = [htmlEl("span", { class: "chip" }, `${DATA.stats.nodes} ノード`),
+    htmlEl("span", { class: "chip" }, `${DATA.stats.edges} エッジ`)];
   for (const severity of ["error", "severe", "warning", "info"]) {
-    if (counts[severity]) chips.push(`<span class="chip ${severity}">${severity} ${counts[severity]}</span>`);
+    if (counts[severity]) chips.push(htmlEl("span", { class: `chip ${severity}` }, `${severity} ${counts[severity]}`));
   }
-  if (!counts.error && !counts.severe && !counts.warning && !counts.info) {
-    chips.push('<span class="chip">指摘なし</span>');
-  }
-  if (DATA.stats.suppressed) chips.push(`<span class="chip">抑制 ${DATA.stats.suppressed} 件</span>`);
-  document.getElementById("stats").innerHTML = chips.join("");
+  if (!counts.error && !counts.severe && !counts.warning && !counts.info) chips.push(htmlEl("span", { class: "chip" }, "指摘なし"));
+  if (DATA.stats.suppressed) chips.push(htmlEl("span", { class: "chip" }, `抑制 ${DATA.stats.suppressed} 件`));
+  stats.replaceChildren(...chips);
   document.getElementById("sources").textContent = DATA.generated_from.join(", ");
   renderLegend();
   renderFindings();
 }
 
-/** 現在のテーマの配色で凡例を描く。 */
 function renderLegend() {
   const scheme = palette().dark ? "dark" : "light";
-  document.getElementById("legend").innerHTML = legendGroups(DATA.meta, scheme)
-    .map((group) => {
-      const items = group.items
-        .map(({ label, swatch }) => {
-          const style = [
-            `background:${swatch.background}`,
-            `border-color:${swatch.borderColor || "currentColor"}`,
-            `border-style:${swatch.borderStyle}`,
-            `border-width:${swatch.borderWidth}px`,
-          ].join(";");
-          return `<span><i class="swatch" style="${style}"></i>${escapeHtml(label)}</span>`;
-        })
-        .join("");
-      return `<span class="legend-group"><b>${escapeHtml(group.title)}</b>${items}</span>`;
-    })
-    .join("");
+  const groups = legendGroups(DATA.meta, scheme).map((group) => {
+    const root = htmlEl("span", { class: "legend-group" }, htmlEl("b", {}, group.title));
+    for (const { label, swatch } of group.items) {
+      root.append(htmlEl("span", {}, htmlEl("i", { class: "swatch", style: {
+        background: swatch.background,
+        borderColor: swatch.borderColor || "currentColor",
+        borderStyle: swatch.borderStyle,
+        borderWidth: `${swatch.borderWidth}px`,
+      } }), label));
+    }
+    return root;
+  });
+  document.getElementById("legend").replaceChildren(...groups);
 }
 
-// --- 検証結果 ---------------------------------------------------------------
-//
-// 指摘は数が増えるほど「重い順の 1 本の帯」では読めなくなる。重大度で絞り、
-// 残りをチェックコードごとにまとめる。同じ規則の違反はまとめて直す (あるいは
-// まとめて抑制する) ものなので、コードが片付ける単位になる。
-
-//: 指摘一覧で選んでいる重大度。URL には載せない (パーマリンクで渡すのは図の状態
-//: であって、右ペインの読み方ではない)。
 let findingSeverity = ALL_SEVERITIES;
 
-/** 重大度タブを選ぶ。押しても ←→ で移っても同じ。 */
 function showSeverity(tab) {
   findingSeverity = tab.dataset.severity;
   renderFindings();
@@ -996,116 +956,74 @@ function showSeverity(tab) {
 
 function renderFindings() {
   const tabs = severityTabs(DATA.findings);
-  //: 選んでいた重大度が消えている状態にはならないが、念のため戻す。
   if (!tabs.some((tab) => tab.key === findingSeverity)) findingSeverity = ALL_SEVERITIES;
-
   const tabBar = document.getElementById("finding-tabs");
-  //: 描き直すとフォーカスが飛ぶ。タブから操作していたなら選んだタブに戻す。
   const refocus = tabBar.contains(document.activeElement);
-  tabBar.innerHTML = tabs
-    .map(
-      (tab) => `<button type="button" role="tab" aria-controls="findings" data-severity="${escapeAttr(tab.key)}"
-        class="${tab.key === findingSeverity ? "active" : ""}"
-        aria-selected="${tab.key === findingSeverity}"
-        tabindex="${tab.key === findingSeverity ? 0 : -1}"
-        >${escapeHtml(tab.label)}<span class="count">${tab.count}</span></button>`,
-    )
-    .join("");
-  tabBar.querySelectorAll("button[data-severity]").forEach((button) => {
-    button.addEventListener("click", () => showSeverity(button));
-  });
+  tabBar.replaceChildren(...tabs.map((tab) => htmlEl("button", {
+    type: "button", role: "tab", "aria-controls": "findings", "data-severity": tab.key,
+    class: tab.key === findingSeverity ? "active" : "", "aria-selected": tab.key === findingSeverity,
+    tabindex: tab.key === findingSeverity ? 0 : -1,
+  }, tab.label, htmlEl("span", { class: "count" }, tab.count))));
+  tabBar.querySelectorAll("button[data-severity]").forEach((button) => button.addEventListener("click", () => showSeverity(button)));
   bindTabKeys(tabBar, showSeverity);
   if (refocus) tabBar.querySelector("button.active")?.focus();
 
   const groups = groupFindings(DATA.findings, findingSeverity);
   const panel = document.getElementById("findings");
-  panel.innerHTML = groups.length
-    ? groups
-        .map(
-          (group) => `<div class="code-head"><span>${escapeHtml(group.code)}</span>
-            <span>${group.items.length} 件</span></div>
-            ${group.items.map((finding) => findingHtml(finding)).join("")}`,
-        )
-        .join("")
-    : '<p class="empty">指摘は無い。</p>';
+  if (!groups.length) panel.replaceChildren(htmlEl("p", { class: "empty" }, "指摘は無い。"));
+  else panel.replaceChildren(...groups.flatMap((group) => [
+    htmlEl("div", { class: "code-head" }, htmlEl("span", {}, group.code), htmlEl("span", {}, `${group.items.length} 件`)),
+    ...group.items.map((finding) => findingNode(finding)),
+  ]));
   panel.querySelectorAll("button.finding[data-id]").forEach((button) => {
     button.addEventListener("click", () => selectNode(button.dataset.id));
   });
 }
 
 // --- テーブルビュー --------------------------------------------------------
-//
-// グラフと同じ view / state を見るので、絞り込みも選択もそのまま共有される。
-// 中央ペインの表示を差し替えるだけで、グラフ側は作り直さない。
 
 function renderTable() {
-  // 隠れている間は作らない。テーブルに切り替えたときに setMode() が作り直す。
   if (state.mode !== "table") return;
   const rows = sortRows(view, tableRows(view, state.query), state.sort);
-  const head = TABLE_COLUMNS.map((column) => {
+  const header = htmlEl("tr");
+  for (const column of TABLE_COLUMNS) {
     const active = state.sort.key === column.key;
     const order = active ? (state.sort.asc ? "ascending" : "descending") : "none";
     const arrow = active ? (state.sort.asc ? "▲" : "▼") : "";
-    return `<th class="${column.numeric ? "num" : ""}" aria-sort="${order}">
-      <button data-key="${column.key}" title="この列で並べ替える">${column.label}<span class="arrow">${arrow}</span></button></th>`;
-  }).join("");
-
-  //: 値が無いこと (根拠 0 件・指摘 0 件) を空欄と区別して見せる。
-  const DASH = '<td class="num dash">—</td>';
-  const cell = (row, key) => {
-    switch (key) {
-      case "text":
-        return `<td class="text">${escapeHtml(row.text)}</td>`;
-      case "findings":
-        return row.findings
-          ? `<td class="num"><button class="finding-count ${row.severity || ""}" data-findings="${row.id}" title="このノードへの指摘を見る">${row.findings}</button></td>`
-          : DASH;
-      case "evidence":
-        return row.evidence ? `<td class="num">${row.evidence}</td>` : DASH;
-      default:
-        return `<td class="${key}">${escapeHtml(row[key])}</td>`;
+    header.append(htmlEl("th", { class: column.numeric ? "num" : "", "aria-sort": order },
+      htmlEl("button", { "data-key": column.key, title: "この列で並べ替える" },
+        column.label, htmlEl("span", { class: "arrow" }, arrow))));
+  }
+  const body = htmlEl("tbody");
+  if (!rows.length) body.append(htmlEl("tr", {}, htmlEl("td", { class: "empty", colspan: TABLE_COLUMNS.length }, "条件に合うノードは無い。")));
+  for (const row of rows) {
+    const tr = htmlEl("tr", { "data-id": row.id, tabindex: 0, class: row.id === state.selected ? "sel" : "" });
+    for (const { key } of TABLE_COLUMNS) {
+      if (key === "text") tr.append(htmlEl("td", { class: "text" }, row.text));
+      else if (key === "findings") tr.append(row.findings
+        ? htmlEl("td", { class: "num" }, htmlEl("button", { class: `finding-count ${row.severity || ""}`, "data-findings": row.id, title: "このノードへの指摘を見る" }, row.findings))
+        : htmlEl("td", { class: "num dash" }, "—"));
+      else if (key === "evidence") tr.append(row.evidence ? htmlEl("td", { class: "num" }, row.evidence) : htmlEl("td", { class: "num dash" }, "—"));
+      else tr.append(htmlEl("td", { class: key }, row[key]));
     }
-  };
-
-  //: 行はクリックでノードを選ぶ操作子なので、キーボードからも入れるようにする
-  //: (tabindex + Enter / Space)。tr は button にできないので手で持たせる。
-  const body = rows.length
-    ? rows
-        .map(
-          (row) => `<tr data-id="${escapeAttr(row.id)}" tabindex="0"
-            class="${row.id === state.selected ? "sel" : ""}">
-            ${TABLE_COLUMNS.map((column) => cell(row, column.key)).join("")}</tr>`,
-        )
-        .join("")
-    : `<tr><td class="empty" colspan="${TABLE_COLUMNS.length}">条件に合うノードは無い。</td></tr>`;
-
+    body.append(tr);
+  }
   const table = document.getElementById("node-table");
-  table.innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
-  document.getElementById("table-note").textContent =
-    `${rows.length} 件を表示中 (全 ${DATA.nodes.length} 件)。` +
-    " 行をクリック (キーボードなら Enter) すると右ペインに詳細が出る。列見出しで並べ替える。";
-
-  table.querySelectorAll("thead button[data-key]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.sort = nextSort(state.sort, button.dataset.key);
-      renderTable();
-      writeHash();
-    });
-  });
+  table.replaceChildren(htmlEl("thead", {}, header), body);
+  document.getElementById("table-note").textContent = `${rows.length} 件を表示中 (全 ${DATA.nodes.length} 件)。 行をクリック (キーボードなら Enter) すると右ペインに詳細が出る。列見出しで並べ替える。`;
+  table.querySelectorAll("thead button[data-key]").forEach((button) => button.addEventListener("click", () => {
+    state.sort = nextSort(state.sort, button.dataset.key); renderTable(); writeHash();
+  }));
   table.querySelectorAll("tbody tr[data-id]").forEach((tr) => {
     tr.addEventListener("click", () => selectNode(tr.dataset.id));
     tr.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      selectNode(tr.dataset.id);
+      event.preventDefault(); selectNode(tr.dataset.id);
     });
   });
-  table.querySelectorAll("button[data-findings]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      showFindings(button.dataset.findings);
-    });
-  });
+  table.querySelectorAll("button[data-findings]").forEach((button) => button.addEventListener("click", (event) => {
+    event.stopPropagation(); showFindings(button.dataset.findings);
+  }));
 }
 
 /** 指摘数から検証結果へ辿る。そのノードを選び、右ペインの指摘まで送る。 */

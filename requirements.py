@@ -276,6 +276,7 @@ FR_SITE = FunctionalRequirement(
         "Goal と Need は、横に並べた全 Requirements 機能枠の外端と同じ幅へ揃える",
         "Goal と Need は折り返さず、dagre の並び順だけを使って不要な横方向の空白を詰める",
         "Requirements の各機能枠はグループ数にかかわらず個別の最大幅まで使用できる",
+        "モデル由来の値は HTML 文字列として再解釈せず、外部リンクは HTTP(S) URL だけを有効にする",
     ],
 )
 FR_FIT_WHOLE = FunctionalRequirement(

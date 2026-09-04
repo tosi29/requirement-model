@@ -215,6 +215,33 @@ def test_detail_panel_uses_japanese_labels_for_external_references(tmp_path: Pat
     assert 'pushReferenceSection(rows, "Evidence"' not in html
 
 
+def test_dynamic_model_values_are_never_reinterpreted_as_html(tmp_path: Path):
+    """モデル値の描画は DOM API に限定し、XSS payload を HTML 化しない。"""
+    payload = '\"><img src=x onerror=alert(1)>こと'
+    malicious_id = '\"><img/src=x/onerror=alert(1)>'
+    graph = build(
+        source("S-1"),
+        fr(malicious_id, text=payload, source=[source("S-1")]),
+    )
+    html = build_site(graph, FindingList(), tmp_path).read_text(encoding="utf-8")
+    script = app_js()
+
+    assert payload not in html
+    assert "\\u003cimg src=x onerror=alert(1)>" in html
+    assert "innerHTML" not in script
+    assert "document.createElement(tag)" in script
+    assert "element.append(" in script
+    assert "replaceChildren" in script
+
+
+def test_external_links_are_restricted_to_http_schemes():
+    """Reference と出所 URL は javascript: 等を href に設定しない。"""
+    script = app_js()
+
+    assert 'url.protocol === "https:" || url.protocol === "http:"' in script
+    assert 'href: safe' in script
+
+
 def test_page_has_impact_depth_and_undirected_controls(tmp_path: Path):
     """影響範囲の深さ・向きは `req explain --depth / --undirected` と同じ操作。"""
     index = build_site(chain(), FindingList(), tmp_path)

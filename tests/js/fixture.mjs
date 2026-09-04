@@ -1,6 +1,6 @@
 /** テスト用の埋め込みデータ。`site_data()` が出す形の最小版。 */
 
-import { initialSelection } from "../../src/reqmodel/presentation/site_logic.ts";
+import { initialSelection } from "../../src/reqmodel/presentation/site_logic.js";
 
 export const EDGE_NAMES = [
   "refines",

@@ -1,4 +1,4 @@
-/** site_logic.ts のユニットテスト。`node --test tests/js/` で走る。 */
+/** site_logic.js のユニットテスト。`node --test tests/js/` で走る。 */
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -60,7 +60,7 @@ import {
   truncate,
   visibleBandKeys,
   wrapLabel,
-} from "../../src/reqmodel/presentation/site_logic.ts";
+} from "../../src/reqmodel/presentation/site_logic.js";
 import { ELLIPSE_FIT, allOn, defaultOn, fixture, largeFixture } from "./fixture.mjs";
 
 const viewOf = (state) => {

@@ -14,7 +14,7 @@ import {
   createView,
   initialSelection,
   nodeContext,
-} from "../../src/reqmodel/presentation/site_logic.ts";
+} from "../../src/reqmodel/presentation/site_logic.js";
 
 const input = JSON.parse(await new Response(process.stdin).text());
 const { data, requests } = input;

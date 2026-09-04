@@ -1,6 +1,5 @@
-// @ts-nocheck
-import { LABEL_FONT, LABEL_MAX_LENGTH, LABEL_WRAP_WIDTH, escapeAttr, escapeHtml, labelChunks, nodeSize, truncate, estimateTextWidth, wrapLabel } from "./site_text.ts";
-import { compare, fieldLabel } from "./site_graph.ts";
+import { LABEL_FONT, LABEL_MAX_LENGTH, LABEL_WRAP_WIDTH, escapeAttr, escapeHtml, labelChunks, nodeSize, truncate, estimateTextWidth, wrapLabel } from "./site_text.js";
+import { compare, fieldLabel } from "./site_graph.js";
 // --- SVG 描画に渡す値 -------------------------------------------------------
 //
 // 生成するのはただのオブジェクトなので、ライブラリを読み込まなくてもテストできる。
@@ -735,7 +734,7 @@ function labelElement(label, x, y, { size = LABEL_FONT.size, fill, weight } = {}
 /**
  * いま図に描かれているものを SVG 1 枚にする。
  *
- * scene は表示層 (`site_app.ts`) が SVG 描画状態から集めた実測値:
+ * scene は表示層 (`site_app.js`) が SVG 描画状態から集めた実測値:
  *
  * - `nodes`: `{ id, type, status, label, x, y, w, h }`
  * - `edges`: `{ name, dashed, x1, y1, x2, y2 }` (端点はノードの縁の座標)

@@ -1,6 +1,5 @@
-// @ts-nocheck
-import { TABLE_COLUMNS } from "./site_table.ts";
-import { FOCUS_DEPTHS, IMPACT_DEPTHS, initialSelection, statusFilters, statusNames } from "./site_graph.ts";
+import { TABLE_COLUMNS } from "./site_table.js";
+import { FOCUS_DEPTHS, IMPACT_DEPTHS, initialSelection, statusFilters, statusNames } from "./site_graph.js";
 // --- URL ハッシュ ----------------------------------------------------------
 //
 // 表示状態を URL に載せ、「この FR を見て」と URL だけ渡せば相手にも同じ画面が

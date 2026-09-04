@@ -1,6 +1,5 @@
-// @ts-nocheck
-import { truncate } from "./site_text.ts";
-import { compare, fieldLabel, rankOf, reach } from "./site_graph.ts";
+import { truncate } from "./site_text.js";
+import { compare, fieldLabel, rankOf, reach } from "./site_graph.js";
 // --- テーブル --------------------------------------------------------------
 //
 // 棚卸し (全件を順に確認する作業) 用の一覧。グラフと同じ view から作るので、

@@ -805,7 +805,8 @@ $ req site -o site && python -m http.server -d site
 Pull Request の差分上へ指摘を表示できる。抑制された指摘は出力しない。
 
 次は、検証の成否を保ったまま SARIF をアップロードする最小の Actions 例である。
-リポジトリの workflow permissions で `security-events: write` が必要になる。
+リポジトリの workflow permissions で `security-events: write` が必要になる。このリポジトリでも
+`.github/workflows/ci.yml` の専用 job で同じ構成を使い、権限をその job だけに限定している。
 
 ```yaml
 permissions:
@@ -821,12 +822,17 @@ steps:
   - id: validate
     continue-on-error: true
     run: req validate --strict --sarif requirements.py > reqmodel.sarif
-  - uses: github/codeql-action/upload-sarif@v3
+  - uses: github/codeql-action/upload-sarif@v4
     with:
       sarif_file: reqmodel.sarif
+      category: reqmodel
   - if: steps.validate.outcome == 'failure'
     run: exit 1
 ```
+
+このリポジトリの workflow は、書き込み権限が付与されない fork 由来の Pull Request では
+アップロードだけを skip する。権限を得るための `pull_request_target` は使わず、`main` への
+push と同一リポジトリ内の Pull Request で Code Scanning を更新する。
 
 `--sarif` と `--json` は同時には指定できない。SARIF をファイルに保存して公式
 スキーマで検査する場合は、たとえば次のように実行する。

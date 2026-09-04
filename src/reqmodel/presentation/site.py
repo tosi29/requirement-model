@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from html import escape
 from importlib import resources
@@ -153,29 +152,20 @@ def _read(name: str) -> str:
     )
 
 
-#: ページに載せる自前の JS。依存する側を後に置く (この順で連結する)。
-SITE_SCRIPTS: tuple[str, ...] = ("site_logic.js", "site_app.js")
-
-#: 連結して 1 つのモジュールにするので、ファイル間の import / export は落とす。
-#: これは「単体で lint / テストできる ES モジュール」を単一ファイル配布に
-#: 載せるための最小の橋渡しであり、これ以上の変換 (最小化・トランスパイル) はしない。
-_JS_IMPORT = re.compile(r'^import\s[^;]*?from\s+"\./[\w.-]+\.js";?[ \t]*\n', re.M)
-_JS_EXPORT = re.compile(
-    r"^export\s+(?=(?:async\s+)?(?:function|const|let|var|class)\b)", re.M
+#: 開発時に直接 lint / test する ES modules。配布時は esbuild の生成物だけを読む。
+SITE_SCRIPTS: tuple[str, ...] = (
+    "site_text.js", "site_graph.js", "site_table.js", "site_state.js",
+    "site_context.js", "site_layout.js", "site_logic.js", "site_app.js",
 )
+SITE_BUNDLE = "site_bundle.js"
 
 
 def app_js() -> str:
-    """`SITE_SCRIPTS` を 1 つのモジュールに連結したもの。"""
-    parts = []
-    for name in SITE_SCRIPTS:
-        source = _JS_EXPORT.sub("", _JS_IMPORT.sub("", _read(name)))
-        if "</script" in source:
-            raise ValueError(f"{name} に </script> が含まれている")
-        parts.append(
-            f"// --- {name} " + "-" * (60 - len(name)) + f"\n\n{source.strip()}\n"
-        )
-    return "\n".join(parts)
+    """ビルド時に生成して package data に含めた自己完結 bundle を返す。"""
+    source = _read(SITE_BUNDLE)
+    if "</script" in source:
+        raise ValueError(f"{SITE_BUNDLE} に </script> が含まれている")
+    return source
 
 
 def build_site(

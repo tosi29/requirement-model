@@ -377,21 +377,17 @@ def test_build_site_writes_page_and_raw_outputs(tmp_path: Path):
     assert json.loads((tmp_path / "model.json").read_text(encoding="utf-8"))["nodes"]
 
 
-def test_app_js_is_the_concatenation_of_the_source_modules():
-    """配布は 1 ファイルのまま、開発は分割したファイルで行う。"""
+def test_app_js_is_the_prebuilt_bundle():
+    """実行時には Node.js を使わず、package data の bundle を読む。"""
     js = app_js()
 
-    for name in SITE_SCRIPTS:
-        assert f"// --- {name}" in js
-    # 連結して 1 つのモジュールにするので、ファイル間の import / export は残らない。
-    assert 'from "./site_logic.js"' not in js
-    assert not re.search(r"^\s*export\s", js, re.M)
-    assert not re.search(r"^\s*import\s", js, re.M)
-    # 中身そのものは落とさない。
     assert "function nodeContext(" in js
     assert "function initGraph(" in js
-    # site_logic.js が先。site_app.js がその定義を参照するため。
-    assert js.index("function nodeContext(") < js.index("function initGraph(")
+    assert not re.search(r"^\s*export\s", js, re.M)
+    assert not re.search(r"^\s*import\s", js, re.M)
+    assert js == (
+        Path(__file__).resolve().parents[1] / "src" / "reqmodel" / "presentation" / "site_bundle.js"
+    ).read_text(encoding="utf-8")
 
 
 def test_page_carries_the_app_js_inline(tmp_path: Path):

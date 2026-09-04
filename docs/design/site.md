@@ -252,24 +252,30 @@ SVG の書き出しは、画面にある SVG DOM を複製し、非表示要素�
 
 ## ページの JS の構成とテスト
 
-出力は 1 枚の HTML だが、**ソースはテンプレートから分けてある**。
+出力は 1 枚の HTML のままだが、ソースは責務別の ES Modules に分ける。
 
 | ファイル | 役割 |
 |---|---|
-| `site_logic.js` | ロジック層。DOM も描画 API も触らない純関数だけ |
-| `site_app.js` | 表示層。DOM・SVG・dagre に触るのはここだけ |
-| `site_template.html` | 骨組みと CSS。JS は `__APP_JS__` の 1 か所に入る |
+| `site_text.js` | 文字列、ラベル折り返し、ノード寸法 |
+| `site_graph.js` | 絞り込み、隣接関係、探索、影響範囲 |
+| `site_table.js` | 検索、表、詳細、指摘の集約 |
+| `site_state.js` | URL hash、保存状態、テーマ |
+| `site_context.js` | explain / LLM コンテキスト |
+| `site_layout.js` | 描画要素、帯レイアウト、SVG / Mermaid export |
+| `site_logic.js` | テストやアプリ向けの公開 facade |
+| `site_app.js` | DOM・SVG・dagre を扱う UI entrypoint |
+| `site_bundle.js` | esbuild で生成し wheel に同梱する配布物 |
 
-`presentation/site.py` の `app_js()` が 2 つを連結して 1 つのモジュールにし、テンプレートへ
-インライン化する。連結にあたって落とすのはファイル間の `import` / `export` 行だけで、
-最小化もトランスパイルもしない。生成された HTML の中身は書いたままの JS である。
-
-分ける目的は**テストできるようにすること**。`site_logic.js` は素の ES モジュールなので、
-Node からそのまま読み込める。
+`npm run build` は `site_app.js` を entrypoint として esbuild で bundle する。
+`req site` は同梱済みの `site_bundle.js` を読むだけなので、実行環境に Node.js は不要である。
+生成 HTML には bundle をインライン化するため、従来どおり単一ファイルで完結する。
+`npm test` は最初に bundle の再生成結果を比較し、source module に対して変更漏れした
+古い bundle を CI で検出する。純粋関数は source module から直接 import してテストする。
 
 ```console
-$ npm run lint    # node --check (依存パッケージは無い)
-$ npm test        # node --test tests/js/*.test.mjs
+$ npm run build   # 配布用 bundle を更新
+$ npm run lint    # source modules と build script の構文検査
+$ npm test        # bundle の鮮度検査 + node:test
 ```
 
 ## ベンチ用サンプル

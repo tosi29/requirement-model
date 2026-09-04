@@ -35,6 +35,7 @@ from .application.plan import diff_graphs, format_plan, impacted_nodes, load_rev
 from .definition.nodes import STATUS_RANK
 from .presentation.plan import render_plan_markdown
 from .presentation.render import FORMATS, render
+from .presentation.sarif import render_sarif
 from .presentation.site import (
     DEFAULT_REF,
     DEFAULT_TITLE,
@@ -86,8 +87,14 @@ def build_parser() -> argparse.ArgumentParser:
     validate_parser.add_argument(
         "--no-lexicon", action="store_true", help="曖昧語チェックを行わない"
     )
-    validate_parser.add_argument(
+    output_group = validate_parser.add_mutually_exclusive_group()
+    output_group.add_argument(
         "--json", action="store_true", help="指摘を JSON で出力する"
+    )
+    output_group.add_argument(
+        "--sarif",
+        action="store_true",
+        help="指摘を SARIF 2.1.0 で出力する",
     )
     validate_parser.add_argument(
         "--show-suppressed",
@@ -294,7 +301,9 @@ def cmd_validate(args: argparse.Namespace) -> int:
         waived = WaiverResult(findings=findings)
     findings = waived.findings
 
-    if args.json:
+    if args.sarif:
+        print(json.dumps(render_sarif(findings), ensure_ascii=False, indent=2))
+    elif args.json:
         payload = {
             "files": [str(p) for p in result.paths],
             "node_count": len(result.graph),

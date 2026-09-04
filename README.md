@@ -46,7 +46,7 @@ $ req validate examples/sample.py
 
 ```console
 $ req validate [PATH ...]                  # 層0〜層2 の全チェック
-$ req plan     [PATH ...] [--rev HEAD]     # git 前版との構造 diff → 影響範囲
+$ req plan     [PATH ...] [--rev HEAD] [--format text|markdown]  # 構造 diff → 影響範囲
 $ req graph    [PATH ...] [--format mermaid|dot] [-o FILE]
 $ req explain  ID [ID ...] [-f PATH]       # 影響部分グラフを LLM 用に整形
 $ req doc      [PATH ...] [--matrix] [-o FILE]  # 仕様書 / トレーサビリティ表の生成
@@ -73,6 +73,8 @@ $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (
 | `--show-suppressed` | validate | 抑制した指摘を理由付きで表示する |
 | `--rev REV` | plan | 比較先のリビジョン (既定: `HEAD`) |
 | `--edges a,b` | plan, explain | 辿るエッジ種別を限定する |
+| `--format text\|markdown` | plan | 端末向けテキスト、または Mermaid 図付きの PR 向け Markdown |
+| `--fail-on-impact STATUS` | plan | 影響範囲に指定 status のノードがあれば終了コード 1 |
 | `--depth N` | explain | 探索の深さ上限 |
 | `--undirected` | explain | エッジの向きを無視して辿る |
 | `--highlight ID,ID` | graph | 指定ノードを強調する |
@@ -344,6 +346,13 @@ impact(n) = ancestors(n) ∪ descendants(n)   # --edges でエッジ型を絞れ
 
 `req plan` は git 前版の定義ファイルを (実行せずに) 読んで正規化し、ノード単位・
 フィールド単位の差分と、変更されたノードの影響範囲を出す。
+
+PR でレビューする場合は `req plan --rev origin/main --format markdown` を使う。
+追加を緑、削除を赤、変更を青、影響範囲を黄で示す Mermaid 図と差分表を、そのまま
+PR 本文やコメントへ貼れる。`--fail-on-impact verified` を併用すると、影響範囲に
+検証済み要求が含まれる変更を CI で失敗させられる。このリポジトリで実際にコメントを
+更新するワークフローは [requirements-plan.yml](.github/workflows/requirements-plan.yml)
+を利用例として同梱している。
 
 **出所 (file:line) は diff の比較対象に含めない**。定義を並べ替えただけ、上に 1 行
 足しただけの変更が「グラフが変わった」として出てしまうと、構造 diff の意味が無くなる。

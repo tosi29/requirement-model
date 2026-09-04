@@ -218,6 +218,35 @@ def test_plan_command(tmp_path: Path, capsys, monkeypatch):
     assert "text: 早く精算したい → 今すぐ精算したい" in out
 
 
+def test_plan_markdown_and_fail_on_impact(tmp_path: Path, capsys, monkeypatch):
+    def git(*args: str) -> None:
+        subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)
+
+    git("init")
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "t")
+    definition = tmp_path / "requirements.py"
+    definition.write_text(
+        "from reqmodel import FunctionalRequirement, Need\n"
+        + 'n = Need(id="Need-1", text="早く精算したい", status="approved")\n'
+        + 'f = FunctionalRequirement(id="FR-1", text="精算すること", '
+        + 'satisfies=[n], status="verified")\n',
+        encoding="utf-8",
+    )
+    git("add", "requirements.py")
+    git("commit", "-m", "first")
+    definition.write_text(
+        "from reqmodel import FunctionalRequirement, Need\n"
+        + 'n = Need(id="Need-1", text="すぐ精算したい", status="approved")\n'
+        + 'f = FunctionalRequirement(id="FR-1", text="精算すること", '
+        + 'satisfies=[n], status="verified")\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    assert main(["plan", "--format", "markdown", "--fail-on-impact", "verified"]) == 1
+    assert "```mermaid" in capsys.readouterr().out
+
+
 def test_doc_command_writes_spec(tmp_path: Path):
     output = tmp_path / "spec.md"
     assert main(["doc", SAMPLE, "-o", str(output)]) == 0

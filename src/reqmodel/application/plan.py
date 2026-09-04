@@ -14,7 +14,7 @@ from typing import Any, Iterable, Sequence
 from ..core.graph import RequirementGraph, node_to_json_obj
 from .loader import LoadResult, load_sources
 
-__all__ = ["GraphDiff", "diff_graphs", "load_revision", "format_plan"]
+__all__ = ["GraphDiff", "diff_graphs", "load_revision", "format_plan", "impacted_nodes"]
 
 
 @dataclass
@@ -95,6 +95,20 @@ def _impact_of(
     return impacted
 
 
+def impacted_nodes(
+    before: RequirementGraph,
+    after: RequirementGraph,
+    diff: GraphDiff,
+    edge_names: Sequence[str] | None = None,
+) -> set[str]:
+    """変更点そのものを除いた、変更によって影響を受けるノード ID。"""
+    impacted = _impact_of(
+        after, diff.added + list(diff.changed) + list(diff.retyped), edge_names
+    )
+    impacted |= _impact_of(before, diff.removed, edge_names)
+    return impacted - set(diff.touched)
+
+
 def _fmt_value(value: Any) -> str:
     if isinstance(value, list):
         return "[" + ", ".join(_fmt_value(v) for v in value) + "]"
@@ -146,9 +160,7 @@ def format_plan(
                 f" → {_fmt_value(change.after)}"
             )
 
-    impacted = _impact_of(after, diff.added + list(diff.changed) + list(diff.retyped), edge_names)
-    impacted |= _impact_of(before, diff.removed, edge_names)
-    impacted -= set(diff.touched)
+    impacted = impacted_nodes(before, after, diff, edge_names)
 
     lines.append("")
     lines.append(f"## 影響範囲 ({len(impacted)} 件)")

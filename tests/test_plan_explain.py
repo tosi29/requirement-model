@@ -11,6 +11,7 @@ from reqmodel.application.explain import explain_text, impact_set
 from reqmodel.application.loader import load_paths
 from reqmodel.application.plan import diff_graphs, format_plan, load_revision
 from reqmodel.presentation.render import render_dot, render_mermaid
+from reqmodel.presentation.plan import render_plan_markdown
 
 HEADER = "from reqmodel import Goal, Need, FunctionalRequirement, Reference\n"
 
@@ -70,6 +71,23 @@ def test_plan_output_lists_impact():
     assert "status: proposed → approved" in text
     assert "## 影響範囲" in text
     assert "Need-1" in text.split("## 影響範囲")[1]
+
+
+def test_markdown_plan_contains_table_mermaid_and_diff_colors():
+    before = build(need("Need-1"), fr("FR-1", satisfies=["Need-1"]))
+    after = build(
+        need("Need-1"),
+        fr("FR-1", text="変更後を読み取ること", satisfies=["Need-1"]),
+        qr("QR-1", text="5 秒以内とすること", qualifies=["FR-1"]),
+    )
+    diff = diff_graphs(before, after)
+    text = render_plan_markdown(before, after, diff, "origin/main")
+    assert "```mermaid" in text
+    assert "classDef added fill:#dafbe1" in text
+    assert "classDef impacted fill:#fff8c5" in text
+    assert "| 🟢 追加 | `QR-1`" in text
+    assert "| 🔵 変更 | `FR-1` | `text`" in text
+    assert "- 🟡 `Need-1`" in text
 
 
 def test_load_revision_reads_the_previous_version(tmp_path: Path):

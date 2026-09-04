@@ -28,4 +28,4 @@ plugins = ["pydantic.mypy"]
 files = ["src", "examples", "requirements.py"]
 
 [tool.setuptools.package-data]
-"reqmodel.presentation" = ["site_template.html", "site_logic.js", "site_app.js"]
+"reqmodel.presentation" = ["site_template.html", "site_bundle.js"]

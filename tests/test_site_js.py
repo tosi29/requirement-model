@@ -26,7 +26,7 @@ from reqmodel.findings import FindingList
 from reqmodel.application.loader import load_paths
 from reqmodel.core.metamodel import EDGE_NAMES
 from reqmodel.presentation.render import render_mermaid
-from reqmodel.presentation.site import site_data
+from reqmodel.presentation.site import SITE_SCRIPTS, site_data
 
 ROOT = Path(__file__).resolve().parents[1]
 JS_TESTS = ROOT / "tests" / "js"
@@ -74,7 +74,7 @@ def sample_graph():
 
 def test_js_modules_are_syntactically_valid_on_their_own():
     """切り出した JS は、埋め込まなくても単体で構文検査できる。"""
-    for name in ("site_logic.js", "site_app.js"):
+    for name in SITE_SCRIPTS:
         result = run_node(["--check", str(ROOT / "src" / "reqmodel" / "presentation" / name)])
         assert result.returncode == 0, result.stderr
 

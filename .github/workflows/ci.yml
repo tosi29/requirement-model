@@ -53,6 +53,9 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Node 依存をインストール
+        run: npm ci
+
       - name: 構文検査
         run: npm run lint
 

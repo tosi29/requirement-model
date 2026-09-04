@@ -45,7 +45,7 @@ $ req validate examples/sample.py
 ## 使い方
 
 ```console
-$ req validate [PATH ...]                  # 層0〜層2 の全チェック
+$ req validate [PATH ...] [--json | --sarif]  # 層0〜層2 の全チェック
 $ req plan     [PATH ...] [--rev HEAD] [--format text|markdown]  # 構造 diff → 影響範囲
 $ req graph    [PATH ...] [--format mermaid|dot] [-o FILE]
 $ req explain  ID [ID ...] [-f PATH]       # 影響部分グラフを LLM 用に整形
@@ -69,6 +69,7 @@ $ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (
 |---|---|---|
 | `--strict` | validate | warning / severe もエラー扱いにする |
 | `--json` | validate, explain, stats | 機械可読な出力 |
+| `--sarif` | validate | GitHub Code Scanning 向け SARIF 2.1.0 出力 |
 | `--no-lexicon` | validate, stats | 曖昧語チェックを行わない |
 | `--show-suppressed` | validate | 抑制した指摘を理由付きで表示する |
 | `--rev REV` | plan | 比較先のリビジョン (既定: `HEAD`) |
@@ -795,6 +796,45 @@ $ req site -o site && python -m http.server -d site
 残る指摘は抑制 (waiver) で理由付きで残してあり、`req validate --show-suppressed` で読める。
 **`--strict` を通すために表現を歪めてはいない**。2 件の抑制はすべて理由が書かれ、
 対象の指摘が消えれば `waiver.stale` で気付ける。
+
+## GitHub Code Scanning への指摘の公開
+
+`req validate --sarif` は、チェックコードを rule、指摘の重大度を SARIF の
+`error` / `warning` / `note` に変換する。出所が分かる指摘には `file:line` を
+`physicalLocation` と `region.startLine` として載せるため、Code Scanning が
+Pull Request の差分上へ指摘を表示できる。抑制された指摘は出力しない。
+
+次は、検証の成否を保ったまま SARIF をアップロードする最小の Actions 例である。
+リポジトリの workflow permissions で `security-events: write` が必要になる。
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+
+steps:
+  - uses: actions/checkout@v4
+  - uses: actions/setup-python@v5
+    with:
+      python-version: "3.14"
+  - run: pip install reqmodel
+  - id: validate
+    continue-on-error: true
+    run: req validate --strict --sarif requirements.py > reqmodel.sarif
+  - uses: github/codeql-action/upload-sarif@v3
+    with:
+      sarif_file: reqmodel.sarif
+  - if: steps.validate.outcome == 'failure'
+    run: exit 1
+```
+
+`--sarif` と `--json` は同時には指定できない。SARIF をファイルに保存して公式
+スキーマで検査する場合は、たとえば次のように実行する。
+
+```console
+$ req validate --sarif requirements.py > reqmodel.sarif
+$ check-jsonschema --schemafile https://json.schemastore.org/sarif-2.1.0.json reqmodel.sarif
+```
 
 ## GitHub Pages への公開
 

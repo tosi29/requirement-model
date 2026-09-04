@@ -30,6 +30,59 @@ def test_validate_json_output(capsys):
     assert payload["findings"] == []
 
 
+def test_validate_sarif_output_maps_rule_severity_and_location(
+    tmp_path: Path, capsys, monkeypatch
+):
+    definition = tmp_path / "requirements.py"
+    definition.write_text(
+        HEADER + 'n = Need(id="Need-1", text="早く精算したい")\n', encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["validate", "requirements.py", "--sarif"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["$schema"] == "https://json.schemastore.org/sarif-2.1.0.json"
+    assert payload["version"] == "2.1.0"
+    run = payload["runs"][0]
+    assert run["tool"]["driver"]["rules"] == [
+        {
+            "id": "structure.orphan_need",
+            "shortDescription": {"text": "satisfies されない Need"},
+        }
+    ]
+    assert run["results"][0] == {
+        "ruleId": "structure.orphan_need",
+        "ruleIndex": 0,
+        "level": "warning",
+        "message": {"text": "どの FR からも satisfies されていない (置き去りのニーズ)"},
+        "properties": {"layer": 2, "nodeId": "Need-1"},
+        "locations": [
+            {
+                "physicalLocation": {
+                    "artifactLocation": {"uri": "requirements.py"},
+                    "region": {"startLine": 2},
+                }
+            }
+        ],
+    }
+
+
+def test_validate_sarif_maps_error_level(tmp_path: Path, capsys):
+    definition = tmp_path / "requirements.py"
+    definition.write_text(HEADER + "for i in [1]:\n    pass\n", encoding="utf-8")
+
+    assert main(["validate", str(definition), "--sarif"]) == 1
+    result = json.loads(capsys.readouterr().out)["runs"][0]["results"][0]
+    assert result["level"] == "error"
+    assert result["locations"][0]["physicalLocation"]["region"] == {"startLine": 2}
+
+
+def test_validate_rejects_multiple_machine_readable_formats():
+    with pytest.raises(SystemExit) as exc:
+        main(["validate", SAMPLE, "--json", "--sarif"])
+    assert exc.value.code == 2
+
+
 def test_validate_reports_errors_and_exits_nonzero(tmp_path: Path, capsys):
     definition = tmp_path / "requirements.py"
     definition.write_text(

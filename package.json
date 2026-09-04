@@ -7,11 +7,13 @@
   "scripts": {
     "build": "node tools/build-site.mjs",
     "check:bundle": "node tools/build-site.mjs --check",
-    "lint": "node --check tools/build-site.mjs && node --check src/reqmodel/presentation/site_*.js",
-    "test": "npm run check:bundle && node --test tests/js/*.test.mjs",
-    "bench": "node tests/js/bench.mjs"
+    "lint": "node --check tools/build-site.mjs && tsc --noEmit",
+    "test": "npm run check:bundle && node --import tsx --test tests/js/*.test.mjs",
+    "bench": "node --import tsx tests/js/bench.mjs"
   },
   "devDependencies": {
-    "esbuild": "^0.25.9"
+    "esbuild": "^0.25.9",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3"
   }
 }

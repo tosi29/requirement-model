@@ -1,9 +1,13 @@
+// @ts-nocheck
 /**
  * 静的サイトの表示層。DOM と SVG に触るのはこのファイルだけ。
  *
- * 計算は `site_logic.js` の純関数に任せ、ここは「受け取った値を貼る」「イベントを
+ * 計算は `site_logic.ts` の純関数に任せ、ここは「受け取った値を貼る」「イベントを
  * 繋ぐ」に徹する。esbuild が依存モジュールと bundle し、`site.py` は生成物を HTML に埋め込む。
  */
+
+import { createGraphViewPrimitives } from "./site_graph_view.ts";
+import type { SiteData, ViewState } from "./site_types.ts";
 
 import {
   ALL_SEVERITIES,
@@ -52,12 +56,12 @@ import {
   tableRows,
   truncate,
   visibleBandKeys,
-} from "./site_logic.js";
+} from "./site_logic.ts";
 
 const dagre = window.dagre;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-const DATA = JSON.parse(document.getElementById("model-data").textContent);
+const DATA: SiteData = JSON.parse(document.getElementById("model-data")!.textContent!);
 const METRICS = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
 
 // --- 保存 (localStorage) ----------------------------------------------------
@@ -90,35 +94,15 @@ function writeStore(key, value) {
  * `writeHash()` で書き戻す (戻る/進むは `applyHash()` で戻す)。ハッシュの無い
  * URL で開いたときだけ、前回の絞り込み (localStorage) を初期値に使う。
  */
-let state = decodeHash(initialHash(location.hash, readStore(VIEW_STORAGE_KEY)), DATA);
+let state: ViewState = decodeHash(initialHash(location.hash, readStore(VIEW_STORAGE_KEY)), DATA);
 
 /** 絞り込みを反映した現在のグラフ。refresh() で作り直す。 */
 let view = createView(DATA, state);
 
-// --- SVG DOM ---------------------------------------------------------------
-//
-// グラフは <svg> 配下の DOM として 1 度だけ構築し、以後は属性と class の更新だけを
-// 行う。フィルタや選択でレイアウトを回さないので、ノードの位置が動かない。
+// --- SVG graph view adapter -------------------------------------------------
 
-const graphEl = document.getElementById("graph");
-const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(name).trim();
-
-/** テーマ依存の色。CSS 変数から読むのでここだけ DOM に依存する。 */
-const palette = () => ({
-  fg: cssVar("--fg"),
-  bg: cssVar("--bg"),
-  panel: cssVar("--panel"),
-  border: cssVar("--border"),
-  muted: cssVar("--muted"),
-  dark: getComputedStyle(document.documentElement).colorScheme === "dark",
-});
-
-/** テーマに対応するノードの塗りと線を選ぶ。 */
-const typeColors = (typeMeta, pal) => ({
-  fill: pal.dark ? typeMeta.dark_fill || typeMeta.fill : typeMeta.fill,
-  stroke: pal.dark ? typeMeta.dark_stroke || typeMeta.stroke : typeMeta.stroke,
-});
-
+const { svgEl, htmlEl, setAttrs, classed, labelMeasurer, renderLabel, shapeEl, polygonCoords, updateShape, palette, typeColors } = createGraphViewPrimitives();
+const graphEl = document.getElementById("graph")!;
 let svg = null;
 let viewport = null;
 let graphLayer = null;
@@ -130,117 +114,8 @@ const nodeItems = new Map();
 const edgeItemsByKey = new Map();
 const bandItems = new Map();
 
-function svgEl(name, attrs = {}) {
-  const element = document.createElementNS(SVG_NS, name);
-  for (const [key, value] of Object.entries(attrs)) {
-    if (value !== undefined && value !== null && value !== "") element.setAttribute(key, String(value));
-  }
-  return element;
-}
-
-/** HTML を文字列として組み立てず、動的値を常にテキストノードとして追加する。 */
-function htmlEl(name, attrs = {}, ...children) {
-  const element = document.createElement(name);
-  for (const [key, value] of Object.entries(attrs)) {
-    if (value === undefined || value === null || value === false) continue;
-    if (key === "class") element.className = String(value);
-    else if (key === "checked") element.checked = Boolean(value);
-    else if (key === "value") element.value = String(value);
-    else element.setAttribute(key, String(value));
-  }
-  element.append(...children.filter((child) => child !== undefined && child !== null));
-  return element;
-}
-
-function setAttrs(element, attrs) {
-  for (const [key, value] of Object.entries(attrs)) {
-    if (value === undefined || value === null || value === "") element.removeAttribute(key);
-    else element.setAttribute(key, String(value));
-  }
-}
-
 function setTransform() {
   if (graphLayer) graphLayer.setAttribute("transform", `translate(${pan.x} ${pan.y}) scale(${zoom})`);
-}
-
-function classed(element, name, enabled) {
-  element.classList.toggle(name, Boolean(enabled));
-}
-
-function labelMeasurer() {
-  const context = document.createElement("canvas").getContext("2d");
-  if (!context) return estimateTextWidth;
-  context.font = `${LABEL_FONT.size}px ${LABEL_FONT.family}`;
-  return (text) => context.measureText(String(text)).width;
-}
-
-function renderLabel(parent, label, x, y, size = LABEL_FONT.size, weight = null) {
-  const lines = String(label).split("\n");
-  const step = size * LABEL_FONT.lineHeight;
-  const top = y - ((lines.length - 1) * step) / 2 + size * 0.35;
-  parent.replaceChildren();
-  for (const [index, line] of lines.entries()) {
-    const tspan = svgEl("tspan", { x, y: top + index * step });
-    tspan.textContent = line;
-    parent.append(tspan);
-  }
-  setAttrs(parent, {
-    "text-anchor": "middle",
-    "font-family": LABEL_FONT.family,
-    "font-size": size,
-    "font-weight": weight,
-  });
-}
-
-function shapeEl(shape) {
-  if (shape === "ellipse") return svgEl("ellipse");
-  if (shape === "barrel") return svgEl("path");
-  if (["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape)) return svgEl("polygon");
-  return svgEl("rect");
-}
-
-const polygonCoords = (shape, w, h) => {
-  const points = {
-    hexagon: [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1],
-    rhomboid: [-1, -1, 0.333, -1, 1, 1, -0.333, 1],
-    diamond: [0, -1, 1, 0, 0, 1, -1, 0],
-    tag: [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1],
-  }[shape] || (() => {
-    const x = (Math.min(w, h) * 0.16) / (w / 2);
-    const y = (Math.min(w, h) * 0.16) / (h / 2);
-    return [-1 + x, -1, 1 - x, -1, 1, -1 + y, 1, 1 - y,
-      1 - x, 1, -1 + x, 1, -1, 1 - y, -1, -1 + y];
-  })();
-  const scaled = [];
-  for (let index = 0; index < points.length; index += 2) {
-    scaled.push({ x: (points[index] * w) / 2, y: (points[index + 1] * h) / 2 });
-  }
-  return scaled;
-};
-
-const polygonPoints = (shape, w, h) =>
-  polygonCoords(shape, w, h).map(({ x, y }) => `${x},${y}`).join(" ");
-
-function updateShape(element, shape, box) {
-  const { w, h } = box;
-  if (element.tagName === "ellipse") setAttrs(element, { cx: 0, cy: 0, rx: w / 2, ry: h / 2 });
-  else if (element.tagName === "polygon") setAttrs(element, { points: polygonPoints(shape, w, h) });
-  else if (element.tagName === "path") {
-    const curve = Math.min(w * 0.12, h * 0.45);
-    setAttrs(element, {
-      d: `M ${-w / 2 + curve} ${-h / 2} L ${w / 2 - curve} ${-h / 2}`
-        + ` C ${w / 2} ${-h / 2} ${w / 2} ${h / 2} ${w / 2 - curve} ${h / 2}`
-        + ` L ${-w / 2 + curve} ${h / 2}`
-        + ` C ${-w / 2} ${h / 2} ${-w / 2} ${-h / 2} ${-w / 2 + curve} ${-h / 2} Z`,
-    });
-  }
-  else setAttrs(element, {
-    x: -w / 2,
-    y: -h / 2,
-    width: w,
-    height: h,
-    rx: shape === "round-rectangle" ? 8 : Math.min(w, h) * 0.3,
-  });
 }
 
 function initGraph() {

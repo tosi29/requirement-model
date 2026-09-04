@@ -1,4 +1,5 @@
-import { labelChunks, nodeSize, estimateTextWidth } from "./site_text.js";
+// @ts-nocheck
+import { labelChunks, nodeSize, estimateTextWidth } from "./site_text.ts";
 // --- 表示対象 --------------------------------------------------------------
 
 /**

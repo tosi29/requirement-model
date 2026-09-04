@@ -4,7 +4,7 @@ import { build } from "esbuild";
 
 const outfile = "src/reqmodel/presentation/site_bundle.js";
 const result = await build({
-  entryPoints: ["src/reqmodel/presentation/site_app.js"],
+  entryPoints: ["src/reqmodel/presentation/site_app.ts"],
   bundle: true,
   format: "iife",
   platform: "browser",

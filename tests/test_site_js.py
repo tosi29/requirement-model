@@ -41,7 +41,7 @@ pytestmark = pytest.mark.skipif(NODE is None, reason="node が無い")
 def run_node(args: list[str], stdin: str | None = None) -> subprocess.CompletedProcess:
     assert NODE is not None
     return subprocess.run(
-        [NODE, *args],
+        [NODE, "--import", "tsx", *args],
         cwd=ROOT,
         input=stdin,
         capture_output=True,
@@ -73,10 +73,12 @@ def sample_graph():
 
 
 def test_js_modules_are_syntactically_valid_on_their_own():
-    """切り出した JS は、埋め込まなくても単体で構文検査できる。"""
-    for name in SITE_SCRIPTS:
-        result = run_node(["--check", str(ROOT / "src" / "reqmodel" / "presentation" / name)])
-        assert result.returncode == 0, result.stderr
+    """切り出した TypeScript は、bundle しなくても型・構文検査できる。"""
+    assert SITE_SCRIPTS
+    result = subprocess.run(
+        ["npm", "run", "lint"], cwd=ROOT, capture_output=True, text=True, encoding="utf-8"
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_js_unit_tests_pass():

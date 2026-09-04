@@ -1,5 +1,5 @@
 (() => {
-  // src/reqmodel/presentation/site_text.js
+  // src/reqmodel/presentation/site_text.ts
   function truncate(text, limit = 42) {
     return text.length > limit ? text.slice(0, limit - 1) + "\u2026" : text;
   }
@@ -147,7 +147,72 @@
     };
   }
 
-  // src/reqmodel/presentation/site_graph.js
+  // src/reqmodel/presentation/site_graph_view.ts
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  function createGraphViewPrimitives() {
+    const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(name).trim();
+    const palette2 = () => ({
+      fg: cssVar("--fg"),
+      bg: cssVar("--bg"),
+      panel: cssVar("--panel"),
+      border: cssVar("--border"),
+      muted: cssVar("--muted"),
+      dark: getComputedStyle(document.documentElement).colorScheme === "dark"
+    });
+    const typeColors2 = (meta, pal) => ({
+      fill: pal.dark ? meta.dark_fill || meta.fill : meta.fill,
+      stroke: pal.dark ? meta.dark_stroke || meta.stroke : meta.stroke
+    });
+    function svgEl2(name, attrs = {}) {
+      const element = document.createElementNS(SVG_NS, name);
+      setAttrs2(element, attrs);
+      return element;
+    }
+    function htmlEl2(name, attrs = {}, ...children) {
+      const element = document.createElement(name);
+      for (const [key, value] of Object.entries(attrs)) {
+        if (value === void 0 || value === null || value === false) continue;
+        if (key === "class") element.className = String(value);
+        else if (key === "checked" && element instanceof HTMLInputElement) element.checked = Boolean(value);
+        else if (key === "value" && "value" in element) element.value = String(value);
+        else element.setAttribute(key, String(value));
+      }
+      element.append(...children.filter((child) => child !== void 0 && child !== null));
+      return element;
+    }
+    function setAttrs2(element, attrs) {
+      for (const [key, value] of Object.entries(attrs)) {
+        if (value === void 0 || value === null || value === "") element.removeAttribute(key);
+        else element.setAttribute(key, String(value));
+      }
+    }
+    const classed2 = (element, name, enabled) => {
+      element.classList.toggle(name, Boolean(enabled));
+    };
+    function labelMeasurer2() {
+      const context = document.createElement("canvas").getContext("2d");
+      if (!context) return estimateTextWidth;
+      context.font = `${LABEL_FONT.size}px ${LABEL_FONT.family}`;
+      return (text) => context.measureText(String(text)).width;
+    }
+    function renderLabel2(parent, label, x, y, size = LABEL_FONT.size, weight = null) {
+      const lines = String(label).split("\n");
+      const step = size * LABEL_FONT.lineHeight;
+      const top = y - (lines.length - 1) * step / 2 + size * 0.35;
+      lines.forEach((line, index) => parent.append(svgEl2("text", { x, y: top + index * step, "text-anchor": "middle", "font-size": size, "font-weight": weight, class: "node-label" }), document.createTextNode(line)));
+    }
+    const shapeEl2 = (shape) => shape === "ellipse" ? svgEl2("ellipse") : shape === "diamond" || shape === "hexagon" ? svgEl2("polygon") : svgEl2("rect");
+    const polygonCoords2 = (shape, w, h) => shape === "diamond" ? [{ x: 0, y: -h / 2 }, { x: w / 2, y: 0 }, { x: 0, y: h / 2 }, { x: -w / 2, y: 0 }] : [{ x: -w * 0.36, y: -h / 2 }, { x: w * 0.36, y: -h / 2 }, { x: w / 2, y: 0 }, { x: w * 0.36, y: h / 2 }, { x: -w * 0.36, y: h / 2 }, { x: -w / 2, y: 0 }];
+    function updateShape2(element, shape, box) {
+      const { x, y, width: w, height: h } = box;
+      if (element instanceof SVGEllipseElement) setAttrs2(element, { cx: x, cy: y, rx: w / 2, ry: h / 2 });
+      else if (element instanceof SVGPolygonElement) setAttrs2(element, { points: polygonCoords2(shape, w, h).map((p) => `${p.x + x},${p.y + y}`).join(" ") });
+      else setAttrs2(element, { x: x - w / 2, y: y - h / 2, width: w, height: h, rx: 8, ry: 8 });
+    }
+    return { svgEl: svgEl2, htmlEl: htmlEl2, setAttrs: setAttrs2, classed: classed2, labelMeasurer: labelMeasurer2, renderLabel: renderLabel2, shapeEl: shapeEl2, polygonCoords: polygonCoords2, updateShape: updateShape2, palette: palette2, typeColors: typeColors2 };
+  }
+
+  // src/reqmodel/presentation/site_graph.ts
   function createView(data, state2) {
     const byId = new Map(data.nodes.map((node) => [node.id, node]));
     const nodes = data.nodes.filter(
@@ -269,7 +334,7 @@
   var rankOf = (view2, id) => view2.order.has(id) ? view2.order.get(id) : MISSING_RANK;
   var compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 
-  // src/reqmodel/presentation/site_table.js
+  // src/reqmodel/presentation/site_table.ts
   var TABLE_COLUMNS = [
     { key: "id", label: "id" },
     { key: "type", label: "type" },
@@ -412,7 +477,7 @@
     }));
   }
 
-  // src/reqmodel/presentation/site_state.js
+  // src/reqmodel/presentation/site_state.ts
   var DEFAULT_SORT = { key: "id", asc: true };
   var SET_FILTERS = [
     {
@@ -534,7 +599,7 @@
     return THEMES[(THEMES.indexOf(normalizeTheme(theme2)) + 1) % THEMES.length];
   }
 
-  // src/reqmodel/presentation/site_context.js
+  // src/reqmodel/presentation/site_context.ts
   function describe(view2, id, inlineSources = true) {
     const node = view2.byId.get(id);
     const attrs = [`status=${node.status}`];
@@ -625,7 +690,7 @@
     return lines.join("\n") + "\n";
   }
 
-  // src/reqmodel/presentation/site_layout.js
+  // src/reqmodel/presentation/site_layout.ts
   var REQUIREMENT_TYPES = /* @__PURE__ */ new Set([
     "FunctionalRequirement",
     "QualityRequirement",
@@ -1084,9 +1149,9 @@ ${text}`;
     return lines.join("\n") + "\n";
   }
 
-  // src/reqmodel/presentation/site_app.js
+  // src/reqmodel/presentation/site_app.ts
   var dagre = window.dagre;
-  var SVG_NS = "http://www.w3.org/2000/svg";
+  var SVG_NS2 = "http://www.w3.org/2000/svg";
   var DATA = JSON.parse(document.getElementById("model-data").textContent);
   var METRICS = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
   function readStore(key) {
@@ -1105,20 +1170,8 @@ ${text}`;
   }
   var state = decodeHash(initialHash(location.hash, readStore(VIEW_STORAGE_KEY)), DATA);
   var view = createView(DATA, state);
+  var { svgEl, htmlEl, setAttrs, classed, labelMeasurer, renderLabel, shapeEl, polygonCoords, updateShape, palette, typeColors } = createGraphViewPrimitives();
   var graphEl = document.getElementById("graph");
-  var cssVar = (name) => getComputedStyle(document.body).getPropertyValue(name).trim();
-  var palette = () => ({
-    fg: cssVar("--fg"),
-    bg: cssVar("--bg"),
-    panel: cssVar("--panel"),
-    border: cssVar("--border"),
-    muted: cssVar("--muted"),
-    dark: getComputedStyle(document.documentElement).colorScheme === "dark"
-  });
-  var typeColors = (typeMeta, pal) => ({
-    fill: pal.dark ? typeMeta.dark_fill || typeMeta.fill : typeMeta.fill,
-    stroke: pal.dark ? typeMeta.dark_stroke || typeMeta.stroke : typeMeta.stroke
-  });
   var svg = null;
   var viewport = null;
   var graphLayer = null;
@@ -1129,117 +1182,8 @@ ${text}`;
   var nodeItems = /* @__PURE__ */ new Map();
   var edgeItemsByKey = /* @__PURE__ */ new Map();
   var bandItems = /* @__PURE__ */ new Map();
-  function svgEl(name, attrs = {}) {
-    const element = document.createElementNS(SVG_NS, name);
-    for (const [key, value] of Object.entries(attrs)) {
-      if (value !== void 0 && value !== null && value !== "") element.setAttribute(key, String(value));
-    }
-    return element;
-  }
-  function htmlEl(name, attrs = {}, ...children) {
-    const element = document.createElement(name);
-    for (const [key, value] of Object.entries(attrs)) {
-      if (value === void 0 || value === null || value === false) continue;
-      if (key === "class") element.className = String(value);
-      else if (key === "checked") element.checked = Boolean(value);
-      else if (key === "value") element.value = String(value);
-      else element.setAttribute(key, String(value));
-    }
-    element.append(...children.filter((child) => child !== void 0 && child !== null));
-    return element;
-  }
-  function setAttrs(element, attrs) {
-    for (const [key, value] of Object.entries(attrs)) {
-      if (value === void 0 || value === null || value === "") element.removeAttribute(key);
-      else element.setAttribute(key, String(value));
-    }
-  }
   function setTransform() {
     if (graphLayer) graphLayer.setAttribute("transform", `translate(${pan.x} ${pan.y}) scale(${zoom})`);
-  }
-  function classed(element, name, enabled) {
-    element.classList.toggle(name, Boolean(enabled));
-  }
-  function labelMeasurer() {
-    const context = document.createElement("canvas").getContext("2d");
-    if (!context) return estimateTextWidth;
-    context.font = `${LABEL_FONT.size}px ${LABEL_FONT.family}`;
-    return (text) => context.measureText(String(text)).width;
-  }
-  function renderLabel(parent, label, x, y, size = LABEL_FONT.size, weight = null) {
-    const lines = String(label).split("\n");
-    const step = size * LABEL_FONT.lineHeight;
-    const top = y - (lines.length - 1) * step / 2 + size * 0.35;
-    parent.replaceChildren();
-    for (const [index, line] of lines.entries()) {
-      const tspan = svgEl("tspan", { x, y: top + index * step });
-      tspan.textContent = line;
-      parent.append(tspan);
-    }
-    setAttrs(parent, {
-      "text-anchor": "middle",
-      "font-family": LABEL_FONT.family,
-      "font-size": size,
-      "font-weight": weight
-    });
-  }
-  function shapeEl(shape) {
-    if (shape === "ellipse") return svgEl("ellipse");
-    if (shape === "barrel") return svgEl("path");
-    if (["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape)) return svgEl("polygon");
-    return svgEl("rect");
-  }
-  var polygonCoords = (shape, w, h) => {
-    const points = {
-      hexagon: [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1],
-      rhomboid: [-1, -1, 0.333, -1, 1, 1, -0.333, 1],
-      diamond: [0, -1, 1, 0, 0, 1, -1, 0],
-      tag: [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1]
-    }[shape] || (() => {
-      const x = Math.min(w, h) * 0.16 / (w / 2);
-      const y = Math.min(w, h) * 0.16 / (h / 2);
-      return [
-        -1 + x,
-        -1,
-        1 - x,
-        -1,
-        1,
-        -1 + y,
-        1,
-        1 - y,
-        1 - x,
-        1,
-        -1 + x,
-        1,
-        -1,
-        1 - y,
-        -1,
-        -1 + y
-      ];
-    })();
-    const scaled = [];
-    for (let index = 0; index < points.length; index += 2) {
-      scaled.push({ x: points[index] * w / 2, y: points[index + 1] * h / 2 });
-    }
-    return scaled;
-  };
-  var polygonPoints = (shape, w, h) => polygonCoords(shape, w, h).map(({ x, y }) => `${x},${y}`).join(" ");
-  function updateShape(element, shape, box) {
-    const { w, h } = box;
-    if (element.tagName === "ellipse") setAttrs(element, { cx: 0, cy: 0, rx: w / 2, ry: h / 2 });
-    else if (element.tagName === "polygon") setAttrs(element, { points: polygonPoints(shape, w, h) });
-    else if (element.tagName === "path") {
-      const curve = Math.min(w * 0.12, h * 0.45);
-      setAttrs(element, {
-        d: `M ${-w / 2 + curve} ${-h / 2} L ${w / 2 - curve} ${-h / 2} C ${w / 2} ${-h / 2} ${w / 2} ${h / 2} ${w / 2 - curve} ${h / 2} L ${-w / 2 + curve} ${h / 2} C ${-w / 2} ${h / 2} ${-w / 2} ${-h / 2} ${-w / 2 + curve} ${-h / 2} Z`
-      });
-    } else setAttrs(element, {
-      x: -w / 2,
-      y: -h / 2,
-      width: w,
-      height: h,
-      rx: shape === "round-rectangle" ? 8 : Math.min(w, h) * 0.3
-    });
   }
   function initGraph() {
     if (!dagre) {
@@ -2247,7 +2191,7 @@ ${text}`;
     const width = box.x2 - box.x1 + padding * 2;
     const height = box.y2 - box.y1 + padding * 2;
     setAttrs(copy, {
-      xmlns: SVG_NS,
+      xmlns: SVG_NS2,
       viewBox: `${box.x1 - padding} ${box.y1 - padding} ${width} ${height}`,
       width,
       height

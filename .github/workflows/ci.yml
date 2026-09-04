@@ -35,12 +35,14 @@ jobs:
         run: req validate --sarif requirements.py > reqmodel.sarif
 
       - name: SARIF を Code Scanning へアップロードする
-        # fork PR では security-events: write が付与されない。権限を得るために
-        # pull_request_target は使わず、安全に upload だけを skip する。
+        # fork PR と Dependabot PR では security-events: write が付与されない。
+        # 権限を得るために pull_request_target は使わず、安全に upload
+        # だけを skip する。SARIF の生成はどの PR でも実行する。
         if: >-
           always() &&
           (github.event_name != 'pull_request' ||
-           github.event.pull_request.head.repo.full_name == github.repository)
+           (github.event.pull_request.head.repo.full_name == github.repository &&
+            github.actor != 'dependabot[bot]'))
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: reqmodel.sarif

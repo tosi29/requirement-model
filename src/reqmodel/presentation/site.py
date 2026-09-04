@@ -15,12 +15,12 @@ from dataclasses import dataclass
 from html import escape
 from importlib import resources
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Sequence, get_args, get_origin
 
 from ..findings import FindingList
 from ..core.graph import RequirementGraph
 from ..core.metamodel import EDGE_NAMES, TYPE_ORDER, edge_specs_for
-from ..definition.nodes import STATUS_RANK
+from ..definition.nodes import Reference, STATUS_RANK
 from .render import render_dot, render_meta, render_mermaid
 from ..definition import RequirementGroup
 
@@ -63,6 +63,43 @@ DEFAULT_TITLE = "要求グラフ"
 
 #: `--repo-ref` の既定。ブランチ名でもコミット SHA でもよい。
 DEFAULT_REF = "main"
+
+
+def _editor_fields() -> dict[str, list[dict[str, Any]]]:
+    """ブラウザ編集用のフィールド仕様を公開型とメタモデルから導出する。"""
+    fields_by_type: dict[str, list[dict[str, Any]]] = {}
+    for node_type in TYPE_ORDER:
+        edge_specs = edge_specs_for(node_type)
+        fields: list[dict[str, Any]] = []
+        for name, model_field in node_type.model_fields.items():
+            if name == "id":
+                continue  # MVP では ID を変更しない。
+            spec: dict[str, Any] = {"name": name}
+            edge_spec = edge_specs.get(name)
+            if edge_spec is not None:
+                spec.update(
+                    kind="relation",
+                    target_types=[target.__name__ for target in edge_spec.targets],
+                )
+            elif name == "text":
+                spec.update(kind="text", required=True)
+            elif name == "status":
+                spec.update(kind="choice", choices=list(STATUS_RANK))
+            else:
+                annotation = model_field.annotation
+                args = get_args(annotation) if get_origin(annotation) is list else ()
+                item_type = args[0] if args else None
+                if item_type is Reference:
+                    spec["kind"] = "reference_list"
+                elif item_type is str:
+                    spec["kind"] = "string_list"
+                elif get_origin(item_type) is tuple:
+                    spec["kind"] = "pair_list"
+                else:
+                    spec["kind"] = "json"
+            fields.append(spec)
+        fields_by_type[node_type.__name__] = fields
+    return fields_by_type
 
 
 @dataclass(frozen=True)
@@ -122,6 +159,9 @@ def site_data(
             node_type.__name__: list(edge_specs_for(node_type))
             for node_type in TYPE_ORDER
         },
+        # 編集可能フィールドと relation の接続可能型。公開型の注釈と
+        # core.metamodel から生成し、ブラウザ側へ同じ規則を複製しない。
+        "editor": {"fields_by_type": _editor_fields()},
         "requirement_groups": [
             group.model_dump(mode="json") for group in requirement_groups
         ],

@@ -250,6 +250,33 @@ SVG の書き出しは、画面にある SVG DOM を複製し、非表示要素�
 「画面では 2 ホップに絞っているのにコピーは全体」が起きない。向きを無視したときは
 `impact_set()` が全件を「関連」として返すのに合わせ、図でも 1 色 (紫) で塗る。
 
+## 編集モードの base / draft と検証境界
+
+編集モードは、HTML へ埋め込んだ生成時のモデルを変更しない `base` とし、JSON として
+deep clone した `draft` を画面表示と編集の対象にする。relation を変更したときは、
+正規化ノードの relation フィールドから `draft.edges` を再構築する。変更破棄は `base` を
+もう一度 clone する操作であり、Python 定義ファイルや生成済み `model.json` には書き戻さない。
+
+編集可能フィールドの種類と relation の接続可能型は、`presentation/site.py` が公開ノード型の
+Pydantic フィールドと `core.metamodel.edge_specs_for()` から導出してページへ渡す。
+ブラウザ側に型ごとの relation 表を複製しない。UI で検査する範囲は JSON のフィールド型、
+status 候補、relation の対象型、既存 id への参照までに限る。語尾や意味を伴う Python validator
+は再実装せず、定義ファイルへ反映した後の `req validate` を正とする。
+
+編集操作は Miro のようにグラフ上で対象を直接扱えることを優先しつつ、要求変更に必要な
+3 操作だけに絞る。ノードのダブルクリックで本文と status を編集し、選択ノードの接続点から
+接続可能な別ノードへのドラッグで relation を追加し、線の選択と Delete で relation を削除する。
+自由配置は semantic diff に表れない表示状態であり、ノード作成や装飾も既存ノードの変更という
+MVP の範囲を越えるため追加しない。外部参照など低頻度の構造フィールドだけを右ペインへ残す。
+
+semantic diff は `req plan` の `GraphDiff` と同じく、出所 (`location`) を比較対象から外し、
+ノード id ごと、フィールド名ごとに `base` と `draft` を比較する。MVP は既存ノード編集だけなので、
+追加・削除・型変更の件数は常に 0 である。表示は `# 構造 diff`、追加／削除／変更／型変更、
+`~ [型] id` という `req plan` の語彙を維持し、Clipboard へ同じ文字列をコピーする。
+`--repo-url` がある場合は、同じ diff を `title` と `body` に入れた GitHub の
+`/issues/new` URL も作る。静的 HTML は Issue を API で作成せず、利用者が内容を確認して
+確定できる GitHub の編集画面を新しいタブで開くところまでを担当する。
+
 ## ページの JS の構成とテスト
 
 出力は 1 枚の HTML だが、**ソースはテンプレートから分けてある**。

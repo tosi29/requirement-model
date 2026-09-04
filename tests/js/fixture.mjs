@@ -33,6 +33,37 @@ export const TYPES = [
   "Constraint",
 ];
 
+export const EDITOR_FIELDS_BY_TYPE = {
+  Goal: [
+    { name: "text", kind: "text", required: true },
+    { name: "status", kind: "choice", choices: Object.keys(STATUS_RANK) },
+    { name: "source", kind: "reference_list" },
+    { name: "refines", kind: "relation", target_types: ["Goal"] },
+    { name: "motivates", kind: "relation", target_types: ["Need"] },
+  ],
+  Need: [
+    { name: "text", kind: "text", required: true },
+    { name: "status", kind: "choice", choices: Object.keys(STATUS_RANK) },
+    { name: "source", kind: "reference_list" },
+  ],
+  FunctionalRequirement: [
+    { name: "text", kind: "text", required: true },
+    { name: "status", kind: "choice", choices: Object.keys(STATUS_RANK) },
+    { name: "acceptance_criteria", kind: "string_list" },
+    { name: "satisfies", kind: "relation", target_types: ["Need"] },
+    { name: "refines", kind: "relation", target_types: ["FunctionalRequirement"] },
+  ],
+  QualityRequirement: [
+    { name: "text", kind: "text", required: true },
+    { name: "status", kind: "choice", choices: Object.keys(STATUS_RANK) },
+    { name: "qualifies", kind: "relation", target_types: ["FunctionalRequirement"] },
+  ],
+  Constraint: [
+    { name: "text", kind: "text", required: true },
+    { name: "constrains", kind: "relation", target_types: ["FunctionalRequirement", "QualityRequirement"] },
+  ],
+};
+
 //: 図に既定で描かないもの (`site_data()` の hidden_by_default と同じ形)。
 export const HIDDEN_BY_DEFAULT = {
   types: [],
@@ -97,6 +128,7 @@ export function fixture(overrides = {}) {
     edge_names: EDGE_NAMES,
     hidden_by_default: HIDDEN_BY_DEFAULT,
     edge_names_by_type: EDGE_NAMES_BY_TYPE,
+    editor: { fields_by_type: structuredClone(EDITOR_FIELDS_BY_TYPE) },
     status_rank: STATUS_RANK,
     nodes,
     edges,
@@ -182,6 +214,7 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60 } = {
     edge_names: EDGE_NAMES,
     hidden_by_default: HIDDEN_BY_DEFAULT,
     edge_names_by_type: EDGE_NAMES_BY_TYPE,
+    editor: { fields_by_type: structuredClone(EDITOR_FIELDS_BY_TYPE) },
     status_rank: STATUS_RANK,
     nodes,
     edges,

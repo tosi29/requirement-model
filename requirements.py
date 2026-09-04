@@ -50,6 +50,10 @@ SRC_BENCH = Reference(
     title="300 ノードの合成モデル (examples/bench.py) による実測結果",
     url="https://github.com/tosi29/requirement-model/issues/123#SRC_BENCH",
 )
+SRC_WEB_EDITOR = Reference(
+    title="Web 上の要求モデル編集と semantic diff (issue #122)",
+    url="https://github.com/tosi29/requirement-model/issues/122",
+)
 
 # --- ニーズ -----------------------------------------------------------------
 
@@ -93,6 +97,11 @@ NEED_CI = Need(
     text="CI を回す人は、既知で意図的な指摘を残したまま、新しい指摘だけで失敗させたい",
     source=[SRC_OWNER],
 )
+NEED_TRY_EDIT = Need(
+    id="Need-9",
+    text="要求を変更する人は、モデル全体を見ながら修正案を試し、要求としての差分を確認したい",
+    source=[SRC_OWNER, SRC_WEB_EDITOR],
+)
 
 # --- ゴール -----------------------------------------------------------------
 
@@ -111,7 +120,7 @@ GOAL_LESS_SURVEY = Goal(
 GOAL_SHARED_UNDERSTANDING = Goal(
     id="Goal-3",
     text="要求の理解が書き手に依存する度合いを下げる",
-    motivates=[NEED_LLM_CONTEXT, NEED_READABLE, NEED_METRICS],
+    motivates=[NEED_LLM_CONTEXT, NEED_READABLE, NEED_METRICS, NEED_TRY_EDIT],
     source=[SRC_SPEC, SRC_OWNER, SRC_LEGACY],
 )
 
@@ -447,6 +456,26 @@ FR_FOCUS = FunctionalRequirement(
         "フォーカスは図の描画にしか効かず、一覧・テーブル・上流/下流の件数は全体のまま",
     ],
 )
+FR_WEB_EDITOR = FunctionalRequirement(
+    id="FR-27",
+    text=(
+        "閲覧用サイトで既存ノードを編集し、元モデルとの差をノード単位・"
+        "フィールド単位の semantic diff として確認できるようにすること"
+    ),
+    refines=[FR_SITE],
+    satisfies=[NEED_TRY_EDIT, NEED_REVIEW_DIFF],
+    source=[SRC_WEB_EDITOR, SRC_OWNER],
+    acceptance_criteria=[
+        "生成時の base と編集中の draft が独立して保持される",
+        "ノードをダブルクリックすると、グラフ上で本文と status を編集できる",
+        "接続点をドラッグすると、メタモデル上で接続可能な型の既存ノードに relation を追加できる",
+        "線を選択して、表示された操作または Delete キーで relation を削除できる",
+        "semantic diff は出所を除外し、req plan と同じノード・フィールド単位で表示される",
+        "diff を Clipboard にコピーでき、GitHub Issue の title と body に渡した編集画面を開ける",
+        "変更破棄で base に戻せる",
+        "編集は静的 HTML 内で完結し、定義ファイルへ直接書き戻さない",
+    ],
+)
 
 # --- 品質要求 ---------------------------------------------------------------
 
@@ -504,7 +533,7 @@ CONSTRAINT_GIT_ONLY = Constraint(
 CONSTRAINT_OFFLINE_SITE = Constraint(
     id="Constraint-4",
     text="公開する閲覧用サイトを、外部への通信なしで表示できるようにすること",
-    constrains=[FR_SITE],
+    constrains=[FR_SITE, FR_WEB_EDITOR],
     source=[SRC_OWNER],
 )
 CONSTRAINT_NO_LLM_CALL = Constraint(
@@ -555,6 +584,7 @@ GROUP_PRESENTATION = RequirementGroup(
         FR_ID_COLLISION,
         FR_SOURCE_AS_ATTRIBUTE,
         FR_FOCUS,
+        FR_WEB_EDITOR,
         QR_READABLE_ZOOM,
         QR_SITE_CLI_PARITY,
         QR_KEYBOARD,

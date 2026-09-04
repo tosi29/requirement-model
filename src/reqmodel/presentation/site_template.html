@@ -145,6 +145,38 @@ main {
   stroke-width: 1.2;
   vector-effect: non-scaling-stroke;
 }
+#graph .edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+#graph.editing .edge-hit { pointer-events: stroke; cursor: pointer; }
+#graph.editing .edge.edit-selected .edge-line { stroke: var(--accent); stroke-width: 3; }
+#graph .connector-handle { display: none; }
+#graph.editing .node.sel .connector-handle {
+  display: block;
+  fill: var(--accent);
+  stroke: var(--graph-bg, var(--bg));
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  cursor: crosshair;
+  pointer-events: all;
+}
+#graph.editing .node.connect-target .node-shape {
+  stroke: var(--accent);
+  stroke-width: 4;
+  filter: drop-shadow(0 0 7px var(--accent));
+}
+#graph .connection-preview {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
 #graph .edge-label {
   fill: var(--graph-muted, var(--muted));
   stroke: var(--graph-bg, var(--bg));
@@ -384,6 +416,65 @@ button.finding:hover { box-shadow: inset 0 0 0 1px var(--accent); }
 .detail .sources .locator { margin-left: 6px; color: var(--muted); font-size: 11.5px; }
 .detail .sources .text { display: block; color: var(--muted); font-size: 12px; }
 .detail .sources .parents { display: block; color: var(--muted); font-size: 11.5px; }
+.edit-controls { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+.edit-controls .changed { color: var(--accent); font-size: 12px; font-weight: 600; }
+.edit-controls button[disabled] { opacity: .5; cursor: default; }
+.canvas-edit-hint { flex-basis: 100%; color: var(--muted); font-size: 11.5px; }
+.canvas-editor, .edge-editor {
+  position: absolute;
+  z-index: 8;
+  display: grid;
+  gap: 6px;
+  width: min(300px, calc(100% - 16px));
+  padding: 10px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 8px 24px rgba(0,0,0,.2);
+}
+.canvas-editor label { color: var(--muted); font-size: 11.5px; }
+.canvas-editor textarea, .canvas-editor select {
+  width: 100%;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px 7px;
+}
+.canvas-editor-actions, .edge-editor { grid-auto-flow: column; align-items: center; }
+.canvas-editor-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.canvas-editor-error { min-height: 1em; color: var(--error); font-size: 11px; }
+.edge-editor { width: auto; max-width: calc(100% - 16px); font-size: 11.5px; }
+.edge-editor span { overflow-wrap: anywhere; }
+.advanced-editor { margin: 8px 0 14px; }
+.advanced-editor > summary { color: var(--muted); cursor: pointer; font-size: 12px; }
+.node-editor { margin: 8px 0 14px; padding: 10px; border: 1px solid var(--accent); border-radius: 7px; background: var(--panel); }
+.editor-note { margin: 0 0 10px; color: var(--muted); font-size: 11.5px; }
+.editor-field { display: grid; grid-template-columns: 1fr auto; gap: 4px 6px; margin: 0 0 10px; }
+.editor-field:last-child { margin-bottom: 0; }
+.editor-field label { grid-column: 1 / -1; font-size: 12px; font-weight: 600; }
+.editor-field textarea, .editor-field select { width: 100%; min-width: 0; font: inherit; font-size: 12px; color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 5px 7px; }
+.editor-field select[multiple] { min-height: 76px; }
+.editor-field [aria-invalid="true"] { border-color: var(--error); }
+.editor-hint { grid-column: 1; color: var(--muted); font-size: 10.5px; }
+.editor-error { grid-column: 1 / -1; min-height: 1em; color: var(--error); font-size: 11px; }
+.diff-dialog { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 32px); color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,.28); }
+.diff-dialog::backdrop { background: rgba(0,0,0,.42); }
+.diff-dialog h2 { margin: 0 0 8px; font-size: 16px; }
+.diff-dialog pre { max-height: 60vh; overflow: auto; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); white-space: pre-wrap; overflow-wrap: anywhere; }
+.dialog-actions { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  text-decoration: none;
+}
+.button-link:hover { background: var(--panel); }
 .empty { color: var(--muted); font-size: 13px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
@@ -441,6 +532,15 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
         <button id="tab-graph" role="tab" class="active" aria-selected="true" aria-controls="graph-frame">グラフ</button>
         <button id="tab-table" role="tab" aria-selected="false" aria-controls="table-frame" tabindex="-1">テーブル</button>
       </span>
+      <span class="edit-controls" aria-label="編集モード">
+        <button id="edit-toggle" aria-pressed="false">編集モード</button>
+        <span id="edit-status">変更なし</span>
+        <button id="review-changes" disabled>変更を確認</button>
+        <button id="discard-changes" disabled>変更を破棄</button>
+      </span>
+      <span id="canvas-edit-hint" class="canvas-edit-hint" hidden>
+        ノードをダブルクリックして編集 · 選択ノードの青い点からドラッグして接続 · 線を選択して Delete
+      </span>
       <span class="tool-group graph-only" id="graph-tools">
         <button id="zoom-out" title="縮小" aria-label="縮小">−</button>
         <button id="zoom-in" title="拡大" aria-label="拡大">＋</button>
@@ -481,11 +581,27 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
     <div id="detail"><p class="empty">グラフのノードをクリックすると、本文・根拠・影響範囲を表示する。</p></div>
 
     <h2>検証結果</h2>
+    <p id="draft-validation-note" class="hint" hidden>
+      以下は base 生成時の結果。draft の完全な検証は定義ファイルへ反映後に <code>req validate</code> で行う。
+    </p>
     <!-- 重大度タブとチェックコード別のまとめは site_app.js が入れる。 -->
     <div class="seg" id="finding-tabs" role="tablist" aria-label="指摘の重大度"></div>
     <div id="findings" role="tabpanel" aria-label="指摘一覧"></div>
   </aside>
 </main>
+
+<dialog id="diff-dialog" class="diff-dialog" aria-labelledby="diff-title">
+  <h2 id="diff-title">semantic diff</h2>
+  <pre id="diff-output"></pre>
+  <p id="issue-link-note" class="hint" hidden>
+    Issue 作成リンクを表示するには、サイト生成時に <code>--repo-url</code> を指定する。
+  </p>
+  <div class="dialog-actions">
+    <a id="create-issue" class="button-link" target="_blank" rel="noopener" hidden>GitHub Issue を作成</a>
+    <button id="copy-diff">diff をコピー</button>
+    <button id="close-diff">閉じる</button>
+  </div>
+</dialog>
 
 <footer>
   静的サイトは <code>req site</code> が生成する。同じデータの生出力は

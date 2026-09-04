@@ -15,9 +15,11 @@ import {
   THEME_LABELS,
   THEME_STORAGE_KEY,
   VIEW_STORAGE_KEY,
+  addDraftRelation,
   bandDefs,
   bandId,
   bandedLayout,
+  cloneSiteData,
   createView,
   decodeHash,
   edgeItems,
@@ -25,12 +27,15 @@ import {
   encodeHash,
   escapeAttr,
   escapeHtml,
+  editorFields,
   estimateTextWidth,
   explainCommand,
   fieldLabel,
   focusSet,
+  formatSemanticDiff,
   graphElements,
   groupFindings,
+  githubIssueUrl,
   impactSets,
   initialHash,
   isNodeVisible,
@@ -41,10 +46,15 @@ import {
   nextSort,
   nextTheme,
   nodeContext,
+  parseEditorValue,
   normalizeTheme,
   quadraticPath,
   quadraticPoint,
+  relationCandidates,
+  relationSpecForTarget,
+  removeDraftRelation,
   searchHits,
+  semanticDiff,
   severityTabs,
   sortRows,
   sourceUrl,
@@ -53,14 +63,17 @@ import {
   storableHash,
   tableRows,
   truncate,
+  updateDraftField,
   visibleBandKeys,
 } from "./site_logic.js";
 
 const dagre = window.dagre;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-const DATA = JSON.parse(document.getElementById("model-data").textContent);
+const BASE_DATA = cloneSiteData(JSON.parse(document.getElementById("model-data").textContent));
+let DATA = cloneSiteData(BASE_DATA);
 const METRICS = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
+let editMode = false;
 
 // --- 保存 (localStorage) ----------------------------------------------------
 //
@@ -126,11 +139,17 @@ let viewport = null;
 let graphLayer = null;
 let defs = null;
 let graph = null;
+let edgeLayer = null;
+let nodeLayer = null;
 let zoom = 1;
 let pan = { x: 0, y: 0 };
 const nodeItems = new Map();
 const edgeItemsByKey = new Map();
 const bandItems = new Map();
+let selectedEdgeKey = null;
+let connectionDrag = null;
+let canvasEditor = null;
+let edgeEditor = null;
 
 function svgEl(name, attrs = {}) {
   const element = document.createElementNS(SVG_NS, name);
@@ -149,6 +168,8 @@ function setAttrs(element, attrs) {
 
 function setTransform() {
   if (graphLayer) graphLayer.setAttribute("transform", `translate(${pan.x} ${pan.y}) scale(${zoom})`);
+  positionCanvasEditor();
+  positionEdgeEditor();
 }
 
 function classed(element, name, enabled) {
@@ -236,6 +257,11 @@ function initGraph() {
     graphEl.innerHTML = '<p class="empty">描画ライブラリ (dagre) を読み込めなかった。図の元データは <a href="graph.mmd">graph.mmd</a> / <a href="graph.dot">graph.dot</a> にある。</p>';
     return;
   }
+  nodeItems.clear();
+  edgeItemsByKey.clear();
+  bandItems.clear();
+  closeCanvasEditor();
+  closeEdgeEditor();
   graph = graphElements(DATA, labelMeasurer());
   graphEl.replaceChildren();
   svg = svgEl("svg", { class: "req-graph", tabindex: 0, role: "img", "aria-label": DATA.title });
@@ -255,13 +281,14 @@ function buildGraphDom() {
   arrow.append(svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: pal.border }));
   defs.replaceChildren(arrow);
 
-  const edgeLayer = svgEl("g", { class: "edges" });
+  edgeLayer = svgEl("g", { class: "edges" });
   const bandLayer = svgEl("g", { class: "bands" });
-  const nodeLayer = svgEl("g", { class: "nodes" });
+  nodeLayer = svgEl("g", { class: "nodes" });
   graphLayer.replaceChildren(bandLayer, edgeLayer, nodeLayer);
 
   const dashedEdges = new Set(DATA.meta.dashed_edges || []);
   for (const item of graph.filter((element) => element.data.source)) {
+    const hit = svgEl("path", { class: "edge-hit" });
     const path = svgEl("path", { class: "edge-line", "marker-end": "url(#req-arrow)" });
     const label = svgEl("text", { class: "edge-label", "text-anchor": "middle" });
     label.textContent = item.data.name;
@@ -270,10 +297,23 @@ function buildGraphDom() {
       "data-id": item.data.id,
       "data-source": item.data.source,
       "data-target": item.data.target,
+      tabindex: -1,
+      role: "button",
+      "aria-label": `${item.data.source} から ${item.data.target} への ${item.data.name}`,
     });
-    group.append(path, label);
+    group.append(hit, path, label);
+    group.addEventListener("click", (event) => {
+      if (!editMode) return;
+      event.stopPropagation();
+      selectCanvasEdge(item.data.id);
+    });
+    group.addEventListener("keydown", (event) => {
+      if (!editMode || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault();
+      selectCanvasEdge(item.data.id);
+    });
     edgeLayer.append(group);
-    edgeItemsByKey.set(item.data.id, { ...item.data, group, path, label, route: [] });
+    edgeItemsByKey.set(item.data.id, { ...item.data, group, hit, path, label, route: [] });
   }
 
   const types = DATA.meta.types || {};
@@ -308,18 +348,43 @@ function buildGraphDom() {
     const statusRing = shapeEl(typeMeta.shape);
     statusRing.classList.add("node-status-ring");
     const label = svgEl("text", { class: "node-label" });
+    const connector = svgEl("circle", {
+      class: "connector-handle",
+      cx: item.data.w / 2 + 10,
+      cy: 0,
+      r: 6,
+      tabindex: -1,
+      role: "button",
+      "aria-label": `${item.data.id} から relation を追加`,
+    });
     renderLabel(label, item.data.label, 0, 0);
-    group.append(shape, statusRing, label);
+    group.append(shape, statusRing, label, connector);
     group.addEventListener("click", () => selectNode(item.data.id));
+    group.addEventListener("dblclick", (event) => {
+      if (!editMode) return;
+      event.preventDefault();
+      event.stopPropagation();
+      state.selected = item.data.id;
+      refresh();
+      openCanvasEditor(item.data.id);
+    });
     group.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
+      if (editMode && event.key === "Enter") {
+        state.selected = item.data.id;
+        refresh();
+        openCanvasEditor(item.data.id);
+        return;
+      }
       chooseNode(item.data.id);
     });
+    connector.addEventListener("pointerdown", (event) => beginConnection(event, item.data.id));
     nodeLayer.append(group);
-    nodeItems.set(item.data.id, { ...item.data, shapeName: typeMeta.shape, statusMeta, x: 0, y: 0, group, shape, statusRing, label });
+    nodeItems.set(item.data.id, { ...item.data, shapeName: typeMeta.shape, statusMeta, x: 0, y: 0, group, shape, statusRing, label, connector });
   }
   restyleGraph();
+  applyCanvasEditState();
 }
 
 function bindPanZoom() {
@@ -340,6 +405,10 @@ function bindPanZoom() {
     svg.setPointerCapture(event.pointerId);
   });
   svg.addEventListener("pointermove", (event) => {
+    if (connectionDrag) {
+      updateConnection(event);
+      return;
+    }
     if (!drag) return;
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
@@ -347,7 +416,11 @@ function bindPanZoom() {
     pan = { x: drag.pan.x + dx, y: drag.pan.y + dy };
     setTransform();
   });
-  svg.addEventListener("pointerup", () => {
+  svg.addEventListener("pointerup", (event) => {
+    if (connectionDrag) {
+      finishConnection(event);
+      return;
+    }
     if (drag?.moved) {
       ignoreClick = true;
       // ブラウザがドラッグ後の click 自体を抑止した場合は、次の通常クリックを
@@ -357,6 +430,7 @@ function bindPanZoom() {
     drag = null;
   });
   svg.addEventListener("pointercancel", () => {
+    if (connectionDrag) cancelConnection();
     drag = null;
     ignoreClick = false;
   });
@@ -481,7 +555,9 @@ function updateEdges() {
     const from = edgeEndpoint(source, control);
     const to = edgeEndpoint(target, control);
     control = edgeControl(from, to, state.direction, offset);
-    setAttrs(edge.path, { d: quadraticPath(from, control, to) });
+    const path = quadraticPath(from, control, to);
+    setAttrs(edge.path, { d: path });
+    setAttrs(edge.hit, { d: path });
     const middle = quadraticPoint(from, control, to);
     setAttrs(edge.label, { x: middle.x, y: middle.y - 4 });
     edge.x1 = from.x; edge.y1 = from.y; edge.x2 = to.x; edge.y2 = to.y;
@@ -679,6 +755,186 @@ function zoomBy(factor) {
   setTransform();
 }
 
+// --- キャンバス編集 --------------------------------------------------------
+
+function closeCanvasEditor() {
+  if (canvasEditor) canvasEditor.remove();
+  canvasEditor = null;
+}
+
+function closeEdgeEditor() {
+  if (edgeEditor) edgeEditor.remove();
+  edgeEditor = null;
+}
+
+function placeNear(element, target, preferRight = true) {
+  if (!element || !target) return;
+  const host = graphEl.getBoundingClientRect();
+  const box = target.getBoundingClientRect();
+  const width = element.offsetWidth || 280;
+  const height = element.offsetHeight || 120;
+  const right = box.right - host.left + 10;
+  const left = box.left - host.left - width - 10;
+  element.style.left = `${Math.max(8, Math.min(host.width - width - 8, preferRight && right + width < host.width ? right : left))}px`;
+  element.style.top = `${Math.max(8, Math.min(host.height - height - 8, box.top - host.top))}px`;
+}
+
+function positionCanvasEditor() {
+  const item = canvasEditor && nodeItems.get(canvasEditor.dataset.nodeId);
+  if (item) placeNear(canvasEditor, item.group);
+}
+
+function positionEdgeEditor() {
+  const item = edgeEditor && edgeItemsByKey.get(selectedEdgeKey);
+  if (item) placeNear(edgeEditor, item.label, false);
+}
+
+function openCanvasEditor(id) {
+  if (!editMode) return;
+  closeCanvasEditor();
+  closeEdgeEditor();
+  selectedEdgeKey = null;
+  applyCanvasEditState();
+  const node = DATA.nodes.find((item) => item.id === id);
+  if (!node) return;
+  canvasEditor = document.createElement("section");
+  canvasEditor.className = "canvas-editor";
+  canvasEditor.dataset.nodeId = id;
+  const choices = Object.keys((DATA.meta || {}).statuses || {}).map((status) =>
+    `<option value="${escapeAttr(status)}"${status === node.status ? " selected" : ""}>${escapeHtml(status)}</option>`,
+  ).join("");
+  canvasEditor.innerHTML = `<strong>${escapeHtml(id)}</strong>
+    <label for="canvas-edit-text">本文</label>
+    <textarea id="canvas-edit-text" rows="4">${escapeHtml(node.text)}</textarea>
+    <label for="canvas-edit-status">ステータス</label>
+    <select id="canvas-edit-status">${choices}</select>
+    <span class="canvas-editor-error" role="alert"></span>
+    <span class="canvas-editor-actions">
+      <button type="button" data-canvas-save>適用</button>
+      <button type="button" data-canvas-cancel>閉じる</button>
+    </span>`;
+  graphEl.append(canvasEditor);
+  placeNear(canvasEditor, nodeItems.get(id)?.group);
+  canvasEditor.querySelector("[data-canvas-cancel]").addEventListener("click", closeCanvasEditor);
+  canvasEditor.querySelector("[data-canvas-save]").addEventListener("click", () => {
+    const textSpec = editorFields(DATA, node).find((spec) => spec.name === "text");
+    const statusSpec = editorFields(DATA, node).find((spec) => spec.name === "status");
+    const text = parseEditorValue(DATA, node, textSpec, canvasEditor.querySelector("textarea").value);
+    const status = parseEditorValue(DATA, node, statusSpec, canvasEditor.querySelector("select").value);
+    const error = text.error || status.error;
+    if (error) {
+      canvasEditor.querySelector(".canvas-editor-error").textContent = error;
+      return;
+    }
+    DATA = updateDraftField(DATA, id, "text", text.value);
+    DATA = updateDraftField(DATA, id, "status", status.value);
+    rebuildDraftView();
+  });
+  canvasEditor.querySelector("textarea").focus();
+  canvasEditor.querySelector("textarea").select();
+}
+
+function clientToGraph(clientX, clientY) {
+  const point = svg.createSVGPoint();
+  point.x = clientX;
+  point.y = clientY;
+  return point.matrixTransform(graphLayer.getScreenCTM().inverse());
+}
+
+function cancelConnection() {
+  if (!connectionDrag) return;
+  connectionDrag.preview.remove();
+  for (const item of nodeItems.values()) item.group.classList.remove("connect-target");
+  connectionDrag = null;
+}
+
+function beginConnection(event, sourceId) {
+  if (!editMode) return;
+  event.preventDefault();
+  event.stopPropagation();
+  closeCanvasEditor();
+  closeEdgeEditor();
+  selectedEdgeKey = null;
+  state.selected = sourceId;
+  const source = DATA.nodes.find((node) => node.id === sourceId);
+  const compatible = new Set(
+    DATA.nodes.filter((target) => relationSpecForTarget(DATA, source, target)).map((node) => node.id),
+  );
+  for (const item of nodeItems.values()) {
+    item.group.classList.toggle(
+      "connect-target",
+      compatible.has(item.id) && !item.group.classList.contains("hidden"),
+    );
+  }
+  const preview = svgEl("path", { class: "connection-preview", "marker-end": "url(#req-arrow)" });
+  edgeLayer.append(preview);
+  connectionDrag = { sourceId, pointerId: event.pointerId, preview };
+  svg.setPointerCapture(event.pointerId);
+  applyHighlight();
+  applyCanvasEditState();
+  updateConnection(event);
+}
+
+function updateConnection(event) {
+  if (!connectionDrag) return;
+  const source = nodeItems.get(connectionDrag.sourceId);
+  const point = clientToGraph(event.clientX, event.clientY);
+  const start = { x: source.x + source.w / 2 + 10, y: source.y };
+  setAttrs(connectionDrag.preview, { d: `M ${start.x} ${start.y} L ${point.x} ${point.y}` });
+}
+
+function finishConnection(event) {
+  if (!connectionDrag) return;
+  const sourceId = connectionDrag.sourceId;
+  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-node-id]");
+  const targetId = target?.dataset.nodeId;
+  cancelConnection();
+  if (!targetId) return;
+  const next = addDraftRelation(DATA, sourceId, targetId);
+  if (next === DATA) return;
+  DATA = next;
+  state.selected = sourceId;
+  rebuildDraftView();
+}
+
+function selectCanvasEdge(key) {
+  selectedEdgeKey = selectedEdgeKey === key ? null : key;
+  closeCanvasEditor();
+  applyCanvasEditState();
+  renderEdgeEditor();
+}
+
+function renderEdgeEditor() {
+  closeEdgeEditor();
+  const edge = selectedEdgeKey && edgeItemsByKey.get(selectedEdgeKey);
+  if (!editMode || !edge) return;
+  edgeEditor = document.createElement("div");
+  edgeEditor.className = "edge-editor";
+  edgeEditor.innerHTML = `<span>${escapeHtml(edge.source)} —${escapeHtml(edge.name)}→ ${escapeHtml(edge.target)}</span>
+    <button type="button" data-edge-delete>relation を削除</button>`;
+  graphEl.append(edgeEditor);
+  placeNear(edgeEditor, edge.label, false);
+  edgeEditor.querySelector("[data-edge-delete]").addEventListener("click", deleteSelectedEdge);
+}
+
+function deleteSelectedEdge() {
+  const edge = selectedEdgeKey && edgeItemsByKey.get(selectedEdgeKey);
+  if (!edge) return;
+  DATA = removeDraftRelation(DATA, edge.source, edge.name, edge.target);
+  selectedEdgeKey = null;
+  rebuildDraftView();
+}
+
+function applyCanvasEditState() {
+  graphEl.classList.toggle("editing", editMode);
+  for (const item of edgeItemsByKey.values()) {
+    item.group.classList.toggle("edit-selected", editMode && item.id === selectedEdgeKey);
+    item.group.tabIndex = editMode ? 0 : -1;
+  }
+  positionCanvasEditor();
+  positionEdgeEditor();
+}
+
 // --- 詳細パネル ------------------------------------------------------------
 
 function pushReferenceSection(rows, title, references) {
@@ -694,6 +950,87 @@ function pushReferenceSection(rows, title, references) {
   rows.push("</ul>");
 }
 
+const editorJson = (value) => JSON.stringify(value ?? [], null, 2);
+
+function editorInput(node, spec) {
+  const name = escapeAttr(spec.name);
+  const inputId = `edit-field-${name}`;
+  if (spec.kind === "text") {
+    return `<textarea id="${inputId}" data-edit-field="${name}" rows="4">${escapeHtml(node[spec.name] || "")}</textarea>`;
+  }
+  if (spec.kind === "choice") {
+    const options = (spec.choices || []).map((choice) =>
+      `<option value="${escapeAttr(choice)}"${choice === node[spec.name] ? " selected" : ""}>${escapeHtml(choice)}</option>`,
+    ).join("");
+    return `<select id="${inputId}" data-edit-field="${name}">${options}</select>`;
+  }
+  if (spec.kind === "relation") {
+    const selected = new Set(node[spec.name] || []);
+    const candidates = relationCandidates(DATA, node, spec);
+    const options = candidates.map((candidate) =>
+      `<option value="${escapeAttr(candidate.id)}"${selected.has(candidate.id) ? " selected" : ""}>${escapeHtml(candidate.id)} [${escapeHtml(candidate.type)}] ${escapeHtml(truncate(candidate.text, 42))}</option>`,
+    ).join("");
+    const size = Math.min(8, Math.max(3, candidates.length));
+    return `<select id="${inputId}" data-edit-field="${name}" multiple size="${size}">${options}</select>
+      <span class="editor-hint">⌘ / Ctrl を押しながら複数選択</span>`;
+  }
+  return `<textarea id="${inputId}" data-edit-field="${name}" rows="5" spellcheck="false">${escapeHtml(editorJson(node[spec.name]))}</textarea>
+    <span class="editor-hint">JSON 配列</span>`;
+}
+
+function renderEditor(rows, node) {
+  const fields = editorFields(DATA, node).filter(
+    (spec) => !["text", "status", "relation"].includes(spec.kind),
+  );
+  if (!fields.length) return;
+  rows.push('<details class="advanced-editor"><summary>詳細フィールドを編集</summary>');
+  rows.push('<section class="node-editor" aria-label="詳細フィールド編集">');
+  rows.push('<p class="editor-note">本文・ステータス・relation はグラフ上で編集する。ここでは外部参照や受け入れ基準を扱う。</p>');
+  for (const spec of fields) {
+    rows.push(`<div class="editor-field" data-editor-name="${escapeAttr(spec.name)}">
+      <label for="edit-field-${escapeAttr(spec.name)}">${escapeHtml(fieldLabel(spec.name))}</label>
+      ${editorInput(node, spec)}
+      <button type="button" data-apply-field="${escapeAttr(spec.name)}"
+        aria-label="${escapeAttr(fieldLabel(spec.name))}を適用">適用</button>
+      <span class="editor-error" role="alert"></span>
+    </div>`);
+  }
+  rows.push("</section></details>");
+}
+
+function rebuildDraftView() {
+  selectedEdgeKey = null;
+  cancelConnection();
+  view = createView(DATA, state);
+  initGraph();
+  renderFilters();
+  renderStats();
+  refresh();
+  renderEditStatus();
+}
+
+function bindEditor(node) {
+  document.querySelectorAll("button[data-apply-field]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const name = button.dataset.applyField;
+      const spec = editorFields(DATA, node).find((item) => item.name === name);
+      const input = button.closest(".editor-field").querySelector("[data-edit-field]");
+      const raw = spec.kind === "relation"
+        ? [...input.selectedOptions].map((option) => option.value)
+        : input.value;
+      const parsed = parseEditorValue(DATA, node, spec, raw);
+      const error = button.closest(".editor-field").querySelector(".editor-error");
+      if (parsed.error) {
+        error.textContent = parsed.error;
+        input.setAttribute("aria-invalid", "true");
+        return;
+      }
+      DATA = updateDraftField(DATA, node.id, name, parsed.value);
+      rebuildDraftView();
+    });
+  });
+}
+
 function renderDetail() {
   const panel = document.getElementById("detail");
   if (!state.selected || !view.byId.has(state.selected)) {
@@ -706,6 +1043,7 @@ function renderDetail() {
 
   const rows = [];
   rows.push(`<h3>${node.id} <span class="node-btn type">[${node.type}]</span></h3>`);
+  if (editMode) renderEditor(rows, node);
   rows.push(`<p class="text">${escapeHtml(node.text)}</p>`);
   rows.push("<dl>");
   rows.push(`<dt>${fieldLabel("status")}</dt><dd>${node.status}</dd>`);
@@ -767,6 +1105,8 @@ function renderDetail() {
       " と同じ内容をクリップボードに入れる。</p>",
   );
   panel.innerHTML = rows.join("");
+
+  if (editMode) bindEditor(node);
 
   panel.querySelectorAll("button[data-goto]").forEach((button) => {
     button.addEventListener("click", () => selectNode(button.dataset.goto));
@@ -1171,6 +1511,64 @@ function setMode(mode) {
   revealSelected();
 }
 
+// --- 編集モード ------------------------------------------------------------
+
+function renderEditStatus() {
+  const diff = semanticDiff(BASE_DATA, DATA);
+  const status = document.getElementById("edit-status");
+  status.textContent = diff.count ? `変更 ${diff.count} 件` : "変更なし";
+  status.classList.toggle("changed", diff.count > 0);
+  document.getElementById("draft-validation-note").hidden = diff.count === 0;
+  document.getElementById("review-changes").disabled = diff.count === 0;
+  document.getElementById("discard-changes").disabled = diff.count === 0;
+}
+
+function setEditMode(enabled) {
+  editMode = enabled;
+  if (!enabled) {
+    selectedEdgeKey = null;
+    cancelConnection();
+    closeCanvasEditor();
+    closeEdgeEditor();
+  }
+  const button = document.getElementById("edit-toggle");
+  button.setAttribute("aria-pressed", String(enabled));
+  button.classList.toggle("active", enabled);
+  button.textContent = enabled ? "閲覧モードへ" : "編集モード";
+  document.getElementById("canvas-edit-hint").hidden = !enabled;
+  applyCanvasEditState();
+  renderDetail();
+}
+
+const editToggle = document.getElementById("edit-toggle");
+editToggle.addEventListener("click", () => setEditMode(!editMode));
+
+const diffDialog = document.getElementById("diff-dialog");
+document.getElementById("review-changes").addEventListener("click", () => {
+  document.getElementById("diff-output").textContent = formatSemanticDiff(BASE_DATA, DATA);
+  const issueLink = document.getElementById("create-issue");
+  const issueUrl = githubIssueUrl(DATA, BASE_DATA, DATA);
+  issueLink.hidden = !issueUrl;
+  issueLink.href = issueUrl || "";
+  document.getElementById("issue-link-note").hidden = Boolean(issueUrl);
+  diffDialog.showModal();
+});
+document.getElementById("close-diff").addEventListener("click", () => diffDialog.close());
+document.getElementById("copy-diff").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  try {
+    await navigator.clipboard.writeText(formatSemanticDiff(BASE_DATA, DATA));
+    button.textContent = "コピーした";
+  } catch {
+    button.textContent = "コピーできなかった";
+  }
+  setTimeout(() => (button.textContent = "diff をコピー"), 1600);
+});
+document.getElementById("discard-changes").addEventListener("click", () => {
+  DATA = cloneSiteData(BASE_DATA);
+  rebuildDraftView();
+});
+
 // --- URL ハッシュ ----------------------------------------------------------
 //
 // 表示状態と URL を両向きに繋ぐ。書くのは writeHash()、読むのは applyHash() だけ。
@@ -1217,6 +1615,9 @@ function applyHash() {
 // --- 操作 ------------------------------------------------------------------
 
 function selectNode(id) {
+  selectedEdgeKey = null;
+  closeEdgeEditor();
+  closeCanvasEditor();
   state.selected = state.selected === id ? null : id;
   refresh();
   revealSelected();
@@ -1242,6 +1643,7 @@ function refresh() {
   applyVisibility();
   applyHighlight();
   applySearchHits();
+  applyCanvasEditState();
   //: 選択の変更・フォーカスの入切・URL からの復元がすべてここを通る。
   syncFocusLayout();
 }
@@ -1409,6 +1811,9 @@ function currentSvg() {
   if (!svg) return null;
   const copy = svg.cloneNode(true);
   copy.querySelectorAll(".hidden").forEach((element) => element.remove());
+  copy.querySelectorAll(".connector-handle, .edge-hit, .connection-preview").forEach(
+    (element) => element.remove(),
+  );
   copy.querySelectorAll("[tabindex], [role], [aria-label]").forEach((element) => {
     element.removeAttribute("tabindex");
     element.removeAttribute("role");
@@ -1497,7 +1902,21 @@ document.addEventListener("keydown", (event) => {
     search.select();
     return;
   }
+  if (editMode && selectedEdgeKey && !typing && ["Delete", "Backspace"].includes(event.key)) {
+    event.preventDefault();
+    deleteSelectedEdge();
+    return;
+  }
   if (event.key !== "Escape") return;
+  if (canvasEditor || edgeEditor || connectionDrag) {
+    event.preventDefault();
+    cancelConnection();
+    closeCanvasEditor();
+    selectedEdgeKey = null;
+    closeEdgeEditor();
+    applyCanvasEditState();
+    return;
+  }
   //: まず選択、無ければ検索語を解く。どちらも無ければ入力欄から手を離す。
   if (state.selected) {
     event.preventDefault();
@@ -1544,6 +1963,7 @@ syncControls();
 renderStats();
 refresh();
 setMode(state.mode);
+renderEditStatus();
 // 解釈できない項目を落とした後の正しい URL に直す (履歴は増やさない)。
 writeHash(false);
 METRICS.initialRenderMs = Date.now() - METRICS.startedAt;

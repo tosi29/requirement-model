@@ -31,7 +31,9 @@ from .findings import FindingList
 from .core.graph import RequirementGraph
 from .application.loader import LoadResult, discover_paths, load_paths
 from .core.metamodel import EDGE_NAMES
-from .application.plan import diff_graphs, format_plan, load_revision
+from .application.plan import diff_graphs, format_plan, impacted_nodes, load_revision
+from .definition.nodes import STATUS_RANK
+from .presentation.plan import render_plan_markdown
 from .presentation.render import FORMATS, render
 from .presentation.site import (
     DEFAULT_REF,
@@ -103,6 +105,14 @@ def build_parser() -> argparse.ArgumentParser:
     plan_parser.add_argument(
         "--edges",
         help="影響範囲の計算に使うエッジ種別をカンマ区切りで指定する",
+    )
+    plan_parser.add_argument(
+        "--format", choices=("text", "markdown"), default="text",
+        help="出力形式 (既定: text)",
+    )
+    plan_parser.add_argument(
+        "--fail-on-impact", choices=tuple(STATUS_RANK), metavar="STATUS",
+        help="影響範囲に指定 status のノードがあれば終了コード 1 を返す",
     )
 
     graph_parser = subparsers.add_parser("graph", help="グラフを出力する")
@@ -334,11 +344,20 @@ def cmd_plan(args: argparse.Namespace) -> int:
             print("  " + finding.format(), file=sys.stderr)
 
     diff = diff_graphs(previous.graph, current.graph)
-    sys.stdout.write(
-        format_plan(
-            previous.graph, current.graph, diff, args.rev, _edge_filter(args.edges)
+    edges = _edge_filter(args.edges)
+    formatter = render_plan_markdown if args.format == "markdown" else format_plan
+    sys.stdout.write(formatter(previous.graph, current.graph, diff, args.rev, edges))
+    impacted = impacted_nodes(previous.graph, current.graph, diff, edges)
+    if args.fail_on_impact and any(
+        (current.graph.nodes.get(node_id) or previous.graph.nodes[node_id]).status
+        == args.fail_on_impact
+        for node_id in impacted
+    ):
+        print(
+            f"影響範囲に status={args.fail_on_impact} のノードが含まれるため失敗した。",
+            file=sys.stderr,
         )
-    )
+        return EXIT_FINDINGS
     return EXIT_OK
 
 

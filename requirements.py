@@ -363,13 +363,15 @@ FR_STATUS_BY_TYPE = FunctionalRequirement(
 # → issue #6
 FR_PLAN_MARKDOWN = FunctionalRequirement(
     id="FR-18",
-    text="構造差分を Markdown で出力し、PR コメントに貼れる形にすること",
+    text="構造差分と影響範囲を Mermaid 図付き Markdown で出力し、PR コメントに貼れる形にすること",
     refines=[FR_PLAN],
     satisfies=[NEED_REVIEW_DIFF],
     source=[SRC_OWNER],
     acceptance_criteria=[
         "出力は GitHub の Markdown としてそのまま読める",
         "差分が無いときは、差分が無いことが 1 行で分かる",
+        "追加・削除・影響ノードをそれぞれ緑・赤・黄で表示する",
+        "--fail-on-impact で指定 status の影響ノードがあれば終了コード 1 を返す",
     ],
 )
 # → issue #7

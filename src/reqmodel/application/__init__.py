@@ -15,7 +15,7 @@ from .doc import (
 )
 from .explain import explain_text, impact_set, subgraph_edges, traversed_edges
 from .loader import DEFAULT_PATHS, LoadResult, discover_paths, load_paths, load_sources
-from .plan import FieldChange, GraphDiff, diff_graphs, format_plan, load_revision
+from .plan import FieldChange, GraphDiff, diff_graphs, format_plan, impacted_nodes, load_revision
 from .stats import (
     DEFAULT_STATS_TITLE,
     Ambiguity,
@@ -32,7 +32,7 @@ __all__ = [
     "DEFAULT_STATS_TITLE", "MATRICES", "Ambiguity", "FieldChange",
     "GraphDiff", "LoadResult", "Matrix", "MatrixSpec", "Ratio", "Stats", "Suppressed",
     "WaiverResult", "apply_waivers", "attach_locations", "build_matrix", "collect_stats",
-    "diff_graphs", "discover_paths", "explain_text", "format_plan", "impact_set",
+    "diff_graphs", "discover_paths", "explain_text", "format_plan", "impact_set", "impacted_nodes",
     "load_paths", "load_revision", "load_sources", "render_matrices_csv",
     "render_matrices_markdown", "render_spec", "render_stats",
     "subgraph_edges", "traversed_edges", "validate_semantics_lexical", "validate_structure",

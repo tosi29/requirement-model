@@ -818,7 +818,7 @@ skip されるので、CI では `.github/workflows/ci.yml` が node を明示�
 
 `reqmodel` は責務ごとに一方向の依存関係を持つサブパッケージへ分割している。
 
-- `reqmodel.definition`: 定義ファイルの利用者が使うノード型・補助型
+- `reqmodel.definition`: 定義ファイルの利用者が使うノード型・補助型・表示グループ宣言
 - `reqmodel.core`: メタモデル、正規化グラフ、既定の投影ポリシー
 - `reqmodel.application`: 読み込み、検証、変更分析、説明・文書・統計生成のユースケース
 - `reqmodel.presentation`: Mermaid / DOT、描画スタイル、静的サイト

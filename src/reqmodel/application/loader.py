@@ -16,8 +16,7 @@ from ..astcheck import ExtractResult, RawNode, extract_file, extract_source
 from ..findings import Finding, FindingList
 from ..core.graph import RequirementGraph
 from ..core.metamodel import NODE_TYPES
-from ..definition import Node
-from ..presentation.view import RequirementGroup
+from ..definition import Node, RequirementGroup
 
 __all__ = ["LoadResult", "load_paths", "load_sources", "discover_paths", "DEFAULT_PATHS"]
 

@@ -1,10 +1,10 @@
-"""Presentation-only view definitions for requirement diagrams."""
+"""Public display-group declarations for requirement definition files."""
 
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from ..definition import Constraint, FunctionalRequirement, QualityRequirement, Ref
+from .nodes import Constraint, FunctionalRequirement, QualityRequirement, Ref
 
 __all__ = ["RequirementGroup"]
 

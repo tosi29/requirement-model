@@ -57,6 +57,7 @@ NEED_SELF_CHECK = Need(
     id="Need-1",
     text="要求を書く人は、書き方の誤りをレビュー会の前に自分で見つけたい",
     source=[SRC_OWNER, SRC_LEGACY],
+    status="approved",
 )
 NEED_NO_DANGLING = Need(
     id="Need-2",
@@ -343,6 +344,20 @@ FR_EXPORT = FunctionalRequirement(
     ],
 )
 
+# → issue #72
+FR_STATUS_BY_TYPE = FunctionalRequirement(
+    id="FR-27",
+    text="ノード型ごとに意味のある status だけを許可し、合意状態の参照整合を検査すること",
+    satisfies=[NEED_SELF_CHECK],
+    source=[SRC_OWNER],
+    status="implemented",
+    acceptance_criteria=[
+        "Goal・Need・Constraint では proposed と approved だけを許可する",
+        "FR・QR では proposed・approved・implemented・verified を許可する",
+        "合意済みノードから proposed ノードへの参照を structure.status_inconsistent として報告する",
+    ],
+)
+
 # --- 機能要求: 未着手 (対応する issue はノード直前のコメントを参照) ----------
 
 # → issue #6
@@ -530,6 +545,7 @@ GROUP_VALIDATION = RequirementGroup(
         FR_LEXICON,
         FR_WAIVER,
         FR_EXIT_CODE,
+        FR_STATUS_BY_TYPE,
         CONSTRAINT_NO_EXEC,
     ],
 )

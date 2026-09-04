@@ -57,7 +57,7 @@ CHECK_CODES: dict[str, CheckCode] = {
         _code("structure.goal_leaf", 2, "未分解の Goal", True),
         _code("structure.goal_decomposition", 2, "Goal の分解が要求群に到達しない", True),
         _code("structure.unverified_claim", 2, "verified なのに根拠が無い", True),
-        _code("structure.status_inconsistent", 2, "状態の成熟度が逆転している", True),
+        _code("structure.status_inconsistent", 2, "承認済みノードが未承認ノードを参照している", True),
         # 抑制機構そのもの
         _code(WAIVER_STALE, 2, "指摘が出ていない抑制 (陳腐化)", False),
     )

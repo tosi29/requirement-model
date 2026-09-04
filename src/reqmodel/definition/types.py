@@ -1,5 +1,5 @@
 """Public helper types for requirement definitions."""
 
-from .nodes import Ref, Status, Waiver
+from .nodes import DecisionStatus, Ref, RequirementStatus, Waiver
 
-__all__ = ["Ref", "Status", "Waiver"]
+__all__ = ["Ref", "DecisionStatus", "RequirementStatus", "Waiver"]

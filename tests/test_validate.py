@@ -138,6 +138,20 @@ def test_approved_requirement_pointing_at_proposed_need_is_reported():
     assert inconsistent and inconsistent[0].node_id == "FR-1"
 
 
+def test_verified_requirement_only_requires_approved_target():
+    """実現状態は参照先と比較せず、参照先が合意済みならよい。"""
+    n = need("Need-1", status="approved")
+    g = goal("Goal-1", motivates=[n], status="approved")
+    f = fr(
+        "FR-1",
+        satisfies=[n],
+        status="verified",
+        evidence=["受入テストで確認した"],
+    )
+    findings = validate_structure(build(n, g, f))
+    assert "structure.status_inconsistent" not in codes(findings)
+
+
 def test_approved_constraint_on_proposed_requirement_is_not_reported():
     # 制約は制約対象より先に決まりうるので、constrains は成熟度の逆転にしない
     s = source("S-1")

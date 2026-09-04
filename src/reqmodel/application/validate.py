@@ -288,6 +288,12 @@ def _check_unverified_claims(graph: RequirementGraph, findings: FindingList) -> 
 
 
 def _check_status_consistency(graph: RequirementGraph, findings: FindingList) -> None:
+    """合意済みの構造が、未合意のノードに依存していないかを見る。
+
+    implemented / verified は FR / QR にだけある実現状態であり、エッジの両端で
+    比較する成熟度ではない。参照元が approved 以上なら、参照先は approved で
+    あればよい。
+    """
     for node in graph.ordered_nodes():
         source_rank = STATUS_RANK[node.status]
         if source_rank < STATUS_RANK["approved"]:

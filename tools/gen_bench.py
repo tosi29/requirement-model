@@ -274,7 +274,7 @@ def render() -> str:
                 "Need",
                 id=f"Need-{number}",
                 text=f"{role}は、{area(index)}の{thing(index)}を{WANTS[index % len(WANTS)]}",
-                status="approved" if index % 3 else "implemented",
+                status="approved",
                 source=[source_of(index), source_of(index + 3)],
             )
         )

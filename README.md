@@ -832,9 +832,10 @@ steps:
     run: exit 1
 ```
 
-このリポジトリの workflow は、書き込み権限が付与されない fork 由来の Pull Request では
-アップロードだけを skip する。権限を得るための `pull_request_target` は使わず、`main` への
-push と同一リポジトリ内の Pull Request で Code Scanning を更新する。
+このリポジトリの workflow は、書き込み権限が付与されない fork 由来の Pull Request と
+Dependabot の Pull Request ではアップロードだけを skip する。SARIF の生成は実行する。
+権限を得るための `pull_request_target` は使わず、`main` への push と、Dependabot 以外の
+同一リポジトリ内 Pull Request で Code Scanning を更新する。
 
 `--sarif` と `--json` は同時には指定できない。SARIF をファイルに保存して公式
 スキーマで検査する場合は、たとえば次のように実行する。

@@ -22,7 +22,7 @@ from ..core.graph import RequirementGraph
 from ..core.metamodel import EDGE_NAMES, TYPE_ORDER, edge_specs_for
 from ..definition.nodes import STATUS_RANK
 from .render import render_dot, render_meta, render_mermaid
-from .view import RequirementGroup
+from ..definition import RequirementGroup
 
 __all__ = [
     "build_site",

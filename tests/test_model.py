@@ -14,6 +14,7 @@ from reqmodel.definition import (
     Need,
     QualityRequirement,
     Reference,
+    RequirementGroup,
 )
 
 
@@ -118,6 +119,50 @@ def test_public_definition_package_has_no_internal_dependencies():
 
 def test_definition_types_are_exposed_by_the_public_root_api():
     from reqmodel import Goal as RootGoal
+    from reqmodel import RequirementGroup as RootRequirementGroup
     from reqmodel.definition import Goal as DefinitionGoal
+    from reqmodel.definition import RequirementGroup as DefinitionRequirementGroup
 
     assert RootGoal is DefinitionGoal
+    assert RootRequirementGroup is DefinitionRequirementGroup
+
+
+def test_lower_layers_do_not_import_presentation():
+    """AST, application, core, and definition must not depend on presentation."""
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).parents[1] / "src" / "reqmodel"
+    paths = [root / "astcheck.py"]
+    paths += [
+        path
+        for package in ("application", "core", "definition")
+        for path in (root / package).glob("*.py")
+    ]
+    for path in paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        assert not any(
+            (
+                isinstance(node, ast.Import)
+                and any(
+                    alias.name.startswith("reqmodel.presentation")
+                    for alias in node.names
+                )
+            )
+            or (
+                isinstance(node, ast.ImportFrom)
+                and (
+                    (node.module or "").startswith("reqmodel.presentation")
+                    or (node.module or "").split(".")[0] == "presentation"
+                )
+            )
+            for node in ast.walk(tree)
+        ), path
+
+
+def test_requirement_group_is_not_a_requirement_node():
+    group = RequirementGroup(id="input", label="入力")
+
+    from reqmodel.definition import Node
+
+    assert not isinstance(group, Node)

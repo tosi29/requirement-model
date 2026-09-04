@@ -28,7 +28,7 @@ from .styles import (
     _mermaid_shape_of_type,
     render_meta,
 )
-from .view import RequirementGroup
+from ..definition import RequirementGroup
 
 
 def _truncate(text: str, limit: int) -> str:

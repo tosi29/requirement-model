@@ -19,8 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from .core.metamodel import NODE_TYPES
-from .definition import Reference
-from .presentation.view import RequirementGroup
+from .definition import Reference, RequirementGroup
 
 DECLARATION_TYPES = {**NODE_TYPES, "RequirementGroup": RequirementGroup}
 VALUE_TYPES = {"Reference": Reference}

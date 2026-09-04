@@ -49,6 +49,7 @@ import {
   quadraticPoint,
   related,
   searchHits,
+  safeHref,
   severityTabs,
   sortRows,
   sourceUrl,
@@ -485,6 +486,15 @@ test("nodeSize は fit が無ければ矩形として扱う", () => {
 
 test("escapeHtml は < & > だけを潰す", () => {
   assert.equal(escapeHtml('<a href="x">&</a>'), '&lt;a href="x"&gt;&amp;&lt;/a&gt;');
+});
+
+test("safeHref は閲覧用 URL だけを許可し、実行可能な scheme を拒否する", () => {
+  assert.equal(safeHref("https://example.com/a?q=1"), "https://example.com/a?q=1");
+  assert.equal(safeHref("http://example.com"), "http://example.com");
+  assert.equal(safeHref("about:blank#legacy"), "about:blank#legacy");
+  assert.equal(safeHref("javascript:alert(1)"), null);
+  assert.equal(safeHref("data:text/html,<script>alert(1)</script>"), null);
+  assert.equal(safeHref("not a url"), null);
 });
 
 // --- テーブル --------------------------------------------------------------

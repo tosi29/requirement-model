@@ -322,6 +322,18 @@ FR_PERMALINK = FunctionalRequirement(
         "解釈できない値は黙って捨て、読み込み後の URL は解釈できた形に直る",
     ],
 )
+FR_SITE_DOM_SAFETY = FunctionalRequirement(
+    id="FR-31",
+    text="閲覧用サイトはモデル由来の値をHTMLとして解釈せず、安全なURLだけをリンクにすること",
+    refines=[FR_SITE],
+    satisfies=[NEED_READABLE],
+    source=[SRC_OWNER],
+    acceptance_criteria=[
+        "動的なUI生成はDOM APIとtextContentを用い、innerHTMLへモデル値を渡さない",
+        "外部参照と出所のリンクはhttps、http、about schemeだけを許可する",
+        "HTMLタグを含むnode id、本文、外部参照、指摘は文字列として表示される",
+    ],
+)
 FR_STATS = FunctionalRequirement(
     id="FR-16",
     text="ノード数・エッジ数・充足率・曖昧語密度を数え、判定を伴わない形で出すこと",
@@ -567,6 +579,7 @@ GROUP_PRESENTATION = RequirementGroup(
         FR_FIT_WHOLE,
         FR_TABLE,
         FR_PERMALINK,
+        FR_SITE_DOM_SAFETY,
         FR_STATS,
         FR_MCP,
         FR_SVG,

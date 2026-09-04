@@ -579,6 +579,8 @@ Mermaid / DOT のノード識別子は `n1`, `n2`, … の連番で、`ordered_n
 - 配色は OS 設定に従い、ヘッダのボタンで**明 / 暗に固定**もできる。絞り込みは
   次に開いたときに戻る
 - **SVG のノードを含むすべての操作要素をキーボードだけで辿れる**
+- モデル由来の値は HTML 文字列へ変換せず DOM API で表示する。外部参照リンクは
+  `https:` / `http:` / `about:` だけを許可し、`javascript:` などはテキストとして表示する
 
 出力ディレクトリには `index.html` のほか、`model.json` (正規化 JSON) と
 `graph.mmd` / `graph.dot` も置かれる。`model.json` の各ノードには

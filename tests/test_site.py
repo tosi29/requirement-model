@@ -210,9 +210,21 @@ def test_detail_panel_uses_japanese_labels_for_external_references(tmp_path: Pat
     assert 'fieldLabel("source")' in html
     assert 'fieldLabel("realized_by")' in html
     assert 'fieldLabel("evidence")' in html
-    assert 'pushReferenceSection(rows, "Source"' not in html
-    assert 'pushReferenceSection(rows, "Realized by"' not in html
-    assert 'pushReferenceSection(rows, "Evidence"' not in html
+    assert 'appendReferenceSection(panel, "Source"' not in html
+    assert 'appendReferenceSection(panel, "Realized by"' not in html
+    assert 'appendReferenceSection(panel, "Evidence"' not in html
+
+
+def test_dynamic_site_ui_does_not_parse_model_values_as_html(tmp_path: Path):
+    """モデル値の描画に HTML parser sink を使わず、DOM API だけで組み立てる。"""
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert ".innerHTML" not in html
+    assert ".outerHTML" not in html
+    assert "insertAdjacentHTML" not in html
+    assert "document.write" not in html
+    assert "replaceChildren" in html
+    assert "textContent" in html
 
 
 def test_page_has_impact_depth_and_undirected_controls(tmp_path: Path):

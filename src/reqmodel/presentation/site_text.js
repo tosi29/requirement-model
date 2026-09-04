@@ -26,6 +26,23 @@ export function escapeAttr(text) {
   return escapeHtml(String(text)).replace(/"/g, "&quot;");
 }
 
+/**
+ * リンクとして DOM に設定してよい URL だけを返す。
+ *
+ * Reference は任意文字列を保持できるため、HTML escape では防げない
+ * `javascript:` などの実行可能 scheme をここで落とす。既存の外部リンクと、旧 Source
+ * から変換される `about:blank#...` だけを許可する。
+ */
+export function safeHref(value) {
+  if (!value) return null;
+  try {
+    const url = new URL(String(value));
+    return ["https:", "http:", "about:"].includes(url.protocol) ? String(value) : null;
+  } catch {
+    return null;
+  }
+}
+
 // --- ラベルの折り返し ------------------------------------------------------
 //
 // SVG の text は自動折り返ししない。かといって
@@ -228,4 +245,3 @@ export function nodeSize(label, fit, measure = estimateTextWidth) {
     h: Math.round(textHeight * box.hmul + box.hpad),
   };
 }
-

@@ -401,7 +401,7 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
   <h1>__TITLE__</h1>
   <span class="sub" id="sources"></span>
   <span class="chips" id="stats"></span>
-  <!-- 表示は site_app.js が THEME_LABELS から入れる。 -->
+  <!-- 表示は site_app.ts が THEME_LABELS から入れる。 -->
   <button id="theme" title="配色を 自動 (OS 設定) → 明 → 暗 で切り替える"></button>
 </header>
 
@@ -416,7 +416,7 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
 
     <h2>影響範囲</h2>
     <label class="toggle" for="depth">探索の深さ<span class="count" id="depth-value"></span></label>
-    <!-- min / max は site_app.js が IMPACT_DEPTHS から入れる。 -->
+    <!-- min / max は site_app.ts が IMPACT_DEPTHS から入れる。 -->
     <input type="range" id="depth" title="影響範囲を何ホップ先まで辿るか (req explain --depth)">
     <label class="toggle"><input type="checkbox" id="undirected">向きを無視して辿る</label>
     <p class="hint">この設定は色分け・上流/下流の件数・「影響部分グラフをコピー」の
@@ -450,7 +450,7 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
           <option value="TD">縦 (TD)</option>
           <option value="LR">横 (LR)</option>
         </select>
-        <!-- 選択肢は site_app.js が FOCUS_DEPTHS から作る。 -->
+        <!-- 選択肢は site_app.ts が FOCUS_DEPTHS から作る。 -->
         <select id="focus" aria-label="フォーカス (近傍だけを描く)" title="選択したノードの近傍だけを図に描く (一覧・表・コピー本文は全体のまま)"></select>
         <button id="relayout" title="表示中のノードだけで並べ直す">整列</button>
       </span>
@@ -481,7 +481,7 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
     <div id="detail"><p class="empty">グラフのノードをクリックすると、本文・根拠・影響範囲を表示する。</p></div>
 
     <h2>検証結果</h2>
-    <!-- 重大度タブとチェックコード別のまとめは site_app.js が入れる。 -->
+    <!-- 重大度タブとチェックコード別のまとめは site_app.ts が入れる。 -->
     <div class="seg" id="finding-tabs" role="tablist" aria-label="指摘の重大度"></div>
     <div id="findings" role="tabpanel" aria-label="指摘一覧"></div>
   </aside>

@@ -1,4 +1,5 @@
-import { compare, activeEdgeNames, edgeSelection, hiddenByDefault, impactScope, impactSets, rankOf, reach } from "./site_graph.js";
+// @ts-nocheck
+import { compare, activeEdgeNames, edgeSelection, hiddenByDefault, impactScope, impactSets, rankOf, reach } from "./site_graph.ts";
 // --- LLM 用コンテキスト -----------------------------------------------------
 //
 // 以下は `explain.py` の explain_text() / _describe() / _all_edge_names() の写し。

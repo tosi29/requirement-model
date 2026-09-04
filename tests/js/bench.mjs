@@ -1,5 +1,5 @@
 /**
- * `site_logic.js` の探索まわりのベンチ。`npm run bench` で走る (テストではない)。
+ * `site_logic.ts` の探索まわりのベンチ。`npm run bench` で走る (テストではない)。
  *
  * 300 ノード級の合成グラフ (`largeFixture()`。examples/bench.py と同じ形) に対して、
  * ページ上で実際に回る経路を回数ぶん回して時間を測る。
@@ -10,7 +10,7 @@
  * 実装を直したときに「速くなったつもり」で終わらせないための、唯一の物差し。
  */
 
-import { createView, focusSet, reach } from "../../src/reqmodel/presentation/site_logic.js";
+import { createView, focusSet, reach } from "../../src/reqmodel/presentation/site_logic.ts";
 import { allOn, largeFixture } from "./fixture.mjs";
 
 /** 隣接マップを使わない、書き換え前の reach()。比較対象として残してある。 */

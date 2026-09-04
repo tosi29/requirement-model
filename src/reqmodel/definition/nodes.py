@@ -34,7 +34,8 @@ __all__ = [
     "FR",
     "QR",
     "Ref",
-    "Status",
+    "DecisionStatus",
+    "RequirementStatus",
     "Waiver",
     "STATUS_RANK",
 ]
@@ -43,9 +44,10 @@ __all__ = [
 # 基本語彙
 # ---------------------------------------------------------------------------
 
-Status = Literal["proposed", "approved", "implemented", "verified"]
+DecisionStatus = Literal["proposed", "approved"]
+RequirementStatus = Literal["proposed", "approved", "implemented", "verified"]
 
-#: 状態の成熟度。上流ノードは下流ノード以上に成熟しているべき、という検査に使う。
+#: status の順序。合意済みかを判定し、表示・集計を安定させるために使う。
 STATUS_RANK: dict[str, int] = {
     "proposed": 0,
     "approved": 1,
@@ -124,7 +126,7 @@ class Node(BaseModel):
 
     id: str
     text: str
-    status: Status = "proposed"
+    status: RequirementStatus = "proposed"
     #: なぜこのノードが存在するのかを示す外部参照。
     source: list[Reference] = []
     #: 既知・意図的な指摘を黙らせる waiver。``[("structure.orphan_fr", "理由")]``
@@ -227,6 +229,8 @@ class Requirement(Node):
 class Goal(Node):
     """事業・ステークホルダーの意図 (なぜ)。"""
 
+    #: Goal は合意の状態だけを持つ。実現・検証される対象ではない。
+    status: DecisionStatus = "proposed"
     #: 自分がどの親 Goal を詳細化しているか (子 → 親)。
     refines: list[Ref["Goal"]] = []
     motivates: list[Ref["Need"]] = []
@@ -235,6 +239,8 @@ class Goal(Node):
 class Need(Node):
     """何が満たされたいか。語尾は願望形「〜たい」。"""
 
+    #: Need は合意の状態だけを持つ。実現・検証される対象ではない。
+    status: DecisionStatus = "proposed"
     @field_validator("text")
     @classmethod
     def _check_suffix(cls, value: str) -> str:
@@ -268,6 +274,8 @@ class QualityRequirement(Requirement):
 class Constraint(Node):
     """解決策の自由度を制限する条件。要求ではない。"""
 
+    #: Constraint は合意の状態だけを持つ。実現・検証される対象ではない。
+    status: DecisionStatus = "proposed"
     constrains: list[Ref[Union["FunctionalRequirement", "QualityRequirement"]]] = []
 
 

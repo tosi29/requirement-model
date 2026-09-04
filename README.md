@@ -226,8 +226,18 @@ Need は「〜たい」、FR は「〜こと」で終わる必要がある (層1
 
 ### 共通属性
 
-`id` / `text` / `status` (`proposed` → `approved` → `implemented` → `verified`) /
-`suppress` ([指摘の抑制](#指摘の抑制-waiver))。
+`id` / `text` / `status` / `suppress` ([指摘の抑制](#指摘の抑制-waiver))。
+`status` の許容値と意味は型ごとに異なる。
+
+| 型 | 許容する `status` | 意味 |
+|---|---|---|
+| Goal / Need / Constraint | `proposed`, `approved` | 記述内容が提案中か、関係者に合意されたか |
+| FR / QR | `proposed`, `approved`, `implemented`, `verified` | 提案・合意に加え、システムへ実現されたか、根拠をもって充足を確認したか |
+
+`implemented` は対象の FR / QR がシステムへ実現された状態、`verified` はその要求の
+充足を `evidence` で確認した状態である。Goal / Need は要求によって充足される対象、
+Constraint は解決策を制限する条件であり、それ自体を「実装済み」「検証済み」とはしない。
+公開型も `DecisionStatus` と `RequirementStatus` に分かれ、許容しない組み合わせは層1で弾く。
 FR / QR には検証に関わる 2 つの欄が加わる。
 
 | 属性 | 何を書くか | 検査 |
@@ -285,7 +295,7 @@ FR / QR には検証に関わる 2 つの欄が加わる。
 | `structure.goal_decomposition` | warning | 要求群に到達しない子 Goal がある |
 | `structure.goal_leaf` | warning | 子 Goal も Need も持たない Goal |
 | `structure.unverified_claim` | warning | `verified` なのに `evidence` の無い FR / QR |
-| `structure.status_inconsistent` | warning | approved 以上のノードが proposed のノードを参照 (`constrains` を除く) |
+| `structure.status_inconsistent` | warning | 合意済みのノードが proposed のノードを参照 (`constrains` を除く) |
 | `semantics.ambiguous_term` | warning | 曖昧語 (「高速に」「適切に」等) |
 | `waiver.stale` | warning | 陳腐化した抑制 (対象の指摘が出ていない) |
 
@@ -295,6 +305,9 @@ FR / QR には検証に関わる 2 つの欄が加わる。
 `structure.status_inconsistent` が見るのは `satisfies` / `refines` / `qualifies` /
 `motivates` の 4 種で、**`constrains` は対象外**である (`validate.py` の `_STATUS_EDGES`。
 制約は制約対象より先に決まりうるため。[理由](docs/design/model.md#constrains-を-structurestatus_inconsistent-の対象から外した))。
+この規則が比較するのは合意状態だけである。参照元が `approved` / `implemented` /
+`verified` のいずれかなら参照先は `approved` であればよく、参照元と同じ実現状態までは
+要求しない。例えば `verified` の QR が `approved` の FR を `qualifies` しても整合している。
 
 ### 指摘の抑制 (waiver)
 

@@ -71,6 +71,18 @@ def test_layer1_violation_becomes_a_finding():
     assert "願望形" in finding.message
 
 
+def test_status_not_allowed_for_node_type_becomes_a_finding():
+    result = load(
+        'n = Need(id="Need-1", text="早く精算したい", status="implemented")\n'
+    )
+    assert not result.ok
+    finding = result.findings.items[0]
+    assert finding.layer == 1
+    assert finding.code == "syntax.invalid_field"
+    assert finding.node_id == "Need-1"
+    assert "Need.status" in finding.message
+
+
 def test_duplicate_id_is_reported():
     result = load(
         'n1 = Need(id="Need-1", text="早く精算したい")\n'

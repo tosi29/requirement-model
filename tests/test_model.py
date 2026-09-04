@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from conftest import fr, need, source
+from conftest import constraint, fr, goal, need, qr, source
 from reqmodel.core.metamodel import edge_specs_for
 from reqmodel.definition import (
     Constraint,
@@ -61,6 +61,25 @@ def test_reference_accepts_node_or_id_string():
 
 def test_status_default_is_proposed():
     assert need().status == "proposed"
+
+
+@pytest.mark.parametrize("factory", [goal, need, constraint])
+@pytest.mark.parametrize("status", ["proposed", "approved"])
+def test_decision_nodes_accept_decision_statuses(factory, status):
+    assert factory(status=status).status == status
+
+
+@pytest.mark.parametrize("factory", [goal, need, constraint])
+@pytest.mark.parametrize("status", ["implemented", "verified"])
+def test_decision_nodes_reject_delivery_statuses(factory, status):
+    with pytest.raises(ValidationError):
+        factory(status=status)
+
+
+@pytest.mark.parametrize("factory", [fr, qr])
+@pytest.mark.parametrize("status", ["proposed", "approved", "implemented", "verified"])
+def test_requirements_accept_all_requirement_statuses(factory, status):
+    assert factory(status=status).status == status
 
 
 def test_edge_specs_are_derived_from_field_annotations():

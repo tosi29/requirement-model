@@ -30,6 +30,21 @@ README の[メタモデル](../../README.md#メタモデル)と[検証 (3層)](.
 `--strict` に通す過程で見つかった誤検出である。approved な Constraint が proposed な
 FR を `constrains` した結果が報告され、抑制ではなく検査そのものを直した (#47)。
 
+## status を合意状態と実現状態に分けた
+
+単一の `Status` を全ノードへ持たせる設計をやめ、Goal / Need / Constraint の
+`DecisionStatus` (`proposed` / `approved`) と、FR / QR の `RequirementStatus`
+(`proposed` / `approved` / `implemented` / `verified`) に分けた (#72)。フィールドを
+二つに分けるのではなく型ごとの許容値を変えたのは、ひとつの要求について状態を一方向に
+進める使い方を保ちつつ、Goal の「実装済み」や Constraint の「検証済み」という機械が
+正誤を判定できない記述を入力時に拒否するためである。
+
+`structure.status_inconsistent` は実現状態の比較ではなく、**合意済みの構造が未合意の
+ノードに依存していないこと**を検査する。したがって `verified` の QR から `approved` の
+FR への `qualifies` は正しい。参照先にも同じ status を要求すると、`implemented` を持たない
+Need を implemented の FR が満たす正常な構造を表現できない。この規則では参照元が
+`approved` 以上なら参照先が `approved` であることだけを求める。
+
 ## `Decision` 型と `conflicts` / `resolves` を置かない
 
 対立の明示 (`conflicts`)、その解消の記録 (`Decision` / `resolves`)、そして

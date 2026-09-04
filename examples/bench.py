@@ -164,7 +164,7 @@ Goal(
 Need(
     id="Need-1",
     text="受注担当者は、受注の登録内容を確認したい",
-    status="implemented",
+    status="approved",
     source=[
         Reference(title="SRC-1", url="https://github.com/tosi29/requirement-model/issues/123#SRC-1"),
         Reference(title="SRC-4", url="https://github.com/tosi29/requirement-model/issues/123#SRC-4"),
@@ -194,7 +194,7 @@ Need(
 Need(
     id="Need-4",
     text="請求担当者は、配送の履歴を受け取りたい",
-    status="implemented",
+    status="approved",
     source=[
         Reference(title="SRC-4", url="https://github.com/tosi29/requirement-model/issues/123#SRC-4"),
         Reference(title="SRC-1", url="https://github.com/tosi29/requirement-model/issues/123#SRC-1"),
@@ -224,7 +224,7 @@ Need(
 Need(
     id="Need-7",
     text="受注担当者は、与信の明細を確認したい",
-    status="implemented",
+    status="approved",
     source=[
         Reference(title="SRC-1", url="https://github.com/tosi29/requirement-model/issues/123#SRC-1"),
         Reference(title="SRC-4", url="https://github.com/tosi29/requirement-model/issues/123#SRC-4"),
@@ -254,7 +254,7 @@ Need(
 Need(
     id="Need-10",
     text="請求担当者は、積載の担当割当を受け取りたい",
-    status="implemented",
+    status="approved",
     source=[
         Reference(title="SRC-4", url="https://github.com/tosi29/requirement-model/issues/123#SRC-4"),
         Reference(title="SRC-1", url="https://github.com/tosi29/requirement-model/issues/123#SRC-1"),
@@ -284,7 +284,7 @@ Need(
 Need(
     id="Need-13",
     text="受注担当者は、受注の進捗を確認したい",
-    status="implemented",
+    status="approved",
     source=[
         Reference(title="SRC-1", url="https://github.com/tosi29/requirement-model/issues/123#SRC-1"),
         Reference(title="SRC-4", url="https://github.com/tosi29/requirement-model/issues/123#SRC-4"),
@@ -314,7 +314,7 @@ Need(
 Need(
     id="Need-16",
     text="請求担当者は、配送の予定を受け取りたい",
-    status="implemented",
+    status="approved",
     source=[
         Reference(title="SRC-4", url="https://github.com/tosi29/requirement-model/issues/123#SRC-4"),
         Reference(title="SRC-1", url="https://github.com/tosi29/requirement-model/issues/123#SRC-1"),
@@ -344,7 +344,7 @@ Need(
 Need(
     id="Need-19",
     text="受注担当者は、与信の区分を確認したい",
-    status="implemented",
+    status="approved",
     source=[
         Reference(title="SRC-1", url="https://github.com/tosi29/requirement-model/issues/123#SRC-1"),
         Reference(title="SRC-4", url="https://github.com/tosi29/requirement-model/issues/123#SRC-4"),
@@ -374,7 +374,7 @@ Need(
 Need(
     id="Need-22",
     text="請求担当者は、積載の引当状況を受け取りたい",
-    status="implemented",
+    status="approved",
     source=[
         Reference(title="SRC-4", url="https://github.com/tosi29/requirement-model/issues/123#SRC-4"),
         Reference(title="SRC-1", url="https://github.com/tosi29/requirement-model/issues/123#SRC-1"),

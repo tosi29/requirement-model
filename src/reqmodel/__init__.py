@@ -28,7 +28,8 @@ from .definition import (
     Reference,
     RequirementGroup,
     Requirement,
-    Status,
+    DecisionStatus,
+    RequirementStatus,
     Waiver,
 )
 from .application.stats import Ambiguity, Ratio, Stats, collect_stats
@@ -52,7 +53,8 @@ __all__ = [
     "Node",
     "Requirement",
     "Ref",
-    "Status",
+    "DecisionStatus",
+    "RequirementStatus",
     "Waiver",
     # ツール API
     "RequirementGraph",

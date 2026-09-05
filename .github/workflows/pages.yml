@@ -28,16 +28,18 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: インストール
-        run: pip install -e .
+      - uses: astral-sh/setup-uv@v7
+
+      - name: uv のロック済み環境を作成する
+        run: uv sync --locked
 
       # ツール自体のテストは ci.yml が同じ push で回すので、ここでは繰り返さない。
       # このワークフローが守るのは「検証を通らないモデルを公開しない」ことだけで、
       # 見る条件は CI と揃える (--strict)。
       - name: 定義ファイルを検証する
         run: |
-          req validate --strict requirements.py
-          req validate --strict examples/sample.py
+          uv run --locked req validate --strict requirements.py
+          uv run --locked req validate --strict examples/sample.py
 
       # 2 つ公開する。ルートがこのリポジトリ自身の要求モデル、/sample/ が
       # 経費精算システムの例。build_site は 1 回 1 ディレクトリなので 2 回叩く
@@ -46,13 +48,13 @@ jobs:
       # 定義ファイルへのリンクになる。参照は公開したコミットそのものにする。
       - name: 静的サイトを生成する
         run: |
-          req site requirements.py \
+          uv run --locked req site requirements.py \
             --output site \
             --title "reqmodel 自身の要求グラフ (requirements.py)" \
             --assets local \
             --repo-url "${{ github.server_url }}/${{ github.repository }}" \
             --repo-ref "${{ github.sha }}"
-          req site examples/sample.py \
+          uv run --locked req site examples/sample.py \
             --output site/sample \
             --title "要求グラフの例 (examples/sample.py)" \
             --assets local \
@@ -64,7 +66,7 @@ jobs:
         # ファイル名と URL (バージョン込み) は reqmodel 側の定義を唯一の出典とする。
         # 参照は相対パスなので、ページを置いたディレクトリごとに要る。
         run: |
-          python -c "from reqmodel.presentation.site import SITE_ASSETS
+          uv run --locked python -c "from reqmodel.presentation.site import SITE_ASSETS
           print('\n'.join(f'{a.file} {a.url}' for a in SITE_ASSETS))" |
           while read -r file url; do
             curl -fsSL --retry 3 -o "site/$file" "$url"

@@ -25,14 +25,16 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: インストール
-        run: pip install -e .
+      - uses: astral-sh/setup-uv@v7
+
+      - name: uv のロック済み環境を作成する
+        run: uv sync --locked
 
       # 違反があっても生成済みの SARIF を次の step でアップロードする。
       # CI の成否は python job の --strict に任せ、ここでは役割を分離する。
       - name: reqmodel の SARIF を生成する
         continue-on-error: true
-        run: req validate --sarif requirements.py > reqmodel.sarif
+        run: uv run --locked req validate --sarif requirements.py > reqmodel.sarif
 
       - name: SARIF を Code Scanning へアップロードする
         # fork PR と Dependabot PR では security-events: write が付与されない。
@@ -62,24 +64,26 @@ jobs:
         with:
           node-version: "22"
 
-      - name: インストール
+      - uses: astral-sh/setup-uv@v7
+
+      - name: uv と npm のロック済み環境を作成する
         run: |
-          pip install -e ".[dev]"
+          uv sync --locked --extra dev
           npm ci
 
       - name: テスト
-        run: pytest -q
+        run: uv run --locked pytest -q
 
       - name: 型検査
-        run: mypy
+        run: uv run --locked mypy
 
       # それぞれ別のグラフなので 1 回にまとめない (id が衝突する)。
       # requirements.py はこのリポジトリ自身の要求モデル (dogfooding)。
       - name: 定義ファイルを検証する
         run: |
-          req validate --strict requirements.py
-          req validate --strict examples/sample.py
-          req validate --strict examples/bench.py
+          uv run --locked req validate --strict requirements.py
+          uv run --locked req validate --strict examples/sample.py
+          uv run --locked req validate --strict examples/bench.py
 
   site-js:
     # 埋め込み前の JS を、単体で構文検査してユニットテストにかける。

@@ -29,3 +29,7 @@ files = ["src", "examples", "requirements.py"]
 
 [tool.setuptools.package-data]
 "reqmodel.presentation" = ["site_template.html", "site_bundle.js"]
+
+[tool.uv]
+# uv add / lock / sync で、公開から3日未満の配布物を解決対象にしない。
+exclude-newer = "3 days"

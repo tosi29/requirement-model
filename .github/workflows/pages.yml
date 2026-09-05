@@ -73,7 +73,7 @@ jobs:
             cp "site/$file" "site/sample/$file"
           done
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 

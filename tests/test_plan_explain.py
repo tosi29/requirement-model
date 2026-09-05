@@ -184,6 +184,12 @@ def test_explain_text_carries_the_evidence_reference():
     assert "Evidence: 受入テスト第 1 回 <https://example.com/references/EV-1>" in text
 
 
+def test_explain_text_omits_missing_reference_url():
+    text = explain_text(build(fr("FR-1", source=[source(url=None)])), ["FR-1"])
+    assert "Source: 経理部長" in text
+    assert "<None>" not in text
+
+
 def test_explain_undirected_reaches_the_goal():
     directed = explain_text(chain(), ["FR-1"])
     undirected = explain_text(chain(), ["FR-1"], undirected=True)

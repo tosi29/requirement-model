@@ -134,7 +134,8 @@ def _reference_lines(node: Node, attr: str, label: str) -> list[str]:
     lines = [f"- {label}:"]
     for item in items:
         lines.append(f"    - **{_inline(item.title)}**: {_inline(item.note or '')}".rstrip())
-        lines.append(f"      URL: {item.url}")
+        if item.url:
+            lines.append(f"      URL: {item.url}")
     return lines
 
 

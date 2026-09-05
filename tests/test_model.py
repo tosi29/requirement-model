@@ -116,6 +116,7 @@ def test_edge_specs_are_derived_from_field_annotations():
 
 def test_reference_is_a_value_object_without_kind():
     assert Reference(title="規程", url="https://example.com").note is None
+    assert Reference(title="作者の運用背景").url is None
     with pytest.raises(ValidationError):
         Reference(title="規程", url="")
 

@@ -802,7 +802,7 @@
     const attrs = [`status=${node.status}`];
     const lines = [`- [${node.type}] ${node.id}: ${node.text}`, `    (${attrs.join(", ")})`];
     const pushReference = (label, item) => {
-      lines.push(`    ${label}: ${item.title} <${item.url}>`);
+      lines.push(`    ${label}: ${item.title}${item.url ? ` <${item.url}>` : ""}`);
       if (item.note) lines.push(`      note: ${item.note}`);
     };
     for (const item of node.source || []) pushReference("Source", item);

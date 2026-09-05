@@ -70,14 +70,22 @@ class Reference(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     title: str
-    url: str
+    #: URL が存在しない一次情報もあるため任意。無関係なダミー URL は割り当てない。
+    url: str | None = None
     note: str | None = None
 
-    @field_validator("title", "url")
+    @field_validator("title")
     @classmethod
     def _check_required_text(cls, value: str) -> str:
         if not value.strip():
-            raise ValueError("Reference の title / url は空にできない")
+            raise ValueError("Reference.title は空にできない")
+        return value
+
+    @field_validator("url")
+    @classmethod
+    def _check_url_text(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Reference.url は空文字にできない (URL が無ければ省略する)")
         return value
 
     @field_validator("note")

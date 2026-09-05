@@ -21,27 +21,26 @@ from reqmodel import (
 
 SRC_FINANCE_HEAD = Reference(
     title="経理部長",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_FINANCE_HEAD",
+    note="組織内の利用背景であり、公開 URL はない。",
 )
 SRC_EMPLOYEE = Reference(
     title="申請者となる一般社員",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_EMPLOYEE",
+    note="組織内の利用背景であり、公開 URL はない。",
 )
 SRC_POLICY = Reference(
     title="経費精算規程 第4版",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_POLICY",
+    note="組織内規程のため、公開 URL はない。",
 )
 SRC_LEGACY = Reference(
     title="現行の表計算ファイルとメールによる精算運用",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_LEGACY",
+    note="組織内の現行運用であり、公開 URL はない。",
 )
 
 # 引用や補足も Reference.note にまとめる。外部参照はグラフノードではなく、
 # 要求ノードの source / realized_by / evidence フィールドに直接保持する。
 SRC_POLICY_RECEIPT = Reference(
     title="1万円を超える支出には領収書の添付を要する",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_POLICY_RECEIPT",
-    note="外部参照の補足",
+    note="組織内規程のため、公開 URL はない。外部参照の補足。",
 )
 EVIDENCE_SHORT_FORM = Reference(
     title="受入テスト第 3 回",
@@ -55,13 +54,11 @@ EVIDENCE_OCR_LATENCY = Reference(
 )
 SRC_POLICY_DOMESTIC = Reference(
     title="経費に関する証憑は国内に保管しなければならない",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_POLICY_DOMESTIC",
-    note="外部参照の補足",
+    note="組織内規程のため、公開 URL はない。外部参照の補足。",
 )
 SRC_CFO_BACKLOG = Reference(
     title="月末に承認待ちが溜まって、締めが 3 日ずれることがある",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_CFO_BACKLOG",
-    note="外部参照の補足",
+    note="組織内の観測事実であり、公開 URL はない。外部参照の補足。",
 )
 
 # --- システム ---------------------------------------------------------------

@@ -54,14 +54,14 @@ Node の依存にはルートの `.npmrc` で `min-release-age=4320` (3日) を�
 ## 使い方
 
 ```console
-$ req validate [PATH ...] [--json | --sarif]  # 層0〜層2 の全チェック
-$ req plan     [PATH ...] [--rev HEAD] [--format text|markdown]  # 構造 diff → 影響範囲
-$ req graph    [PATH ...] [--format mermaid|dot] [-o FILE]
-$ req explain  ID [ID ...] [-f PATH]       # 影響部分グラフを LLM 用に整形
-$ req doc      [PATH ...] [--matrix] [-o FILE]  # 仕様書 / トレーサビリティ表の生成
-$ req stats    [PATH ...] [--json]         # モデルの健全性メトリクス
-$ req export   [PATH ...] [-o FILE]        # 正規化 JSON の出力
-$ req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (GitHub Pages 用)
+$ uv run --locked req validate [PATH ...] [--json | --sarif]  # 層0〜層2 の全チェック
+$ uv run --locked req plan     [PATH ...] [--rev HEAD] [--format text|markdown]  # 構造 diff → 影響範囲
+$ uv run --locked req graph    [PATH ...] [--format mermaid|dot] [-o FILE]
+$ uv run --locked req explain  ID [ID ...] [-f PATH]       # 影響部分グラフを LLM 用に整形
+$ uv run --locked req doc      [PATH ...] [--matrix] [-o FILE]  # 仕様書 / トレーサビリティ表の生成
+$ uv run --locked req stats    [PATH ...] [--json]         # モデルの健全性メトリクス
+$ uv run --locked req export   [PATH ...] [-o FILE]        # 正規化 JSON の出力
+$ uv run --locked req site     [PATH ...] [-o DIR]         # 閲覧用の静的サイト生成 (GitHub Pages 用)
 ```
 
 `PATH` を省略するとカレントの `requirements.py` または `requirements/` を探す。
@@ -381,7 +381,7 @@ PR 本文やコメントへ貼れる。`--fail-on-impact verified` を併用す�
 `--undirected` で向きを無視した近傍も集められる。
 
 ```console
-$ req explain FR-3 -f examples/sample.py --undirected --depth 2
+$ uv run --locked req explain FR-3 -f examples/sample.py --undirected --depth 2
 ```
 
 ## 仕様書とトレーサビリティ表の生成
@@ -390,9 +390,9 @@ $ req explain FR-3 -f examples/sample.py --undirected --depth 2
 モデルから導出する。仕様書を手で書くとモデルとの二重管理になる。
 
 ```console
-$ req doc examples/sample.py -o spec.md              # 階層構造の仕様書 (Markdown)
-$ req doc examples/sample.py --matrix -o trace.md    # トレーサビリティ表 (Markdown)
-$ req doc examples/sample.py --matrix -o trace.csv   # 同上 (CSV)
+$ uv run --locked req doc examples/sample.py -o spec.md              # 階層構造の仕様書 (Markdown)
+$ uv run --locked req doc examples/sample.py --matrix -o trace.md    # トレーサビリティ表 (Markdown)
+$ uv run --locked req doc examples/sample.py --matrix -o trace.csv   # 同上 (CSV)
 ```
 
 出力形式は `-o` の拡張子から決まる (`.csv` なら CSV)。`--format md|csv` で明示もできる。
@@ -485,7 +485,7 @@ Goal × Need,motivates,Goal,Goal-2,申請 1 件あたりの入力の手間を減
 読み取れない。`req stats` はモデルを数える。
 
 ```console
-$ req stats examples/sample.py
+$ uv run --locked req stats examples/sample.py
 ```
 
 4 つの節が出る。**1.** ノード数 (型 × 状態の表)、**2.** エッジ数 (種別ごと)、
@@ -514,7 +514,7 @@ $ req stats examples/sample.py
 といった用途はこちらを使う。
 
 ```console
-$ req stats examples/sample.py --json
+$ uv run --locked req stats examples/sample.py --json
 ```
 
 最上位のキーは `files` / `totals` / `nodes` / `edges` / `ratios` / `ambiguity` の 6 つ。
@@ -605,8 +605,8 @@ Mermaid / DOT のノード識別子は `n1`, `n2`, … の連番で、`ordered_n
 `"location": "examples/sample.py:42"` が入るので、そこから定義に戻れる。
 
 ```console
-$ req site examples/sample.py -o site --title "経費精算システムの要求グラフ"
-$ python -m http.server -d site
+$ uv run --locked req site examples/sample.py -o site --title "経費精算システムの要求グラフ"
+$ uv run --locked python -m http.server -d site
 ```
 
 > **なぜその作りなのか**は [`docs/design/site.md`](docs/design/site.md) にまとめてある
@@ -732,7 +732,7 @@ tab キーだけで一巡できる。タブ群は選択中の 1 つだけが tab
 リポジトリの URL と参照を渡せば blob URL に組み立てられる。
 
 ```console
-$ req site examples/sample.py -o site \
+$ uv run --locked req site examples/sample.py -o site \
     --repo-url https://github.com/owner/repo --repo-ref "$(git rev-parse HEAD)"
 ```
 
@@ -783,9 +783,9 @@ $ req site examples/sample.py -o site \
 `req validate --strict requirements.py` を回している。
 
 ```console
-$ req validate --strict     # requirements.py が読まれる
-$ req doc -o spec.md
-$ req site -o site && python -m http.server -d site
+$ uv run --locked req validate --strict     # requirements.py が読まれる
+$ uv run --locked req doc -o spec.md
+$ uv run --locked req site -o site && uv run --locked python -m http.server -d site
 ```
 
 自分に `--strict` を課すと、`verified` と書いた要求がすべて根拠を持ち、全要求が源泉を持ち、全 Need が satisfy され、
@@ -859,7 +859,7 @@ Dependabot の Pull Request ではアップロードだけを skip する。SARI
 スキーマで検査する場合は、たとえば次のように実行する。
 
 ```console
-$ req validate --sarif requirements.py > reqmodel.sarif
+$ uv run --locked req validate --sarif requirements.py > reqmodel.sarif
 $ check-jsonschema --schemafile https://json.schemastore.org/sarif-2.1.0.json reqmodel.sarif
 ```
 

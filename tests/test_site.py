@@ -313,6 +313,7 @@ def test_svg_edges_keep_labels_line_types_and_use_final_node_positions(tmp_path:
     html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
 
     assert 'const label = svgEl("text", { class: "edge-label"' in html
+    assert 'fill: "context-stroke"' in html
     assert "#graph .dashed .edge-line { stroke-dasharray: 6 4; }" in html
     assert "edgeControl(source, target, state.direction, offset)" in html
     assert "setAttrs(edge.path, { d: quadraticPath(from, control, to) })" in html

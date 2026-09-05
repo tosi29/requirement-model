@@ -17,7 +17,6 @@ interface ThemePrimitives {
 /** CSS 変数と render metadata を、構築済み SVG DOM に反映する。 */
 export function applyGraphTheme(
   graphEl: HTMLElement,
-  defs: SVGDefsElement,
   data: SiteData,
   nodeItems: Iterable<GraphNodeElement>,
   bandItems: Iterable<BandElement>,
@@ -29,7 +28,6 @@ export function applyGraphTheme(
   graphEl.style.setProperty("--graph-panel", pal.panel);
   graphEl.style.setProperty("--graph-border", pal.border);
   graphEl.style.setProperty("--graph-muted", pal.muted);
-  defs.querySelector("#req-arrow path")?.setAttribute("fill", pal.border);
   const impact = data.meta.impact_colors;
   graphEl.style.setProperty("--impact-selected", impact?.selected || pal.fg);
   graphEl.style.setProperty("--impact-upstream", impact?.upstream || pal.fg);

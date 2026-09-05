@@ -6,7 +6,7 @@ import type { GraphViewModel, SiteData } from "./site_types.ts";
 // 出力が 1 文字でもずれるとテストが落ちるので、片方を直したら両方を直すこと。
 
 /** ノード 1 件の記述。`explain.py` の `_describe()` と同じ整形。 */
-function describe(view, id, inlineSources = true) {
+function describe(view, id) {
   const node = view.byId.get(id);
   const attrs = [`status=${node.status}`];
   const lines = [`- [${node.type}] ${node.id}: ${node.text}`, `    (${attrs.join(", ")})`];
@@ -61,7 +61,6 @@ export function nodeContext(view: GraphViewModel, id: string, scope: { depth: nu
   const settings = scope || impactScope(view.state);
   const selection = edgeSelection(view);
   const edgeFilter = Array.isArray(selection) ? selection : null;
-  const includeSources = false;
   const { upstream, downstream, whole, undirected } = impactSets(view, id, settings);
 
   const lines = [`# 影響部分グラフ: ${id}`, ""];
@@ -84,7 +83,7 @@ export function nodeContext(view: GraphViewModel, id: string, scope: { depth: nu
     const sorted = [...ids].sort((a, b) => rankOf(view, a) - rankOf(view, b));
     if (!sorted.length) return;
     lines.push("", `## ${title} (${sorted.length} 件)`);
-    for (const nodeId of sorted) lines.push(...describe(view, nodeId, !includeSources));
+    for (const nodeId of sorted) lines.push(...describe(view, nodeId));
   };
 
   block("対象ノード", [id]);
@@ -112,11 +111,7 @@ export function nodeContext(view: GraphViewModel, id: string, scope: { depth: nu
     }
   }
 
-  //: 既定で外した源泉エッジは「現れなかった」に混ぜない (`explain.py` と同じ)。
-  //: --edges 相当を明示しているときは書き手の指定なので畳まない。
-  const hidden = new Set(
-    edgeFilter || includeSources ? [] : hiddenByDefault(view.data, "edges"),
-  );
+  const hidden = new Set(edgeFilter ? [] : hiddenByDefault(view.data, "edges"));
   const unused = allEdgeNames(view.data).filter(
     (name) => !hidden.has(name) && !edges.some((edge) => edge.name === name),
   );

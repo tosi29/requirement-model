@@ -56,15 +56,8 @@ def _ids(nodes: Iterable[Node]) -> dict[str, str]:
     return {node.id: f"n{index}" for index, node in enumerate(nodes, 1)}
 
 
-def _drawn(
-    graph: RequirementGraph, include_sources: bool
-) -> tuple[list[Node], list[Edge]]:
-    """図に出すノードとエッジ。
-
-    ``include_sources`` は旧 CLI オプションとの内部互換のため受け取るが、
-    Source ノードはメタモデルから無くなったので描画対象は常に同じである。
-    """
-    _ = include_sources
+def _drawn(graph: RequirementGraph) -> tuple[list[Node], list[Edge]]:
+    """図に出すノードとエッジ。"""
     return graph.ordered_nodes(), list(graph.edges)
 
 
@@ -122,12 +115,11 @@ def render_mermaid(
     graph: RequirementGraph,
     max_label: int = 40,
     highlight: Iterable[str] | None = None,
-    include_sources: bool = False,
     requirement_groups: Iterable[RequirementGroup] = (),
 ) -> str:
     lines = ["flowchart TD"]
     highlighted = set(highlight or ())
-    nodes, drawn_edges = _drawn(graph, include_sources)
+    nodes, drawn_edges = _drawn(graph)
     ids = _ids(nodes)
 
     node_lines: dict[str, str] = {}
@@ -218,7 +210,6 @@ def render_dot(
     graph: RequirementGraph,
     max_label: int = 40,
     highlight: Iterable[str] | None = None,
-    include_sources: bool = False,
     requirement_groups: Iterable[RequirementGroup] = (),
 ) -> str:
     highlighted = set(highlight or ())
@@ -228,7 +219,7 @@ def render_dot(
         '    node [fontname="sans-serif", style=filled, fillcolor=white];',
         '    edge [fontname="sans-serif", fontsize=10];',
     ]
-    nodes, drawn_edges = _drawn(graph, include_sources)
+    nodes, drawn_edges = _drawn(graph)
     ids = _ids(nodes)
     node_lines: dict[str, str] = {}
     for node in nodes:
@@ -306,15 +297,10 @@ def render(
     fmt: str = "mermaid",
     max_label: int = 40,
     highlight: Iterable[str] | None = None,
-    include_sources: bool = False,
     requirement_groups: Iterable[RequirementGroup] = (),
 ) -> str:
     if fmt == "mermaid":
-        return render_mermaid(
-            graph, max_label, highlight, include_sources, requirement_groups
-        )
+        return render_mermaid(graph, max_label, highlight, requirement_groups)
     if fmt == "dot":
-        return render_dot(
-            graph, max_label, highlight, include_sources, requirement_groups
-        )
+        return render_dot(graph, max_label, highlight, requirement_groups)
     raise ValueError(f"未対応の形式: {fmt}")

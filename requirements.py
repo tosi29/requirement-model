@@ -8,10 +8,8 @@ reqmodel は要求管理ツールでありながら、自分の要求だけは�
 引数なしの `req validate` がそのままこのモデルを読む。
 
 対象は「実装済みの機能」と「開いている issue」の両方である。未着手のものは
-status="proposed" で置き、対応する issue 番号を各ノードの直前のコメントに書く。
-コメントはモデルに入らない (機械が辿れない) が、外部の課題管理への参照を持つ場は
-今のメタモデルに無く、issue ごとに Source を作るのは意味的に歪むため、
-現時点ではこの形にしてある。
+status="proposed" で置き、対応する GitHub Issue は ``Reference`` として ``source`` に
+保持する。これにより課題管理への参照もモデルに入り、機械が辿れる。
 """
 
 from reqmodel import (
@@ -49,6 +47,39 @@ SRC_LEGACY = Reference(
 SRC_BENCH = Reference(
     title="300 ノードの合成モデル (examples/bench.py) による実測結果",
     url="https://github.com/tosi29/requirement-model/issues/123#SRC_BENCH",
+)
+ISSUE_STATUS_BY_TYPE = Reference(
+    title="GitHub Issue #72: status をノード型ごとに分離する",
+    url="https://github.com/tosi29/requirement-model/issues/72",
+)
+ISSUE_PLAN_MARKDOWN = Reference(
+    title="GitHub Issue #6: plan の Markdown 出力",
+    url="https://github.com/tosi29/requirement-model/issues/6",
+)
+ISSUE_CONFIG = Reference(
+    title="GitHub Issue #7: プロジェクト固有設定",
+    url="https://github.com/tosi29/requirement-model/issues/7",
+)
+ISSUE_MCP = Reference(
+    title="GitHub Issue #10: MCP サーバ",
+    url="https://github.com/tosi29/requirement-model/issues/10",
+)
+ISSUE_MORE_CHECKS = Reference(
+    title="GitHub Issue #13: 追加の検査規則",
+    url="https://github.com/tosi29/requirement-model/issues/13",
+)
+ISSUE_SARIF = Reference(
+    title="GitHub Issue #14: SARIF 出力",
+    url="https://github.com/tosi29/requirement-model/issues/14",
+)
+ISSUE_SVG = Reference(
+    title="GitHub Issue #24: SVG 出力",
+    url="https://github.com/tosi29/requirement-model/issues/24",
+)
+EVIDENCE_SITE_CLI_PARITY = Reference(
+    title="サイトと CLI の Mermaid 一致テスト",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_site_js.py",
+    note="test_mermaid_export_matches_req_graph を CI で実行している",
 )
 
 # --- ニーズ -----------------------------------------------------------------
@@ -356,12 +387,11 @@ FR_EXPORT = FunctionalRequirement(
     ],
 )
 
-# → issue #72
 FR_STATUS_BY_TYPE = FunctionalRequirement(
     id="FR-27",
     text="ノード型ごとに意味のある status だけを許可し、合意状態の参照整合を検査すること",
     satisfies=[NEED_SELF_CHECK],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_STATUS_BY_TYPE],
     status="implemented",
     acceptance_criteria=[
         "Goal・Need・Constraint では proposed と approved だけを許可する",
@@ -370,15 +400,14 @@ FR_STATUS_BY_TYPE = FunctionalRequirement(
     ],
 )
 
-# --- 機能要求: 未着手 (対応する issue はノード直前のコメントを参照) ----------
+# --- 機能要求: 未着手 -------------------------------------------------------
 
-# → issue #6
 FR_PLAN_MARKDOWN = FunctionalRequirement(
     id="FR-18",
     text="構造差分と影響範囲を Mermaid 図付き Markdown で出力し、PR コメントに貼れる形にすること",
     refines=[FR_PLAN],
     satisfies=[NEED_REVIEW_DIFF],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_PLAN_MARKDOWN],
     acceptance_criteria=[
         "出力は GitHub の Markdown としてそのまま読める",
         "差分が無いときは、差分が無いことが 1 行で分かる",
@@ -386,57 +415,52 @@ FR_PLAN_MARKDOWN = FunctionalRequirement(
         "--fail-on-impact で指定 status の影響ノードがあれば終了コード 1 を返す",
     ],
 )
-# → issue #7
 FR_CONFIG = FunctionalRequirement(
     id="FR-19",
     text="プロジェクト固有の曖昧語と、検査ごとの有効・無効を設定ファイルで宣言できるようにすること",
     satisfies=[NEED_SELF_CHECK],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_CONFIG],
     acceptance_criteria=[
         "設定ファイルに書いた語が曖昧語として報告される",
         "設定ファイルから外した語は報告されなくなる",
         "設定ファイルが無くても既定の辞書で動く",
     ],
 )
-# → issue #10
 FR_MCP = FunctionalRequirement(
     id="FR-20",
     text="MCP サーバとして validate / explain / impact を公開すること",
     satisfies=[NEED_LLM_CONTEXT],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_MCP],
     acceptance_criteria=[
         "MCP クライアントから 3 つの操作を呼び出せる",
         "返す内容は同名の CLI の --json 出力と一致する",
     ],
 )
-# → issue #13
 FR_MORE_CHECKS = FunctionalRequirement(
     id="FR-21",
     text="測定不能な QR・status の後退・id の命名規則違反を検査すること",
     satisfies=[NEED_NO_DANGLING],
-    source=[SRC_OWNER, SRC_IREB],
+    source=[SRC_OWNER, SRC_IREB, ISSUE_MORE_CHECKS],
     acceptance_criteria=[
         "数値を含まない QR の text が報告される",
         "追加する検査はいずれもチェックコードを持ち、抑制の可否が定義されている",
     ],
 )
-# → issue #14
 FR_SARIF = FunctionalRequirement(
     id="FR-22",
     text="指摘を SARIF 形式で出力し、GitHub Code Scanning に載せられるようにすること",
     satisfies=[NEED_CI],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_SARIF],
     acceptance_criteria=[
         "出力は SARIF 2.1.0 のスキーマに適合する",
         "指摘がファイルと行に紐づき、PR の差分上に表示される",
     ],
 )
-# → issue #24
 FR_SVG = FunctionalRequirement(
     id="FR-23",
     text="Graphviz のレイアウトを用いて SVG の図を書き出すこと",
     satisfies=[NEED_READABLE],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_SVG],
     acceptance_criteria=[
         "Graphviz が入っていない環境では、その旨を伝えて終了コード 2 で終わる",
     ],
@@ -493,10 +517,7 @@ QR_SITE_CLI_PARITY = QualityRequirement(
     text="閲覧用サイトが書き出す図と CLI が出す図を、一字一句一致させること",
     qualifies=[FR_SITE],
     source=[SRC_OWNER],
-    evidence=[
-        "tests/test_site_js.py の test_mermaid_export_matches_req_graph が、"
-        "サイトの Mermaid 出力と render_mermaid() の一致を CI で検査している",
-    ],
+    evidence=[EVIDENCE_SITE_CLI_PARITY],
 )
 QR_KEYBOARD = QualityRequirement(
     id="QR-4",

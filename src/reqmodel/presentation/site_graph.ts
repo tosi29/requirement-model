@@ -104,7 +104,7 @@ export function initialSelection(data: SiteData, all: readonly string[], key: "t
 /**
  * 選択中のエッジ種別が `req explain` のどの呼び方に当たるか。
  *
- * - `"default"` … 既定のまま (源泉エッジだけ外れている) → 引数なし
+ * - `"default"` … 既定のまま → 引数なし
  * - `"all"`     … 全エッジ選択。外部参照はエッジではないので CLI 引数は不要
  * - 配列        … それ以外 → `--edges a,b,c`
  *

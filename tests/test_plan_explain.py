@@ -170,7 +170,7 @@ def test_explain_text_contains_natural_language_edges_and_references():
     assert "# 影響部分グラフ: FR-1" in text
     assert "領収書を読み取ること" in text
     assert "受け入れ基準:" in text
-    assert "Source: 経理部長 <about:blank#S-1>" in text
+    assert "Source: 経理部長 <https://example.com/references/S-1>" in text
     assert "FR-1 --satisfies--> Need-1" in text
 
 
@@ -181,7 +181,7 @@ def test_explain_text_carries_the_evidence_reference():
     g = goal("Goal-1", motivates=[n], source=[s])
     f = fr("FR-1", satisfies=[n], source=[s], status="verified", evidence=[e])
     text = explain_text(build(n, g, f), ["FR-1"])
-    assert "Evidence: 受入テスト第 1 回 <about:blank#EV-1>" in text
+    assert "Evidence: 受入テスト第 1 回 <https://example.com/references/EV-1>" in text
 
 
 def test_explain_undirected_reaches_the_goal():

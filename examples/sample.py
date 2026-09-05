@@ -43,6 +43,16 @@ SRC_POLICY_RECEIPT = Reference(
     url="https://github.com/tosi29/requirement-model/issues/123#SRC_POLICY_RECEIPT",
     note="外部参照の補足",
 )
+EVIDENCE_SHORT_FORM = Reference(
+    title="受入テスト第 3 回",
+    url="https://example.com/tests/acceptance/3",
+    note="2026-02-18 に新規申請画面の必須項目を数え、3 項目だった",
+)
+EVIDENCE_OCR_LATENCY = Reference(
+    title="OCR 応答時間の計測結果",
+    url="https://example.com/tests/performance/ocr-latency",
+    note="2026-02-20 に本番同等環境で 100 回計測し、95 パーセンタイル値は 4.2 秒だった",
+)
 SRC_POLICY_DOMESTIC = Reference(
     title="経費に関する証憑は国内に保管しなければならない",
     url="https://github.com/tosi29/requirement-model/issues/123#SRC_POLICY_DOMESTIC",
@@ -113,9 +123,7 @@ FR_SHORT_FORM = FunctionalRequirement(
     text="申請フォームの必須入力項目を 3 項目以下とすること",
     satisfies=[NEED_PHOTO_ONLY],
     source=[SRC_EMPLOYEE],
-    evidence=[
-        "受入テスト第 3 回 (2026-02-18) で新規申請画面の必須項目を数え、3 項目だった",
-    ],
+    evidence=[EVIDENCE_SHORT_FORM],
     acceptance_criteria=[
         "新規申請画面の必須項目数が 3 以下である",
     ],
@@ -170,9 +178,7 @@ QR_OCR_LATENCY = QualityRequirement(
     text="領収書画像の送信から抽出結果の表示までを、95 パーセンタイルで 5 秒以内とすること",
     qualifies=[FR_OCR],
     source=[SRC_EMPLOYEE],
-    evidence=[
-        "本番同等環境で 100 回計測し (2026-02-20)、95 パーセンタイル値は 4.2 秒だった",
-    ],
+    evidence=[EVIDENCE_OCR_LATENCY],
     acceptance_criteria=[
         "本番同等環境で 100 回計測し、95 パーセンタイル値が 5.0 秒以下である",
     ],

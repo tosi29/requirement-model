@@ -149,25 +149,6 @@ class Node(BaseModel):
             raise ValueError("text は空にできない")
         return value
 
-    @field_validator("source", mode="before")
-    @classmethod
-    def _coerce_source_references(cls, value: Any) -> Any:
-        if value is None:
-            return []
-        if not isinstance(value, (list, tuple)):
-            return value
-        result = []
-        for item in value:
-            if isinstance(item, Reference):
-                result.append(item)
-            elif isinstance(item, Node):
-                result.append(Reference(title=item.text, url=f"about:blank#{item.id}"))
-            elif isinstance(item, str):
-                result.append(Reference(title=item, url=f"about:blank#{item}"))
-            else:
-                result.append(item)
-        return result
-
     @field_validator("suppress", mode="before")
     @classmethod
     def _check_suppress(cls, value: Any) -> Any:
@@ -219,11 +200,6 @@ class Requirement(Node):
     #: text が測定可能に書けないときだけ、事前の基準としてその操作化を書く。
     #: 書かなくても指摘は出ない。
     acceptance_criteria: list[str] = []
-
-    @field_validator("realized_by", "evidence", mode="before")
-    @classmethod
-    def _coerce_requirement_references(cls, value: Any) -> Any:
-        return Node._coerce_source_references(value)
 
 
 class Goal(Node):

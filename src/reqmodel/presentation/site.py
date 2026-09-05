@@ -110,7 +110,7 @@ def site_data(
         "schema_version": graph.to_json_obj()["schema_version"],
         "types": [node_type.__name__ for node_type in TYPE_ORDER],
         "edge_names": list(EDGE_NAMES),
-        # 図に既定で描かないもの。Source ノード廃止後は要求グラフの全ノードを描く。
+        # 図に既定で描かないもの。現在は全ノード・全エッジを描く。
         "hidden_by_default": {"types": [], "edges": []},
         # status の成熟度。テーブルビューの status 列をこの順で並べる
         # (辞書順に並べても意味が無いので、順序は Python 側を唯一の出典とする)。

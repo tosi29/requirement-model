@@ -8,7 +8,7 @@
     if (!value) return null;
     try {
       const url = new URL(String(value));
-      return ["https:", "http:", "about:"].includes(url.protocol) ? String(value) : null;
+      return ["https:", "http:"].includes(url.protocol) ? String(value) : null;
     } catch {
       return null;
     }
@@ -798,7 +798,7 @@
   }
 
   // src/reqmodel/presentation/site_context.ts
-  function describe(view2, id, inlineSources = true) {
+  function describe(view2, id) {
     const node = view2.byId.get(id);
     const attrs = [`status=${node.status}`];
     const lines = [`- [${node.type}] ${node.id}: ${node.text}`, `    (${attrs.join(", ")})`];
@@ -836,7 +836,6 @@
     const settings = scope || impactScope(view2.state);
     const selection = edgeSelection(view2);
     const edgeFilter = Array.isArray(selection) ? selection : null;
-    const includeSources = false;
     const { upstream, downstream, whole, undirected } = impactSets(view2, id, settings);
     const lines = [`# \u5F71\u97FF\u90E8\u5206\u30B0\u30E9\u30D5: ${id}`, ""];
     if (undirected) {
@@ -855,7 +854,7 @@
       const sorted = [...ids].sort((a, b) => rankOf(view2, a) - rankOf(view2, b));
       if (!sorted.length) return;
       lines.push("", `## ${title} (${sorted.length} \u4EF6)`);
-      for (const nodeId of sorted) lines.push(...describe(view2, nodeId, !includeSources));
+      for (const nodeId of sorted) lines.push(...describe(view2, nodeId));
     };
     block("\u5BFE\u8C61\u30CE\u30FC\u30C9", [id]);
     if (undirected) {
@@ -876,9 +875,7 @@
         lines.push(`- ${edge.source} --${edge.name}--> ${edge.target}`);
       }
     }
-    const hidden = new Set(
-      edgeFilter || includeSources ? [] : hiddenByDefault(view2.data, "edges")
-    );
+    const hidden = new Set(edgeFilter ? [] : hiddenByDefault(view2.data, "edges"));
     const unused = allEdgeNames(view2.data).filter(
       (name) => !hidden.has(name) && !edges.some((edge) => edge.name === name)
     );

@@ -123,7 +123,7 @@ def test_no_lexicon_option(tmp_path: Path, capsys):
 #: 源泉付きの Need 1 つ。放っておくと structure.orphan_need だけが出る。
 WAIVER_HEADER = (
     "from reqmodel import Need, Reference\n"
-    's = Reference(title="経理部長", url="about:blank#S-1")\n'
+    's = Reference(title="経理部長", url="https://example.com/references/S-1")\n'
 )
 
 

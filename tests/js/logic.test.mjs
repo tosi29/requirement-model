@@ -491,7 +491,7 @@ test("escapeHtml は < & > だけを潰す", () => {
 test("safeHref は閲覧用 URL だけを許可し、実行可能な scheme を拒否する", () => {
   assert.equal(safeHref("https://example.com/a?q=1"), "https://example.com/a?q=1");
   assert.equal(safeHref("http://example.com"), "http://example.com");
-  assert.equal(safeHref("about:blank#legacy"), "about:blank#legacy");
+  assert.equal(safeHref("about:blank#legacy"), null);
   assert.equal(safeHref("javascript:alert(1)"), null);
   assert.equal(safeHref("data:text/html,<script>alert(1)</script>"), null);
   assert.equal(safeHref("not a url"), null);
@@ -879,7 +879,7 @@ test("explainCommand は画面の設定をそのまま引数にする", () => {
   const data = fixture();
   const edges = new Set(["satisfies", "motivates"]);
 
-  //: 初期状態 (源泉エッジが外れている) が `req explain ID` の既定と同じ。
+  //: 初期状態が `req explain ID` の既定と同じ。
   assert.equal(explainCommand(createView(data, defaultOn(data)), "FR-1"), "req explain FR-1");
   //: 源泉も出している状態は既定ではないので、フラグとして現れる。
   assert.equal(explainCommand(viewOf(), "FR-1"), "req explain FR-1");

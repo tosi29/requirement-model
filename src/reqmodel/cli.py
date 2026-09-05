@@ -384,7 +384,6 @@ def cmd_graph(args: argparse.Namespace) -> int:
             args.format,
             args.max_label,
             highlight,
-            False,
             result.requirement_groups,
         ),
         args.output,
@@ -409,7 +408,6 @@ def cmd_explain(args: argparse.Namespace) -> int:
             edges,
             args.depth,
             args.undirected,
-            False,
         )
         sub = RequirementGraph(
             [result.graph.nodes[i] for i in whole if i in result.graph.nodes],
@@ -431,7 +429,6 @@ def cmd_explain(args: argparse.Namespace) -> int:
                 edges,
                 args.depth,
                 args.undirected,
-                False,
             ),
             args.output,
         )

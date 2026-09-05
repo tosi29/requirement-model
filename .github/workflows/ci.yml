@@ -63,7 +63,9 @@ jobs:
           node-version: "22"
 
       - name: インストール
-        run: pip install -e ".[dev]"
+        run: |
+          pip install -e ".[dev]"
+          npm ci
 
       - name: テスト
         run: pytest -q

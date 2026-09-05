@@ -1,5 +1,6 @@
-import { truncate } from "./site_text.js";
-import { compare, fieldLabel, rankOf, reach } from "./site_graph.js";
+import { truncate } from "./site_text.ts";
+import { compare, fieldLabel, rankOf, reach } from "./site_graph.ts";
+import type { Finding, GraphViewModel, NormalizedNode, SiteData, SortState } from "./site_types.ts";
 // --- テーブル --------------------------------------------------------------
 //
 // 棚卸し (全件を順に確認する作業) 用の一覧。グラフと同じ view から作るので、
@@ -19,7 +20,7 @@ export const TABLE_COLUMNS = [
 const SEVERITY_ORDER = ["error", "severe", "warning", "info"];
 
 /** 検索欄の絞り込み。id と本文の部分一致 (大文字小文字は区別しない)。 */
-export function matchesQuery(node, query) {
+export function matchesQuery(node: NormalizedNode, query: string): boolean {
   const needle = (query || "").trim().toLowerCase();
   if (!needle) return true;
   return (
@@ -33,7 +34,7 @@ export function matchesQuery(node, query) {
  * 検索語が空なら「ヒット無し」= 空配列 (全件ではない)。ハイライトもキーボード
  * 選択も「絞り込んだ結果を送る」ためのものなので、空欄で全件を送っても意味が無い。
  */
-export function searchHits(view, query) {
+export function searchHits(view: GraphViewModel, query: string): string[] {
   if (!(query || "").trim()) return [];
   return view.nodes.filter((node) => matchesQuery(node, query)).map((node) => node.id);
 }
@@ -42,7 +43,7 @@ export function searchHits(view, query) {
  * ↑↓ で候補を送ったときの次の id。delta は +1 (下) か -1 (上)。
  * 端では巻き戻す。候補が無ければ null、現在位置が候補に無ければ端から始める。
  */
-export function stepHit(hits, current, delta) {
+export function stepHit(hits: readonly string[], current: string | null, delta: number): string | null {
   if (!hits.length) return null;
   const at = hits.indexOf(current);
   if (at < 0) return delta > 0 ? hits[0] : hits[hits.length - 1];
@@ -53,7 +54,7 @@ export function stepHit(hits, current, delta) {
  * 表に出す行。view に見えているノードだけを、検索語で更に絞る。
  * 指摘は「そのノードに紐づくもの」だけを数え、色付け用に最も重い severity を添える。
  */
-export function tableRows(view, query = "") {
+export function tableRows(view: GraphViewModel, query = "") {
   const counts = new Map();
   const worst = new Map();
   for (const finding of view.data.findings || []) {
@@ -102,7 +103,7 @@ function sortValue(view, row, key) {
  * 行の並び替え。同値のときは正規化 JSON の並び (型順 → id 順) で決めるので、
  * 何度押しても結果が揺れない。
  */
-export function sortRows(view, rows, sort) {
+export function sortRows(view: GraphViewModel, rows: ReturnType<typeof tableRows>, sort: SortState) {
   const sign = sort.asc ? 1 : -1;
   return [...rows].sort((a, b) => {
     const left = sortValue(view, a, sort.key);
@@ -119,7 +120,7 @@ export function sortRows(view, rows, sort) {
  * 列見出しを押したときの新しい並び順。同じ列なら向きを反転し、別の列なら
  * その列の既定の向き (数の列は多い順、文字の列は昇順) から始める。
  */
-export function nextSort(sort, key) {
+export function nextSort(sort: SortState, key: string): SortState {
   const column = TABLE_COLUMNS.find((item) => item.key === key);
   if (!column) return sort;
   if (sort.key === key) return { key, asc: !sort.asc };
@@ -135,7 +136,7 @@ export function nextSort(sort, key) {
  * 並びは正規化 JSON の順 (`view.edges` の順) のまま。両端が見えているエッジしか
  * view に無いので、相手ノードは必ず引ける。
  */
-export function edgeItems(view, id) {
+export function edgeItems(view: GraphViewModel, id: string) {
   const item = (edge, direction) => {
     const other = direction === "out" ? edge.target : edge.source;
     const node = view.byId.get(other);
@@ -163,7 +164,7 @@ export function edgeItems(view, id) {
  * 出所は生成時の作業ディレクトリからの相対パスなので、絶対パスのときは
  * リポジトリ内の位置が決まらない。黙って null にする (誤ったリンクは出さない)。
  */
-export function sourceUrl(data, location) {
+export function sourceUrl(data: SiteData, location: string): string | null {
   const repo = (data || {}).repo;
   if (!repo || !repo.url || !location) return null;
   const match = /^(.+?)(?::(\d+))?$/.exec(String(location).trim());
@@ -191,7 +192,7 @@ export const ALL_SEVERITIES = "all";
  * 重大度タブ。件数が 0 の重大度は出さない (押しても何も起きないタブを並べない)。
  * 「すべて」は指摘が 1 件も無くても出す。
  */
-export function severityTabs(findings) {
+export function severityTabs(findings: readonly Finding[]) {
   const counts = new Map();
   for (const finding of findings) {
     counts.set(finding.severity, (counts.get(finding.severity) || 0) + 1);
@@ -212,7 +213,7 @@ export function severityTabs(findings) {
  * 群の並びは「その群で最も重い指摘」の重大度 → コード名。群の中は渡された順
  * (Python 側が重い順に並べたもの) のまま。
  */
-export function groupFindings(findings, severity = ALL_SEVERITIES) {
+export function groupFindings(findings: readonly Finding[], severity = ALL_SEVERITIES) {
   const groups = new Map();
   for (const finding of findings) {
     if (severity !== ALL_SEVERITIES && finding.severity !== severity) continue;
@@ -233,4 +234,3 @@ export function groupFindings(findings, severity = ALL_SEVERITIES) {
       severity: SEVERITY_ORDER[rank] || items[0].severity,
     }));
 }
-

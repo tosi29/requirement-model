@@ -131,7 +131,7 @@ FR→Need と上向き) ため、レイアウトエンジンに任せるだけ�
 - 枠はクリックを素通しするただの背面描画で、選択・影響範囲・検索には関わらない
 - 種別の絞り込みでその型を外せば、枠ごと消える
 - Goal / Need の帯にする型とラベルは `presentation/styles.py` の `_BANDS` を唯一の出典とし、meta 経由で
-  ページに渡る (帯の並べ直しそのものは `site_logic.js` の `bandedLayout()`)
+  ページに渡る (帯の並べ直しそのものは `site_logic.ts` の `bandedLayout()`)
 - Requirements 段は `RequirementGroup` を出典にした表示専用の機能枠で横方向に並べる。
   これは presentation 層のビュー定義であり、FR / QR / Constraint の公開ノード型へ
   表示都合の `group` フィールドは足さない
@@ -154,7 +154,7 @@ FR→Need と上向き) ため、レイアウトエンジンに任せるだけ�
   `presentation/styles.py` の `_SHAPE_FIT`。形状の定義と同じく **Python 側が唯一の出典**で、
   meta 経由でページに渡る
 - ラベルの幅はブラウザで**実測する** (SVG と同じ字体で canvas に測らせる)。
-  字体の定義は `site_logic.js` の `LABEL_FONT` が唯一の出典で、実測とスタイルの
+  字体の定義は `site_logic.ts` の `LABEL_FONT` が唯一の出典で、実測とスタイルの
   両方がそこを見る
 
 折り返し (`wrapLabel()`) は文字数ではなく**実測幅**で折る。SVG の `<text>` は
@@ -215,7 +215,7 @@ FR→Need と上向き) ため、レイアウトエンジンに任せるだけ�
   id、知らない種別、壊れたエスケープ)。読み込み後に URL は解釈できた形へ直される
 - 検索候補を送っている最中の位置は URL に載せない。決めた選択 (`#node=...`) だけが表示状態である
 
-`site_logic.js` の `encodeHash()` / `decodeHash()` が状態と `#...` の相互変換を持ち、
+`site_logic.ts` の `encodeHash()` / `decodeHash()` が状態と `#...` の相互変換を持ち、
 DOM も履歴も触らない純関数なので往復はテストで担保している。絞り込みの軸
 (種別・エッジ種別・status) は `SET_FILTERS` の 1 行で対応付けてあり、
 軸を足せば既定値・URL への書き出し・復元の 3 つが揃って増える。
@@ -256,17 +256,19 @@ SVG の書き出しは、画面にある SVG DOM を複製し、非表示要素�
 
 | ファイル | 役割 |
 |---|---|
-| `site_text.js` | 文字列、ラベル折り返し、ノード寸法 |
-| `site_graph.js` | 絞り込み、隣接関係、探索、影響範囲 |
-| `site_table.js` | 検索、表、詳細、指摘の集約 |
-| `site_state.js` | URL hash、保存状態、テーマ |
-| `site_context.js` | explain / LLM コンテキスト |
-| `site_layout.js` | 描画要素、帯レイアウト、SVG / Mermaid export |
-| `site_logic.js` | テストやアプリ向けの公開 facade |
-| `site_app.js` | DOM・SVG・dagre を扱う UI entrypoint |
+| `site_text.ts` | 文字列、ラベル折り返し、ノード寸法 |
+| `site_graph.ts` | 絞り込み、隣接関係、探索、影響範囲 |
+| `site_table.ts` | 検索、表、詳細、指摘の集約 |
+| `site_state.ts` | URL hash、保存状態、テーマ |
+| `site_context.ts` | explain / LLM コンテキスト |
+| `site_layout.ts` | 描画要素、帯レイアウト、SVG / Mermaid export |
+| `site_logic.ts` | テストやアプリ向けの公開 facade |
+| `site_types.ts` | 正規化データ、表示 state、layout、SVG 要素の共有型 |
+| `site_graph_view.ts` | SVG 要素・図形・配色と pan / zoom 状態を扱うグラフ表示アダプター |
+| `site_app.ts` | state と各 view、UI event、startup を接続する entrypoint |
 | `site_bundle.js` | esbuild で生成し wheel に同梱する配布物 |
 
-`npm run build` は `site_app.js` を entrypoint として esbuild で bundle する。
+`npm run build` は `site_app.ts` を entrypoint として esbuild で bundle する。
 `req site` は同梱済みの `site_bundle.js` を読むだけなので、実行環境に Node.js は不要である。
 生成 HTML には bundle をインライン化するため、従来どおり単一ファイルで完結する。
 `npm test` は最初に bundle の再生成結果を比較し、source module に対して変更漏れした

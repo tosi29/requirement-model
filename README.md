@@ -874,7 +874,7 @@ $ pytest
 $ mypy
 ```
 
-静的サイトの JS だけを回すなら Node (18 以上) で次を叩く。依存パッケージは無い。
+静的サイトの TypeScript だけを回すなら Node (18 以上) で、`npm install` 後に次を叩く。
 
 ```console
 $ npm run lint

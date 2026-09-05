@@ -1,5 +1,6 @@
+"use strict";
 (() => {
-  // src/reqmodel/presentation/site_text.js
+  // src/reqmodel/presentation/site_text.ts
   function truncate(text, limit = 42) {
     return text.length > limit ? text.slice(0, limit - 1) + "\u2026" : text;
   }
@@ -147,7 +148,266 @@
     };
   }
 
-  // src/reqmodel/presentation/site_graph.js
+  // src/reqmodel/presentation/site_graph_view.ts
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  function applyGraphTheme(graphEl2, defs2, data, nodeItems2, bandItems2, primitives) {
+    const pal = primitives.palette();
+    graphEl2.style.setProperty("--graph-fg", pal.fg);
+    graphEl2.style.setProperty("--graph-bg", pal.bg);
+    graphEl2.style.setProperty("--graph-panel", pal.panel);
+    graphEl2.style.setProperty("--graph-border", pal.border);
+    graphEl2.style.setProperty("--graph-muted", pal.muted);
+    defs2.querySelector("#req-arrow path")?.setAttribute("fill", pal.border);
+    const impact = data.meta.impact_colors;
+    graphEl2.style.setProperty("--impact-selected", impact?.selected || pal.fg);
+    graphEl2.style.setProperty("--impact-upstream", impact?.upstream || pal.fg);
+    graphEl2.style.setProperty("--impact-downstream", impact?.downstream || pal.fg);
+    graphEl2.style.setProperty("--impact-related", impact?.related || pal.fg);
+    graphEl2.style.setProperty("--search-hit", data.meta.search?.hit || pal.fg);
+    for (const item of nodeItems2) {
+      const typeMeta = data.meta.types[item.type] || {};
+      const statusMeta = data.meta.statuses[item.status] || { border_width: 1.5, border_style: "solid" };
+      const colors = primitives.typeColors(typeMeta, pal);
+      item.shapeName = typeMeta.shape || "round-rectangle";
+      primitives.updateShape(item.shape, item.shapeName, item);
+      primitives.updateShape(item.statusRing, item.shapeName, item);
+      primitives.setAttrs(item.shape, {
+        fill: colors.fill,
+        stroke: colors.stroke,
+        "stroke-width": statusMeta.border_width || 1.5,
+        "stroke-dasharray": statusMeta.border_style === "dashed" ? "6 4" : statusMeta.border_style === "dotted" ? "1 3" : ""
+      });
+      primitives.setAttrs(item.statusRing, { fill: "none", stroke: colors.stroke, "stroke-width": 1 });
+    }
+    for (const item of bandItems2) {
+      const bandType = item.bandType || "RequirementGroup";
+      const colors = primitives.typeColors(data.meta.types[bandType] || {}, pal);
+      primitives.setAttrs(item.shape, {
+        fill: bandType === "RequirementGroup" ? pal.panel : colors.fill,
+        stroke: colors.stroke || pal.border
+      });
+    }
+  }
+  function createPanZoom(graphEl2, graphLayer2) {
+    let zoom = 1;
+    let pan = { x: 0, y: 0 };
+    const transform = () => graphLayer2.setAttribute("transform", `translate(${pan.x} ${pan.y}) scale(${zoom})`);
+    const fit = (box, readable = false) => {
+      const width = graphEl2.clientWidth || 800;
+      const height = graphEl2.clientHeight || 480;
+      zoom = Math.min((width - 36) / (box.x2 - box.x1 || 1), (height - 36) / (box.y2 - box.y1 || 1));
+      if (readable) zoom = Math.max(0.45, zoom);
+      pan = { x: 18 - box.x1 * zoom, y: 18 - box.y1 * zoom };
+      transform();
+    };
+    const zoomBy2 = (factor) => {
+      const next = Math.max(0.1, Math.min(3, zoom * factor));
+      const cx = (graphEl2.clientWidth || 800) / 2;
+      const cy = (graphEl2.clientHeight || 480) / 2;
+      const mx = (cx - pan.x) / zoom;
+      const my = (cy - pan.y) / zoom;
+      zoom = next;
+      pan = { x: cx - mx * zoom, y: cy - my * zoom };
+      transform();
+    };
+    return {
+      bind(svg2, viewport2, onBackgroundClick) {
+        let ignoreClick = false;
+        let drag = null;
+        svg2.addEventListener("click", (event) => {
+          if (ignoreClick) {
+            ignoreClick = false;
+            return;
+          }
+          if (event.target === svg2 || event.target === viewport2) onBackgroundClick();
+        });
+        svg2.addEventListener("pointerdown", (event) => {
+          if (event.target.closest(".node:not(.band)")) return;
+          drag = { x: event.clientX, y: event.clientY, pan: { ...pan }, moved: false };
+          svg2.setPointerCapture(event.pointerId);
+        });
+        svg2.addEventListener("pointermove", (event) => {
+          if (!drag) return;
+          const dx = event.clientX - drag.x;
+          const dy = event.clientY - drag.y;
+          if (Math.hypot(dx, dy) >= 3) drag.moved = true;
+          pan = { x: drag.pan.x + dx, y: drag.pan.y + dy };
+          transform();
+        });
+        svg2.addEventListener("pointerup", () => {
+          if (drag?.moved) {
+            ignoreClick = true;
+            setTimeout(() => {
+              ignoreClick = false;
+            }, 0);
+          }
+          drag = null;
+        });
+        svg2.addEventListener("pointercancel", () => {
+          drag = null;
+          ignoreClick = false;
+        });
+        svg2.addEventListener("wheel", (event) => {
+          event.preventDefault();
+          zoomBy2(event.deltaY < 0 ? 1.12 : 1 / 1.12);
+        }, { passive: false });
+      },
+      fit,
+      reveal(box, margin = 40) {
+        const extent = {
+          x1: -pan.x / zoom,
+          y1: -pan.y / zoom,
+          x2: (graphEl2.clientWidth - pan.x) / zoom,
+          y2: (graphEl2.clientHeight - pan.y) / zoom
+        };
+        const target = {
+          x1: box.x - box.w / 2,
+          y1: box.y - box.h / 2,
+          x2: box.x + box.w / 2,
+          y2: box.y + box.h / 2
+        };
+        const inner = {
+          x1: extent.x1 + margin / zoom,
+          y1: extent.y1 + margin / zoom,
+          x2: extent.x2 - margin / zoom,
+          y2: extent.y2 - margin / zoom
+        };
+        const fits = target.x2 - target.x1 <= inner.x2 - inner.x1 && target.y2 - target.y1 <= inner.y2 - inner.y1;
+        const visible = fits ? target.x1 >= inner.x1 && target.x2 <= inner.x2 && target.y1 >= inner.y1 && target.y2 <= inner.y2 : box.x >= extent.x1 && box.x <= extent.x2 && box.y >= extent.y1 && box.y <= extent.y2;
+        if (visible) return;
+        pan = { x: graphEl2.clientWidth / 2 - box.x * zoom, y: graphEl2.clientHeight / 2 - box.y * zoom };
+        transform();
+      },
+      zoomBy: zoomBy2,
+      reset() {
+        zoom = 1;
+        pan = { x: 0, y: 0 };
+        transform();
+      }
+    };
+  }
+  function createGraphViewPrimitives() {
+    const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(name).trim();
+    const palette2 = () => ({
+      fg: cssVar("--fg"),
+      bg: cssVar("--bg"),
+      panel: cssVar("--panel"),
+      border: cssVar("--border"),
+      muted: cssVar("--muted"),
+      dark: getComputedStyle(document.documentElement).colorScheme === "dark"
+    });
+    const typeColors = (meta, pal) => ({
+      fill: pal.dark ? meta.dark_fill || meta.fill : meta.fill,
+      stroke: pal.dark ? meta.dark_stroke || meta.stroke : meta.stroke
+    });
+    function svgEl2(name, attrs = {}) {
+      const element = document.createElementNS(SVG_NS, name);
+      setAttrs2(element, attrs);
+      return element;
+    }
+    function htmlEl2(name, attrs = {}, ...children) {
+      const element = document.createElement(name);
+      for (const [key, value] of Object.entries(attrs)) {
+        if (value === void 0 || value === null || value === false) continue;
+        if (key === "class") element.className = String(value);
+        else if (key === "checked" && element instanceof HTMLInputElement) element.checked = Boolean(value);
+        else if (key === "value" && "value" in element) element.value = String(value);
+        else element.setAttribute(key, String(value));
+      }
+      element.append(...children.filter((child) => child !== void 0 && child !== null));
+      return element;
+    }
+    function setAttrs2(element, attrs) {
+      for (const [key, value] of Object.entries(attrs)) {
+        if (value === void 0 || value === null || value === "") element.removeAttribute(key);
+        else element.setAttribute(key, String(value));
+      }
+    }
+    const classed2 = (element, name, enabled) => {
+      element.classList.toggle(name, Boolean(enabled));
+    };
+    function labelMeasurer2() {
+      const context = document.createElement("canvas").getContext("2d");
+      if (!context) return estimateTextWidth;
+      context.font = `${LABEL_FONT.size}px ${LABEL_FONT.family}`;
+      return (text) => context.measureText(String(text)).width;
+    }
+    function renderLabel2(parent, label, x, y, size = LABEL_FONT.size, weight = null) {
+      const lines = String(label).split("\n");
+      const step = size * LABEL_FONT.lineHeight;
+      const top = y - (lines.length - 1) * step / 2 + size * 0.35;
+      parent.replaceChildren();
+      lines.forEach((line, index) => {
+        const tspan = svgEl2("tspan", { x, y: top + index * step });
+        tspan.textContent = line;
+        parent.append(tspan);
+      });
+      setAttrs2(parent, {
+        "text-anchor": "middle",
+        "font-family": LABEL_FONT.family,
+        "font-size": size,
+        "font-weight": weight
+      });
+    }
+    const shapeEl2 = (shape) => {
+      if (shape === "ellipse") return svgEl2("ellipse");
+      if (shape === "barrel") return svgEl2("path");
+      if (["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape)) return svgEl2("polygon");
+      return svgEl2("rect");
+    };
+    const polygonCoords2 = (shape, w, h) => {
+      const points = {
+        hexagon: [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1],
+        rhomboid: [-1, -1, 0.333, -1, 1, 1, -0.333, 1],
+        diamond: [0, -1, 1, 0, 0, 1, -1, 0],
+        tag: [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1]
+      }[shape] ?? (() => {
+        const x = Math.min(w, h) * 0.16 / (w / 2);
+        const y = Math.min(w, h) * 0.16 / (h / 2);
+        return [
+          -1 + x,
+          -1,
+          1 - x,
+          -1,
+          1,
+          -1 + y,
+          1,
+          1 - y,
+          1 - x,
+          1,
+          -1 + x,
+          1,
+          -1,
+          1 - y,
+          -1,
+          -1 + y
+        ];
+      })();
+      const scaled = [];
+      for (let index = 0; index < points.length; index += 2) {
+        scaled.push({ x: points[index] * w / 2, y: points[index + 1] * h / 2 });
+      }
+      return scaled;
+    };
+    function updateShape2(element, shape, box) {
+      const { w, h } = box;
+      if (element.tagName === "ellipse") setAttrs2(element, { cx: 0, cy: 0, rx: w / 2, ry: h / 2 });
+      else if (element.tagName === "polygon") setAttrs2(element, { points: polygonCoords2(shape, w, h).map(({ x, y }) => `${x},${y}`).join(" ") });
+      else if (element.tagName === "path") {
+        const curve = Math.min(w * 0.12, h * 0.45);
+        setAttrs2(element, { d: `M ${-w / 2 + curve} ${-h / 2} L ${w / 2 - curve} ${-h / 2} C ${w / 2} ${-h / 2} ${w / 2} ${h / 2} ${w / 2 - curve} ${h / 2} L ${-w / 2 + curve} ${h / 2} C ${-w / 2} ${h / 2} ${-w / 2} ${-h / 2} ${-w / 2 + curve} ${-h / 2} Z` });
+      } else setAttrs2(element, {
+        x: -w / 2,
+        y: -h / 2,
+        width: w,
+        height: h,
+        rx: shape === "round-rectangle" ? 8 : Math.min(w, h) * 0.3
+      });
+    }
+    return { svgEl: svgEl2, htmlEl: htmlEl2, setAttrs: setAttrs2, classed: classed2, labelMeasurer: labelMeasurer2, renderLabel: renderLabel2, shapeEl: shapeEl2, polygonCoords: polygonCoords2, updateShape: updateShape2, palette: palette2, typeColors };
+  }
+
+  // src/reqmodel/presentation/site_graph.ts
   function createView(data, state2) {
     const byId = new Map(data.nodes.map((node) => [node.id, node]));
     const nodes = data.nodes.filter(
@@ -269,7 +529,7 @@
   var rankOf = (view2, id) => view2.order.has(id) ? view2.order.get(id) : MISSING_RANK;
   var compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 
-  // src/reqmodel/presentation/site_table.js
+  // src/reqmodel/presentation/site_table.ts
   var TABLE_COLUMNS = [
     { key: "id", label: "id" },
     { key: "type", label: "type" },
@@ -412,7 +672,7 @@
     }));
   }
 
-  // src/reqmodel/presentation/site_state.js
+  // src/reqmodel/presentation/site_state.ts
   var DEFAULT_SORT = { key: "id", asc: true };
   var SET_FILTERS = [
     {
@@ -432,6 +692,9 @@
   var initialOf = (filter, data) => filter.initial ? filter.initial(data) : filter.all(data);
   function defaultState(data) {
     const state2 = {
+      types: /* @__PURE__ */ new Set(),
+      edges: /* @__PURE__ */ new Set(),
+      statuses: /* @__PURE__ */ new Set(),
       selected: null,
       direction: "TD",
       mode: "graph",
@@ -534,7 +797,7 @@
     return THEMES[(THEMES.indexOf(normalizeTheme(theme2)) + 1) % THEMES.length];
   }
 
-  // src/reqmodel/presentation/site_context.js
+  // src/reqmodel/presentation/site_context.ts
   function describe(view2, id, inlineSources = true) {
     const node = view2.byId.get(id);
     const attrs = [`status=${node.status}`];
@@ -625,7 +888,7 @@
     return lines.join("\n") + "\n";
   }
 
-  // src/reqmodel/presentation/site_layout.js
+  // src/reqmodel/presentation/site_layout.ts
   var REQUIREMENT_TYPES = /* @__PURE__ */ new Set([
     "FunctionalRequirement",
     "QualityRequirement",
@@ -759,21 +1022,6 @@ ${text}`;
       });
     }
     return groups;
-  }
-  function isNodeVisible(extent, box, margin = 0) {
-    const inner = {
-      x1: extent.x1 + margin,
-      y1: extent.y1 + margin,
-      x2: extent.x2 - margin,
-      y2: extent.y2 - margin
-    };
-    const fits = box.x2 - box.x1 <= inner.x2 - inner.x1 && box.y2 - box.y1 <= inner.y2 - inner.y1;
-    if (fits) {
-      return box.x1 >= inner.x1 && box.x2 <= inner.x2 && box.y1 >= inner.y1 && box.y2 <= inner.y2;
-    }
-    const centerX = (box.x1 + box.x2) / 2;
-    const centerY = (box.y1 + box.y2) / 2;
-    return centerX >= extent.x1 && centerX <= extent.x2 && centerY >= extent.y1 && centerY <= extent.y2;
   }
   function edgeControl(source, target, direction, offset = 0) {
     const dx = target.x - source.x;
@@ -1057,7 +1305,7 @@ ${text}`;
     return text.replace(/\\/g, "\uFF3C").replace(/"/g, "#quot;").replace(/</g, "#lt;").replace(/>/g, "#gt;");
   }
   function mermaidText(view2, maxLabel = EXPORT_LABEL_LIMIT) {
-    const meta = view2.data.meta || {};
+    const meta = view2.data.meta;
     const types = meta.types || {};
     const dashed = new Set(meta.dashed_edges || []);
     const ids = exportIds(view2.nodes);
@@ -1084,11 +1332,19 @@ ${text}`;
     return lines.join("\n") + "\n";
   }
 
-  // src/reqmodel/presentation/site_app.js
+  // src/reqmodel/presentation/site_app.ts
+  var getElement = (id) => document.getElementById(id);
+  var queryElements = (selector) => document.querySelectorAll(selector);
   var dagre = window.dagre;
-  var SVG_NS = "http://www.w3.org/2000/svg";
-  var DATA = JSON.parse(document.getElementById("model-data").textContent);
+  var SVG_NS2 = "http://www.w3.org/2000/svg";
+  var DATA = JSON.parse(getElement("model-data").textContent);
   var METRICS = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
+  var impactColors = () => DATA.meta.impact_colors ?? {
+    selected: "",
+    upstream: "",
+    downstream: "",
+    related: ""
+  };
   function readStore(key) {
     try {
       return localStorage.getItem(key);
@@ -1105,142 +1361,18 @@ ${text}`;
   }
   var state = decodeHash(initialHash(location.hash, readStore(VIEW_STORAGE_KEY)), DATA);
   var view = createView(DATA, state);
-  var graphEl = document.getElementById("graph");
-  var cssVar = (name) => getComputedStyle(document.body).getPropertyValue(name).trim();
-  var palette = () => ({
-    fg: cssVar("--fg"),
-    bg: cssVar("--bg"),
-    panel: cssVar("--panel"),
-    border: cssVar("--border"),
-    muted: cssVar("--muted"),
-    dark: getComputedStyle(document.documentElement).colorScheme === "dark"
-  });
-  var typeColors = (typeMeta, pal) => ({
-    fill: pal.dark ? typeMeta.dark_fill || typeMeta.fill : typeMeta.fill,
-    stroke: pal.dark ? typeMeta.dark_stroke || typeMeta.stroke : typeMeta.stroke
-  });
+  var graphPrimitives = createGraphViewPrimitives();
+  var { svgEl, htmlEl, setAttrs, classed, labelMeasurer, renderLabel, shapeEl, polygonCoords, updateShape, palette } = graphPrimitives;
+  var graphEl = getElement("graph");
   var svg = null;
   var viewport = null;
   var graphLayer = null;
   var defs = null;
-  var graph = null;
-  var zoom = 1;
-  var pan = { x: 0, y: 0 };
+  var graph = [];
+  var panZoom = null;
   var nodeItems = /* @__PURE__ */ new Map();
   var edgeItemsByKey = /* @__PURE__ */ new Map();
   var bandItems = /* @__PURE__ */ new Map();
-  function svgEl(name, attrs = {}) {
-    const element = document.createElementNS(SVG_NS, name);
-    for (const [key, value] of Object.entries(attrs)) {
-      if (value !== void 0 && value !== null && value !== "") element.setAttribute(key, String(value));
-    }
-    return element;
-  }
-  function htmlEl(name, attrs = {}, ...children) {
-    const element = document.createElement(name);
-    for (const [key, value] of Object.entries(attrs)) {
-      if (value === void 0 || value === null || value === false) continue;
-      if (key === "class") element.className = String(value);
-      else if (key === "checked") element.checked = Boolean(value);
-      else if (key === "value") element.value = String(value);
-      else element.setAttribute(key, String(value));
-    }
-    element.append(...children.filter((child) => child !== void 0 && child !== null));
-    return element;
-  }
-  function setAttrs(element, attrs) {
-    for (const [key, value] of Object.entries(attrs)) {
-      if (value === void 0 || value === null || value === "") element.removeAttribute(key);
-      else element.setAttribute(key, String(value));
-    }
-  }
-  function setTransform() {
-    if (graphLayer) graphLayer.setAttribute("transform", `translate(${pan.x} ${pan.y}) scale(${zoom})`);
-  }
-  function classed(element, name, enabled) {
-    element.classList.toggle(name, Boolean(enabled));
-  }
-  function labelMeasurer() {
-    const context = document.createElement("canvas").getContext("2d");
-    if (!context) return estimateTextWidth;
-    context.font = `${LABEL_FONT.size}px ${LABEL_FONT.family}`;
-    return (text) => context.measureText(String(text)).width;
-  }
-  function renderLabel(parent, label, x, y, size = LABEL_FONT.size, weight = null) {
-    const lines = String(label).split("\n");
-    const step = size * LABEL_FONT.lineHeight;
-    const top = y - (lines.length - 1) * step / 2 + size * 0.35;
-    parent.replaceChildren();
-    for (const [index, line] of lines.entries()) {
-      const tspan = svgEl("tspan", { x, y: top + index * step });
-      tspan.textContent = line;
-      parent.append(tspan);
-    }
-    setAttrs(parent, {
-      "text-anchor": "middle",
-      "font-family": LABEL_FONT.family,
-      "font-size": size,
-      "font-weight": weight
-    });
-  }
-  function shapeEl(shape) {
-    if (shape === "ellipse") return svgEl("ellipse");
-    if (shape === "barrel") return svgEl("path");
-    if (["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape)) return svgEl("polygon");
-    return svgEl("rect");
-  }
-  var polygonCoords = (shape, w, h) => {
-    const points = {
-      hexagon: [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1],
-      rhomboid: [-1, -1, 0.333, -1, 1, 1, -0.333, 1],
-      diamond: [0, -1, 1, 0, 0, 1, -1, 0],
-      tag: [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1]
-    }[shape] || (() => {
-      const x = Math.min(w, h) * 0.16 / (w / 2);
-      const y = Math.min(w, h) * 0.16 / (h / 2);
-      return [
-        -1 + x,
-        -1,
-        1 - x,
-        -1,
-        1,
-        -1 + y,
-        1,
-        1 - y,
-        1 - x,
-        1,
-        -1 + x,
-        1,
-        -1,
-        1 - y,
-        -1,
-        -1 + y
-      ];
-    })();
-    const scaled = [];
-    for (let index = 0; index < points.length; index += 2) {
-      scaled.push({ x: points[index] * w / 2, y: points[index + 1] * h / 2 });
-    }
-    return scaled;
-  };
-  var polygonPoints = (shape, w, h) => polygonCoords(shape, w, h).map(({ x, y }) => `${x},${y}`).join(" ");
-  function updateShape(element, shape, box) {
-    const { w, h } = box;
-    if (element.tagName === "ellipse") setAttrs(element, { cx: 0, cy: 0, rx: w / 2, ry: h / 2 });
-    else if (element.tagName === "polygon") setAttrs(element, { points: polygonPoints(shape, w, h) });
-    else if (element.tagName === "path") {
-      const curve = Math.min(w * 0.12, h * 0.45);
-      setAttrs(element, {
-        d: `M ${-w / 2 + curve} ${-h / 2} L ${w / 2 - curve} ${-h / 2} C ${w / 2} ${-h / 2} ${w / 2} ${h / 2} ${w / 2 - curve} ${h / 2} L ${-w / 2 + curve} ${h / 2} C ${-w / 2} ${h / 2} ${-w / 2} ${-h / 2} ${-w / 2 + curve} ${-h / 2} Z`
-      });
-    } else setAttrs(element, {
-      x: -w / 2,
-      y: -h / 2,
-      width: w,
-      height: h,
-      rx: shape === "round-rectangle" ? 8 : Math.min(w, h) * 0.3
-    });
-  }
   function initGraph() {
     if (!dagre) {
       graphEl.replaceChildren(htmlEl(
@@ -1260,10 +1392,11 @@ ${text}`;
     defs = svgEl("defs");
     viewport = svgEl("rect", { class: "graph-bg", x: -1e5, y: -1e5, width: 2e5, height: 2e5 });
     graphLayer = svgEl("g", { class: "graph-layer" });
+    panZoom = createPanZoom(graphEl, graphLayer);
     svg.append(defs, viewport, graphLayer);
     graphEl.append(svg);
     buildGraphDom();
-    bindPanZoom();
+    panZoom.bind(svg, viewport, () => selectNode(state.selected));
     runLayout();
   }
   function buildGraphDom() {
@@ -1288,11 +1421,11 @@ ${text}`;
       });
       group.append(path, label);
       edgeLayer.append(group);
-      edgeItemsByKey.set(item.data.id, { ...item.data, group, path, label, route: [] });
+      edgeItemsByKey.set(item.data.id, { ...item.data, group, path, label, points: [] });
     }
     const types = DATA.meta.types || {};
     const statuses = DATA.meta.statuses || {};
-    const impact = DATA.meta.impact_colors || {};
+    const impact = impactColors();
     graphEl.style.setProperty("--impact-selected", impact.selected || pal.fg);
     graphEl.style.setProperty("--impact-upstream", impact.upstream || pal.fg);
     graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
@@ -1309,7 +1442,6 @@ ${text}`;
     }
     for (const item of graph.filter((element) => !element.classes && !element.data.source)) {
       const typeMeta = types[item.data.type] || {};
-      const statusMeta = statuses[item.data.status] || {};
       const group = svgEl("g", {
         class: `node status-${item.data.status || "unknown"}`,
         "data-node-id": item.data.id,
@@ -1331,48 +1463,9 @@ ${text}`;
         chooseNode(item.data.id);
       });
       nodeLayer.append(group);
-      nodeItems.set(item.data.id, { ...item.data, shapeName: typeMeta.shape, statusMeta, x: 0, y: 0, group, shape, statusRing, label });
+      nodeItems.set(item.data.id, { ...item.data, shapeName: typeMeta.shape, x: 0, y: 0, group, shape, statusRing, label });
     }
     restyleGraph();
-  }
-  function bindPanZoom() {
-    let ignoreClick = false;
-    svg.addEventListener("click", (event) => {
-      if (ignoreClick) {
-        ignoreClick = false;
-        return;
-      }
-      if (event.target === svg || event.target === viewport) selectNode(state.selected);
-    });
-    let drag = null;
-    svg.addEventListener("pointerdown", (event) => {
-      if (event.target.closest(".node:not(.band)")) return;
-      drag = { x: event.clientX, y: event.clientY, pan: { ...pan }, moved: false };
-      svg.setPointerCapture(event.pointerId);
-    });
-    svg.addEventListener("pointermove", (event) => {
-      if (!drag) return;
-      const dx = event.clientX - drag.x;
-      const dy = event.clientY - drag.y;
-      if (Math.hypot(dx, dy) >= 3) drag.moved = true;
-      pan = { x: drag.pan.x + dx, y: drag.pan.y + dy };
-      setTransform();
-    });
-    svg.addEventListener("pointerup", () => {
-      if (drag?.moved) {
-        ignoreClick = true;
-        setTimeout(() => ignoreClick = false, 0);
-      }
-      drag = null;
-    });
-    svg.addEventListener("pointercancel", () => {
-      drag = null;
-      ignoreClick = false;
-    });
-    svg.addEventListener("wheel", (event) => {
-      event.preventDefault();
-      zoomBy(event.deltaY < 0 ? 1.12 : 1 / 1.12);
-    }, { passive: false });
   }
   function focusedIds() {
     if (!state.focus || !state.selected || !view.byId.has(state.selected)) return null;
@@ -1599,45 +1692,20 @@ ${text}`;
     };
   }
   function fitToView() {
-    if (!svg) return;
-    const box = graphBox();
-    const width = graphEl.clientWidth || 800;
-    const height = graphEl.clientHeight || 480;
-    zoom = Math.min((width - 36) / (box.x2 - box.x1 || 1), (height - 36) / (box.y2 - box.y1 || 1));
-    pan = { x: 18 - box.x1 * zoom, y: 18 - box.y1 * zoom };
-    setTransform();
+    panZoom?.fit(graphBox());
   }
-  var MIN_READABLE_ZOOM = 0.45;
   function fitInitial() {
-    fitToView();
-    if (zoom >= MIN_READABLE_ZOOM) return;
-    const box = graphBox();
-    zoom = MIN_READABLE_ZOOM;
-    pan = { x: 18 - box.x1 * zoom, y: 18 - box.y1 * zoom };
-    setTransform();
+    panZoom?.fit(graphBox(), true);
   }
-  var REVEAL_MARGIN_PX = 40;
   function revealNode(id) {
     if (!svg || state.mode !== "graph") return;
     const item = nodeItems.get(id);
     if (!item || item.group.classList.contains("hidden")) return;
-    const extent = { x1: -pan.x / zoom, y1: -pan.y / zoom, x2: (graphEl.clientWidth - pan.x) / zoom, y2: (graphEl.clientHeight - pan.y) / zoom };
-    const box = { x1: item.x - item.w / 2, y1: item.y - item.h / 2, x2: item.x + item.w / 2, y2: item.y + item.h / 2 };
-    if (isNodeVisible(extent, box, REVEAL_MARGIN_PX / zoom)) return;
-    pan = { x: graphEl.clientWidth / 2 - item.x * zoom, y: graphEl.clientHeight / 2 - item.y * zoom };
-    setTransform();
+    panZoom?.reveal(item);
   }
   var revealSelected = () => revealNode(state.selected);
   function zoomBy(factor) {
-    if (!svg) return;
-    const next = Math.max(0.1, Math.min(3, zoom * factor));
-    const cx = (graphEl.clientWidth || 800) / 2;
-    const cy = (graphEl.clientHeight || 480) / 2;
-    const mx = (cx - pan.x) / zoom;
-    const my = (cy - pan.y) / zoom;
-    zoom = next;
-    pan = { x: cx - mx * zoom, y: cy - my * zoom };
-    setTransform();
+    panZoom?.zoomBy(factor);
   }
   function appendReferenceSection(panel, title, references) {
     if (!Array.isArray(references) || references.length === 0) return;
@@ -1660,7 +1728,7 @@ ${text}`;
     list.append(htmlEl("dt", {}, term), htmlEl("dd", className ? { class: className } : {}, value));
   }
   function renderDetail() {
-    const panel = document.getElementById("detail");
+    const panel = getElement("detail");
     panel.replaceChildren();
     if (!state.selected || !view.byId.has(state.selected)) {
       panel.append(htmlEl("p", { class: "empty" }, "\u30B0\u30E9\u30D5\u306E\u30CE\u30FC\u30C9\u3092\u30AF\u30EA\u30C3\u30AF\u3059\u308B\u3068\u3001\u672C\u6587\u30FB\u6839\u62E0\u30FB\u5F71\u97FF\u7BC4\u56F2\u3092\u8868\u793A\u3059\u308B\u3002"));
@@ -1766,7 +1834,7 @@ ${text}`;
     return htmlEl("div", { class: `finding ${finding.severity}` }, ...content);
   }
   function renderNodeList() {
-    const list = document.getElementById("node-list");
+    const list = getElement("node-list");
     const matched = view.nodes.filter((node) => matchesQuery(node, state.query));
     list.replaceChildren(...matched.map((node) => {
       const marks = [node.id === state.selected ? "active" : "", node.id === cursor ? "cursor" : ""].filter(Boolean).join(" ");
@@ -1788,7 +1856,7 @@ ${text}`;
     });
   }
   function renderToggles(containerId, attribute, items, set) {
-    document.getElementById(containerId).replaceChildren(...items.map((item) => htmlEl(
+    getElement(containerId).replaceChildren(...items.map((item) => htmlEl(
       "label",
       { class: "toggle" },
       htmlEl("input", { type: "checkbox", [`data-${attribute}`]: item.key, checked: set.has(item.key) }),
@@ -1797,7 +1865,7 @@ ${text}`;
     )));
   }
   function bindToggles(attribute, key) {
-    document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
+    queryElements(`input[data-${attribute}]`).forEach((input) => {
       const value = input.dataset[attribute];
       input.addEventListener("change", () => {
         input.checked ? state[key].add(value) : state[key].delete(value);
@@ -1835,27 +1903,27 @@ ${text}`;
     }
   }
   function renderFocusOptions() {
-    document.getElementById("focus").replaceChildren(
+    getElement("focus").replaceChildren(
       htmlEl("option", { value: 0 }, "\u30D5\u30A9\u30FC\u30AB\u30B9: \u5207"),
       ...FOCUS_DEPTHS.map((depth) => htmlEl("option", { value: depth }, `\u8FD1\u508D ${depth} \u30DB\u30C3\u30D7`))
     );
   }
   function renderImpactControls() {
-    const slider = document.getElementById("depth");
+    const slider = getElement("depth");
     slider.min = "0";
     slider.max = String(Math.max(...IMPACT_DEPTHS));
     slider.step = "1";
   }
   var depthLabel = () => state.depth ? `${state.depth} \u30DB\u30C3\u30D7` : "\u7121\u5236\u9650";
   function syncControls() {
-    document.getElementById("search").value = state.query;
-    document.getElementById("direction").value = state.direction;
-    document.getElementById("focus").value = String(state.focus);
-    document.getElementById("depth").value = String(state.depth);
-    document.getElementById("depth-value").textContent = depthLabel();
-    document.getElementById("undirected").checked = state.undirected;
+    getElement("search").value = state.query;
+    getElement("direction").value = state.direction;
+    getElement("focus").value = String(state.focus);
+    getElement("depth").value = String(state.depth);
+    getElement("depth-value").textContent = depthLabel();
+    getElement("undirected").checked = state.undirected;
     for (const [attribute, key] of FILTER_SETS) {
-      document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
+      queryElements(`input[data-${attribute}]`).forEach((input) => {
         input.checked = state[key].has(input.dataset[attribute]);
       });
     }
@@ -1873,8 +1941,8 @@ ${text}`;
       chips.push(htmlEl("span", { class: "chip" }, "\u6307\u6458\u306A\u3057"));
     }
     if (DATA.stats.suppressed) chips.push(htmlEl("span", { class: "chip" }, `\u6291\u5236 ${DATA.stats.suppressed} \u4EF6`));
-    document.getElementById("stats").replaceChildren(...chips);
-    document.getElementById("sources").textContent = DATA.generated_from.join(", ");
+    getElement("stats").replaceChildren(...chips);
+    getElement("sources").textContent = DATA.generated_from.join(", ");
     renderLegend();
     renderFindings();
   }
@@ -1892,7 +1960,7 @@ ${text}`;
       }
       return container;
     });
-    document.getElementById("legend").replaceChildren(...groups);
+    getElement("legend").replaceChildren(...groups);
   }
   var findingSeverity = ALL_SEVERITIES;
   function showSeverity(tab) {
@@ -1902,7 +1970,7 @@ ${text}`;
   function renderFindings() {
     const tabs = severityTabs(DATA.findings);
     if (!tabs.some((tab) => tab.key === findingSeverity)) findingSeverity = ALL_SEVERITIES;
-    const tabBar = document.getElementById("finding-tabs");
+    const tabBar = getElement("finding-tabs");
     const refocus = tabBar.contains(document.activeElement);
     tabBar.replaceChildren(...tabs.map((tab) => htmlEl("button", {
       type: "button",
@@ -1919,7 +1987,7 @@ ${text}`;
     bindTabKeys(tabBar, showSeverity);
     if (refocus) tabBar.querySelector("button.active")?.focus();
     const groups = groupFindings(DATA.findings, findingSeverity);
-    const panel = document.getElementById("findings");
+    const panel = getElement("findings");
     if (!groups.length) panel.replaceChildren(htmlEl("p", { class: "empty" }, "\u6307\u6458\u306F\u7121\u3044\u3002"));
     else {
       const children = [];
@@ -1986,9 +2054,9 @@ ${text}`;
         colspan: TABLE_COLUMNS.length
       }, "\u6761\u4EF6\u306B\u5408\u3046\u30CE\u30FC\u30C9\u306F\u7121\u3044\u3002")));
     }
-    const table = document.getElementById("node-table");
+    const table = getElement("node-table");
     table.replaceChildren(htmlEl("thead", {}, headRow), body);
-    document.getElementById("table-note").textContent = `${rows.length} \u4EF6\u3092\u8868\u793A\u4E2D (\u5168 ${DATA.nodes.length} \u4EF6)\u3002 \u884C\u3092\u30AF\u30EA\u30C3\u30AF (\u30AD\u30FC\u30DC\u30FC\u30C9\u306A\u3089 Enter) \u3059\u308B\u3068\u53F3\u30DA\u30A4\u30F3\u306B\u8A73\u7D30\u304C\u51FA\u308B\u3002\u5217\u898B\u51FA\u3057\u3067\u4E26\u3079\u66FF\u3048\u308B\u3002`;
+    getElement("table-note").textContent = `${rows.length} \u4EF6\u3092\u8868\u793A\u4E2D (\u5168 ${DATA.nodes.length} \u4EF6)\u3002 \u884C\u3092\u30AF\u30EA\u30C3\u30AF (\u30AD\u30FC\u30DC\u30FC\u30C9\u306A\u3089 Enter) \u3059\u308B\u3068\u53F3\u30DA\u30A4\u30F3\u306B\u8A73\u7D30\u304C\u51FA\u308B\u3002\u5217\u898B\u51FA\u3057\u3067\u4E26\u3079\u66FF\u3048\u308B\u3002`;
     table.querySelectorAll("thead button[data-key]").forEach((button) => {
       button.addEventListener("click", () => {
         state.sort = nextSort(state.sort, button.dataset.key);
@@ -2013,7 +2081,7 @@ ${text}`;
   }
   function showFindings(id) {
     if (state.selected !== id) selectNode(id);
-    const heading = document.getElementById("node-findings");
+    const heading = getElement("node-findings");
     if (heading) heading.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
   function bindTabKeys(container, activate) {
@@ -2038,13 +2106,13 @@ ${text}`;
   ];
   function setMode(mode) {
     state.mode = mode;
-    document.getElementById("graph-frame").hidden = mode !== "graph";
-    document.getElementById("table-frame").hidden = mode !== "table";
-    for (const element of document.querySelectorAll(".graph-only")) {
+    getElement("graph-frame").hidden = mode !== "graph";
+    getElement("table-frame").hidden = mode !== "table";
+    for (const element of queryElements(".graph-only")) {
       element.hidden = mode !== "graph";
     }
     for (const [id, name] of VIEW_TABS) {
-      const tab = document.getElementById(id);
+      const tab = getElement(id);
       tab.classList.toggle("active", mode === name);
       tab.setAttribute("aria-selected", String(mode === name));
       tab.tabIndex = mode === name ? 0 : -1;
@@ -2103,7 +2171,7 @@ ${text}`;
   }
   function applyQuery(value) {
     state.query = value;
-    document.getElementById("search").value = value;
+    getElement("search").value = value;
     cursor = null;
     renderNodeList();
     renderTable();
@@ -2111,7 +2179,7 @@ ${text}`;
     writeHash(false);
   }
   for (const [id, name] of VIEW_TABS) {
-    document.getElementById(id).addEventListener("click", () => {
+    getElement(id).addEventListener("click", () => {
       setMode(name);
       writeHash();
     });
@@ -2120,10 +2188,10 @@ ${text}`;
     setMode(VIEW_TABS.find(([id]) => id === tab.id)[1]);
     writeHash();
   });
-  document.getElementById("search").addEventListener("input", (event) => {
+  getElement("search").addEventListener("input", (event) => {
     applyQuery(event.target.value);
   });
-  document.getElementById("search").addEventListener("keydown", (event) => {
+  getElement("search").addEventListener("keydown", (event) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       moveCursor(event.key === "ArrowDown" ? 1 : -1);
@@ -2134,45 +2202,41 @@ ${text}`;
     const target = cursor === null ? hits()[0] : cursor;
     if (target) chooseNode(target);
   });
-  document.getElementById("depth").addEventListener("input", (event) => {
+  getElement("depth").addEventListener("input", (event) => {
     state.depth = Number(event.target.value);
-    document.getElementById("depth-value").textContent = depthLabel();
+    getElement("depth-value").textContent = depthLabel();
     refresh();
     writeHash(false);
   });
-  document.getElementById("undirected").addEventListener("change", (event) => {
+  getElement("undirected").addEventListener("change", (event) => {
     state.undirected = event.target.checked;
     refresh();
     writeHash();
   });
-  document.getElementById("clear").addEventListener("click", () => {
+  getElement("clear").addEventListener("click", () => {
     state.selected = null;
     refresh();
     writeHash();
   });
-  document.getElementById("direction").addEventListener("change", (event) => {
-    state.direction = event.target.value;
+  getElement("direction").addEventListener("change", (event) => {
+    state.direction = event.target.value === "LR" ? "LR" : "TD";
     relayout();
     writeHash();
   });
-  document.getElementById("focus").addEventListener("change", (event) => {
+  getElement("focus").addEventListener("change", (event) => {
     state.focus = Number(event.target.value);
     refresh();
     writeHash();
   });
-  document.getElementById("relayout").addEventListener("click", relayout);
-  document.getElementById("zoom-in").addEventListener("click", () => zoomBy(1.2));
-  document.getElementById("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
-  document.getElementById("zoom-reset").addEventListener("click", () => {
-    if (svg) {
-      zoom = 1;
-      pan = { x: 0, y: 0 };
-      setTransform();
-    }
+  getElement("relayout").addEventListener("click", relayout);
+  getElement("zoom-in").addEventListener("click", () => zoomBy(1.2));
+  getElement("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
+  getElement("zoom-reset").addEventListener("click", () => {
+    panZoom?.reset();
   });
-  document.getElementById("zoom-fit").addEventListener("click", fitToView);
+  getElement("zoom-fit").addEventListener("click", fitToView);
   var theme = normalizeTheme(readStore(THEME_STORAGE_KEY));
-  var themeButton = document.getElementById("theme");
+  var themeButton = getElement("theme");
   function applyTheme() {
     if (theme === "auto") document.documentElement.removeAttribute("data-theme");
     else document.documentElement.dataset.theme = theme;
@@ -2180,37 +2244,8 @@ ${text}`;
     restyleGraph();
   }
   function restyleGraph() {
-    if (!svg) return;
-    const pal = palette();
-    graphEl.style.setProperty("--graph-fg", pal.fg);
-    graphEl.style.setProperty("--graph-bg", pal.bg);
-    graphEl.style.setProperty("--graph-panel", pal.panel);
-    graphEl.style.setProperty("--graph-border", pal.border);
-    graphEl.style.setProperty("--graph-muted", pal.muted);
-    const arrow = defs?.querySelector("#req-arrow path");
-    if (arrow) arrow.setAttribute("fill", pal.border);
-    const types = DATA.meta.types || {};
-    const statuses = DATA.meta.statuses || {};
-    const impact = DATA.meta.impact_colors || {};
-    graphEl.style.setProperty("--impact-selected", impact.selected || pal.fg);
-    graphEl.style.setProperty("--impact-upstream", impact.upstream || pal.fg);
-    graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
-    graphEl.style.setProperty("--impact-related", impact.related || pal.fg);
-    graphEl.style.setProperty("--search-hit", (DATA.meta.search || {}).hit || pal.fg);
-    for (const item of nodeItems.values()) {
-      const typeMeta = types[item.type] || {};
-      const statusMeta = statuses[item.status] || {};
-      const colors = typeColors(typeMeta, pal);
-      item.shapeName = typeMeta.shape;
-      updateShape(item.shape, item.shapeName, item);
-      updateShape(item.statusRing, item.shapeName, item);
-      setAttrs(item.shape, { fill: colors.fill, stroke: colors.stroke, "stroke-width": statusMeta.border_width || 1.5, "stroke-dasharray": statusMeta.border_style === "dashed" ? "6 4" : statusMeta.border_style === "dotted" ? "1 3" : "" });
-      setAttrs(item.statusRing, { fill: "none", stroke: colors.stroke, "stroke-width": 1 });
-    }
-    for (const item of bandItems.values()) {
-      const colors = typeColors(types[item.bandType] || {}, pal);
-      setAttrs(item.shape, { fill: item.bandType === "RequirementGroup" ? pal.panel : colors.fill, stroke: colors.stroke || pal.border });
-    }
+    if (!svg || !defs) return;
+    applyGraphTheme(graphEl, defs, DATA, nodeItems.values(), bandItems.values(), graphPrimitives);
     renderLegend();
   }
   themeButton.addEventListener("click", () => {
@@ -2247,7 +2282,7 @@ ${text}`;
     const width = box.x2 - box.x1 + padding * 2;
     const height = box.y2 - box.y1 + padding * 2;
     setAttrs(copy, {
-      xmlns: SVG_NS,
+      xmlns: SVG_NS2,
       viewBox: `${box.x1 - padding} ${box.y1 - padding} ${width} ${height}`,
       width,
       height
@@ -2262,7 +2297,7 @@ ${text}`;
       height,
       fill: pal.bg
     });
-    const impact = DATA.meta.impact_colors || {};
+    const impact = impactColors();
     const style = svgEl("style");
     style.textContent = `
     .node-label { fill: ${pal.fg}; font-family: ${LABEL_FONT.family}; }
@@ -2288,14 +2323,14 @@ ${text}`;
     return `<?xml version="1.0" encoding="UTF-8"?>
 ${new XMLSerializer().serializeToString(copy)}`;
   }
-  var exportSvg = document.getElementById("export-svg");
+  var exportSvg = getElement("export-svg");
   exportSvg.addEventListener("click", () => {
     const text = currentSvg();
     if (!text) return;
     download("graph.svg", text, "image/svg+xml;charset=utf-8");
     exportSvg.closest("details").open = false;
   });
-  var exportMmd = document.getElementById("export-mmd");
+  var exportMmd = getElement("export-mmd");
   exportMmd.addEventListener("click", () => {
     download("graph.mmd", mermaidText(view), "text/plain;charset=utf-8");
     exportMmd.closest("details").open = false;
@@ -2303,10 +2338,10 @@ ${new XMLSerializer().serializeToString(copy)}`;
   document.addEventListener("keydown", (event) => {
     if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
     const target = event.target;
-    const typing = target instanceof HTMLElement && (target.isContentEditable || ["SELECT", "TEXTAREA"].includes(target.tagName) || target.tagName === "INPUT" && !["checkbox", "radio", "range", "button"].includes(target.type));
+    const typing = target instanceof HTMLElement && (target.isContentEditable || ["SELECT", "TEXTAREA"].includes(target.tagName) || target instanceof HTMLInputElement && !["checkbox", "radio", "range", "button"].includes(target.type));
     if (event.key === "/" && !typing) {
       event.preventDefault();
-      const search = document.getElementById("search");
+      const search = getElement("search");
       search.focus();
       search.select();
       return;
@@ -2324,7 +2359,7 @@ ${new XMLSerializer().serializeToString(copy)}`;
       target.blur();
     }
   });
-  var copyLink = document.getElementById("copy-link");
+  var copyLink = getElement("copy-link");
   copyLink.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(location.href);

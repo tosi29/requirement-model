@@ -1,5 +1,6 @@
-import { LABEL_FONT, LABEL_MAX_LENGTH, LABEL_WRAP_WIDTH, escapeAttr, escapeHtml, labelChunks, nodeSize, truncate, estimateTextWidth, wrapLabel } from "./site_text.js";
-import { compare, fieldLabel } from "./site_graph.js";
+import { LABEL_FONT, LABEL_MAX_LENGTH, LABEL_WRAP_WIDTH, escapeAttr, escapeHtml, labelChunks, nodeSize, truncate, estimateTextWidth, wrapLabel } from "./site_text.ts";
+import { compare, fieldLabel } from "./site_graph.ts";
+import type { GraphElementDefinition, GraphViewModel, RenderMetadata, SiteData } from "./site_types.ts";
 // --- SVG 描画に渡す値 -------------------------------------------------------
 //
 // 生成するのはただのオブジェクトなので、ライブラリを読み込まなくてもテストできる。
@@ -12,7 +13,7 @@ const REQUIREMENT_TYPES = new Set([
 ]);
 
 /** 帯 (枠) の定義。Goal / Need は型ごと、Requirements は表示用グループごとに作る。 */
-export function bandDefs(data) {
+export function bandDefs(data: SiteData) {
   const top = ((data.meta || {}).bands || [])
     .filter((band) => data.nodes.some((node) => node.type === band.type))
     .map((band) => ({ ...band, key: band.type }));
@@ -85,7 +86,7 @@ export const bandId = (key) => `band:${key}`;
  * ラベルの外接矩形になり、六角形や菱形では文字が図形の外に出る。measure は
  * ラベル 1 行の幅 (px) を返す関数で、省略すると概算 (`estimateTextWidth`) を使う。
  */
-export function graphElements(data, measure = estimateTextWidth) {
+export function graphElements(data: SiteData, measure = estimateTextWidth): GraphElementDefinition[] {
   const bands = bandDefs(data);
   const types = (data.meta || {}).types || {};
   return [
@@ -143,7 +144,7 @@ const LEGEND_MAX_BORDER = 3;
  * 各 swatch は CSS の border 指定にそのまま写せる形にしてある
  * (`borderColor` が null ならテーマの文字色を使う、の意味)。
  */
-export function legendGroups(meta, colorScheme = "light") {
+export function legendGroups(meta: RenderMetadata, colorScheme = "light") {
   const dark = colorScheme === "dark";
   const groups = [
     {
@@ -323,7 +324,7 @@ function bandRows(members, edges) {
  * RequirementGroup 自体は 1 行のまま保ち、その全体幅を Goal / Need の共通幅にも
  * 使う。グループ内のノードだけを指定された最大幅で折り返す。
  */
-export function bandedLayout(bands, placed, edges, direction, options = {}) {
+export function bandedLayout(bands, placed, edges, direction, options: { groupMaxWidth?: number } = {}) {
   const positions = new Map();
   const frames = new Map();
   const membersOf = bands.map((band) => {
@@ -598,8 +599,8 @@ function mermaidEscape(text) {
  * classDef は全型ぶん出す (絞り込みで消えている型も含む) ので、絞り込みの
  * 有無で classDef の並びは変わらない。
  */
-export function mermaidText(view, maxLabel = EXPORT_LABEL_LIMIT) {
-  const meta = view.data.meta || {};
+export function mermaidText(view: GraphViewModel, maxLabel = EXPORT_LABEL_LIMIT) {
+  const meta = view.data.meta;
   const types = meta.types || {};
   const dashed = new Set(meta.dashed_edges || []);
   const ids = exportIds(view.nodes);
@@ -667,7 +668,7 @@ const attrs = (values) =>
     .map(([name, value]) => `${name}="${escapeAttr(value)}"`)
     .join(" ");
 
-const element = (name, values, children) => {
+const element = (name, values, children = undefined) => {
   const head = [name, attrs(values)].filter(Boolean).join(" ");
   return children === undefined ? `<${head}/>` : `<${head}>${children}</${name}>`;
 };
@@ -709,7 +710,7 @@ function shapeElement(shape, box, style) {
 }
 
 /** 改行入りのラベル。中心 (x, y) に上下中央で置く。 */
-function labelElement(label, x, y, { size = LABEL_FONT.size, fill, weight } = {}) {
+function labelElement(label, x, y, { size = LABEL_FONT.size, fill = undefined, weight = undefined }: { size?: number; fill?: string; weight?: string } = {}) {
   const lines = String(label).split("\n");
   const step = size * LABEL_FONT.lineHeight;
   const top = y - ((lines.length - 1) * step) / 2 + size * 0.35;
@@ -734,7 +735,7 @@ function labelElement(label, x, y, { size = LABEL_FONT.size, fill, weight } = {}
 /**
  * いま図に描かれているものを SVG 1 枚にする。
  *
- * scene は表示層 (`site_app.js`) が SVG 描画状態から集めた実測値:
+ * scene は表示層 (`site_app.ts`) が SVG 描画状態から集めた実測値:
  *
  * - `nodes`: `{ id, type, status, label, x, y, w, h }`
  * - `edges`: `{ name, dashed, x1, y1, x2, y2 }` (端点はノードの縁の座標)

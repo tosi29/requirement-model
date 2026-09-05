@@ -1,5 +1,6 @@
-import { TABLE_COLUMNS } from "./site_table.js";
-import { FOCUS_DEPTHS, IMPACT_DEPTHS, initialSelection, statusFilters, statusNames } from "./site_graph.js";
+import { TABLE_COLUMNS } from "./site_table.ts";
+import { FOCUS_DEPTHS, IMPACT_DEPTHS, initialSelection, statusFilters, statusNames } from "./site_graph.ts";
+import type { SiteData, ViewState } from "./site_types.ts";
 // --- URL ハッシュ ----------------------------------------------------------
 //
 // 表示状態を URL に載せ、「この FR を見て」と URL だけ渡せば相手にも同じ画面が
@@ -42,8 +43,11 @@ const initialOf = (filter, data) =>
   filter.initial ? filter.initial(data) : filter.all(data);
 
 /** ハッシュが無いときの状態。ページの初期 state でもある。 */
-export function defaultState(data) {
-  const state = {
+export function defaultState(data: SiteData): ViewState {
+  const state: ViewState = {
+    types: new Set(),
+    edges: new Set(),
+    statuses: new Set(),
     selected: null,
     direction: "TD",
     mode: "graph",
@@ -103,7 +107,7 @@ export function encodeHash(state, data) {
  * 種別・存在しないノード id・壊れたエスケープ)。ただし `types=` のように
  * 「空を選んでいる」状態は URL に出せる以上そのまま復元する。
  */
-export function decodeHash(hash, data) {
+export function decodeHash(hash: string | null, data: SiteData): ViewState {
   const state = defaultState(data);
   const params = parseHash(hash);
   const subset = (raw, all) =>
@@ -197,4 +201,3 @@ export const normalizeTheme = (value) => (THEMES.includes(value) ? value : "auto
 export function nextTheme(theme) {
   return THEMES[(THEMES.indexOf(normalizeTheme(theme)) + 1) % THEMES.length];
 }
-

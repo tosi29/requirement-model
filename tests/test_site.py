@@ -435,6 +435,8 @@ def test_graph_only_controls_are_overlaid_inside_the_graph_frame(tmp_path: Path)
     assert 'id="tab-graph"' in toolbar
     assert 'id="tab-table"' in toolbar
     assert 'id="copy-link"' in toolbar
+    assert '<span class="toolbar-actions" role="group" aria-label="ビュー共通操作">' in toolbar
+    assert 'margin-left: auto;' in html
     for element_id in (
         "zoom-out",
         "zoom-in",

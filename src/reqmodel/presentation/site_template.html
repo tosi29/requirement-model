@@ -105,6 +105,12 @@ main {
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
 .graph-frame { flex: 1; position: relative; min-height: 480px; isolation: isolate; }
 #graph { position: absolute; inset: 0; }
 #graph .empty { padding: 14px; }
@@ -539,10 +545,12 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
         <button id="tab-graph" role="tab" class="active" aria-selected="true" aria-controls="graph-frame">グラフ</button>
         <button id="tab-table" role="tab" aria-selected="false" aria-controls="table-frame" tabindex="-1">テーブル</button>
       </span>
-      <button id="clear">選択解除</button>
-      <button id="copy-link" class="icon-button" title="表示中のページへのリンクをコピー" aria-label="表示中のページへのリンクをコピー">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-      </button>
+      <span class="toolbar-actions" role="group" aria-label="ビュー共通操作">
+        <button id="clear">選択解除</button>
+        <button id="copy-link" class="icon-button" title="表示中のページへのリンクをコピー" aria-label="表示中のページへのリンクをコピー">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+        </button>
+      </span>
     </div>
     <div class="graph-frame" id="graph-frame" role="tabpanel" aria-label="グラフ">
       <div id="graph"></div>

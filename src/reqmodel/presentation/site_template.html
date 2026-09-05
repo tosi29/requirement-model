@@ -199,6 +199,7 @@ main {
   pointer-events: none;
 }
 .graph-controls > * { pointer-events: auto; }
+.graph-zoom-controls { top: auto; bottom: 12px; }
 .graph-control-group, .graph-controls > .export-menu {
   display: flex;
   align-items: center;
@@ -538,21 +539,7 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
     </div>
     <div class="graph-frame" id="graph-frame" role="tabpanel" aria-label="グラフ">
       <div id="graph"></div>
-      <div class="graph-controls graph-only" id="graph-tools" role="group" aria-label="グラフ操作">
-        <div class="graph-control-group" role="group" aria-label="表示操作">
-          <button id="zoom-out" class="icon-button" type="button" title="縮小" aria-label="縮小">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
-          </button>
-          <button id="zoom-in" class="icon-button" type="button" title="拡大" aria-label="拡大">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
-          </button>
-          <button id="zoom-reset" class="icon-button" type="button" title="等倍に戻す" aria-label="等倍に戻す">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle></svg>
-          </button>
-          <button id="zoom-fit" class="icon-button" type="button" title="全体表示" aria-label="全体表示">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M4 16v4h4M20 16v4h-4"></path></svg>
-          </button>
-        </div>
+      <div class="graph-controls graph-only" id="graph-tools" role="group" aria-label="レイアウトと出力">
         <div class="graph-control-group" role="group" aria-label="レイアウト">
           <button id="direction" class="icon-button" type="button" title="図の向き" aria-label="図の向き">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"></path><path d="m8 8 4-4 4 4"></path><path d="m8 16 4 4 4-4"></path></svg>
@@ -579,6 +566,22 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
             </button>
           </span>
         </details>
+      </div>
+      <div class="graph-controls graph-only graph-zoom-controls" id="zoom-tools" role="group" aria-label="表示操作">
+        <div class="graph-control-group" role="group" aria-label="拡大縮小">
+          <button id="zoom-out" class="icon-button" type="button" title="縮小" aria-label="縮小">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+          </button>
+          <button id="zoom-in" class="icon-button" type="button" title="拡大" aria-label="拡大">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+          </button>
+          <button id="zoom-reset" class="icon-button" type="button" title="等倍に戻す" aria-label="等倍に戻す">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+          </button>
+          <button id="zoom-fit" class="icon-button" type="button" title="全体表示" aria-label="全体表示">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M4 16v4h4M20 16v4h-4"></path></svg>
+          </button>
+        </div>
       </div>
       <div class="graph-legend graph-only" id="legend" role="group" aria-label="凡例"></div>
     </div>

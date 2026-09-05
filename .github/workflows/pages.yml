@@ -13,6 +13,10 @@ permissions:
   pages: write
   id-token: write
 
+env:
+  # pip の単位は ISO 8601 duration。PyPI の公開時刻から3日待つ。
+  PIP_UPLOADED_PRIOR_TO: P3D
+
 # 公開は同時に 1 つだけ。実行中のデプロイは中断しない。
 concurrency:
   group: pages
@@ -29,7 +33,9 @@ jobs:
           python-version: "3.14"
 
       - name: インストール
-        run: pip install -e .
+        run: |
+          python -m pip install --upgrade --only-binary=:all: "pip>=26.2"
+          python -m pip install --uploaded-prior-to P3D --only-binary=:all: -e .
 
       # ツール自体のテストは ci.yml が同じ push で回すので、ここでは繰り返さない。
       # このワークフローが守るのは「検証を通らないモデルを公開しない」ことだけで、

@@ -38,9 +38,26 @@ IREB の連鎖は Goal → Requirement で `Need` を持たず、INCOSE は `Goa
 ## インストール
 
 ```console
-$ pip install -e .          # Python 3.14 以上 / 依存は pydantic のみ
+$ PIP_UPLOADED_PRIOR_TO=P3D python -m pip install --uploaded-prior-to P3D --only-binary=:all: -e .
 $ req validate examples/sample.py
 ```
+
+Python 3.14 以上と pip 26.2 以上が必要である。pip のオプションは PyPI など
+公開時刻を提供するインデックスに対して、公開から3日未満の版を解決対象から外す。
+`PIP_UPLOADED_PRIOR_TO=P3D` は子プロセスのビルド分離環境にも引き継ぐため、環境変数と
+`--uploaded-prior-to` の両方を指定する。pip は `pyproject.toml` の `[tool.uv]` を読まないので、
+pip を使うときはこの指定を省略しない。
+
+uv を使う場合は、`pyproject.toml` の `[tool.uv] exclude-newer = "3 days"` が同じ制約を適用し、
+コミット済みの `uv.lock` で解決結果も固定する。
+
+```console
+$ uv sync --locked --extra dev
+$ uv run --locked req validate examples/sample.py
+```
+
+Node の依存にはルートの `.npmrc` で `min-release-age=4320` (3日) を設定している。
+`npm install` の解決と `npm ci` のロック済みインストールは、この設定を自動的に読む。
 
 ## 使い方
 
@@ -828,7 +845,7 @@ steps:
   - uses: actions/setup-python@v5
     with:
       python-version: "3.14"
-  - run: pip install reqmodel
+  - run: PIP_UPLOADED_PRIOR_TO=P3D python -m pip install --uploaded-prior-to P3D --only-binary=:all: reqmodel
   - id: validate
     continue-on-error: true
     run: req validate --strict --sarif requirements.py > reqmodel.sarif
@@ -877,9 +894,17 @@ Source を **GitHub Actions** にする。これは API やワークフローか
 ## 開発
 
 ```console
-$ pip install -e ".[dev]"
+$ PIP_UPLOADED_PRIOR_TO=P3D python -m pip install --uploaded-prior-to P3D --only-binary=:all: -e ".[dev]"
 $ pytest
 $ mypy
+```
+
+uv で開発環境を作る場合は、次のようにロック済みの依存だけを使う。
+
+```console
+$ uv sync --locked --extra dev
+$ uv run --locked pytest
+$ uv run --locked mypy
 ```
 
 静的サイトの TypeScript だけを回すなら Node (18 以上) で、`npm install` 後に次を叩く。

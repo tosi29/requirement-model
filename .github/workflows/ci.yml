@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # pip の単位は ISO 8601 duration。PyPI の公開時刻から3日待つ。
+  PIP_UPLOADED_PRIOR_TO: P3D
+
 jobs:
   sarif:
     # Code Scanning への書き込み権限は、この job だけに限定する。
@@ -26,7 +30,9 @@ jobs:
           python-version: "3.14"
 
       - name: インストール
-        run: pip install -e .
+        run: |
+          python -m pip install --upgrade --only-binary=:all: "pip>=26.2"
+          python -m pip install --uploaded-prior-to P3D --only-binary=:all: -e .
 
       # 違反があっても生成済みの SARIF を次の step でアップロードする。
       # CI の成否は python job の --strict に任せ、ここでは役割を分離する。
@@ -62,9 +68,12 @@ jobs:
         with:
           node-version: "22"
 
+      - uses: astral-sh/setup-uv@v7
+
       - name: インストール
         run: |
-          pip install -e ".[dev]"
+          python -m pip install --upgrade --only-binary=:all: "pip>=26.2"
+          python -m pip install --uploaded-prior-to P3D --only-binary=:all: -e ".[dev]"
           npm ci
 
       - name: テスト
@@ -80,6 +89,12 @@ jobs:
           req validate --strict requirements.py
           req validate --strict examples/sample.py
           req validate --strict examples/bench.py
+
+      - name: uv のロック済み環境を検証する
+        run: uv sync --locked --extra dev
+
+      - name: uv 経由でもテストする
+        run: uv run --locked pytest -q
 
   site-js:
     # 埋め込み前の JS を、単体で構文検査してユニットテストにかける。

@@ -26,7 +26,7 @@ jobs:
       - name: Markdown の変更プランを生成する
         run: uv run --locked req plan --rev origin/${{ github.event.repository.default_branch }} --format markdown > requirements-plan.md
       - name: PR コメントを作成または更新する
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require("fs");

@@ -492,6 +492,10 @@ def test_graph_legend_separates_type_and_status_rows(tmp_path: Path):
     assert ".graph-legend {" in html
     assert "flex-direction: column;" in html
     assert ".graph-legend .legend-group + .legend-group" in html
+    assert ".graph-legend .swatch {" in html
+    assert "display: inline-block;" in html
+    assert "width: 14px;" in html
+    assert "height: 14px;" in html
 
 
 def test_page_puts_the_view_state_in_the_url(tmp_path: Path):

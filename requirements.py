@@ -76,6 +76,10 @@ ISSUE_SVG = Reference(
     title="GitHub Issue #24: SVG 出力",
     url="https://github.com/tosi29/requirement-model/issues/24",
 )
+ISSUE_GRAPH_CONTROLS = Reference(
+    title="GitHub Issue #145: グラフ専用の操作コントロールをグラフ領域内へ移動する",
+    url="https://github.com/tosi29/requirement-model/issues/145",
+)
 EVIDENCE_SITE_CLI_PARITY = Reference(
     title="サイトと CLI の Mermaid 一致テスト",
     url="https://github.com/tosi29/requirement-model/blob/main/tests/test_site_js.py",
@@ -295,7 +299,7 @@ FR_SITE = FunctionalRequirement(
     id="FR-12",
     text="外部の実行環境を要さない 1 枚の HTML として、閲覧用サイトを生成すること",
     satisfies=[NEED_READABLE],
-    source=[SRC_OWNER, SRC_LEGACY],
+    source=[SRC_OWNER, SRC_LEGACY, ISSUE_GRAPH_CONTROLS],
     acceptance_criteria=[
         "生成物を静的ファイルとして配るだけでブラウザから閲覧できる",
         "ノードを選ぶと影響範囲が色分けされ、指摘の一覧から該当ノードへ飛べる",
@@ -307,6 +311,8 @@ FR_SITE = FunctionalRequirement(
         "Goal と Need は、横に並べた全 Requirements 機能枠の外端と同じ幅へ揃える",
         "Goal と Need は折り返さず、dagre の並び順だけを使って不要な横方向の空白を詰める",
         "Requirements の各機能枠はグループ数にかかわらず個別の最大幅まで使用できる",
+        "中央上部にはビュー切替と共通操作だけを置き、グラフ専用操作と出力はグラフ領域内に置く",
+        "テーブル表示中はグラフ専用操作と図のダウンロードを表示せず、グラフ領域内の操作はアイコンと title / aria-label で確認できる",
     ],
 )
 FR_FIT_WHOLE = FunctionalRequirement(

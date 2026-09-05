@@ -105,7 +105,13 @@ main {
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
-.graph-frame { flex: 1; position: relative; min-height: 480px; }
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.graph-frame { flex: 1; position: relative; min-height: 480px; isolation: isolate; }
 #graph { position: absolute; inset: 0; }
 #graph .empty { padding: 14px; }
 #graph svg { display: block; width: 100%; height: 100%; background: var(--graph-bg, var(--bg)); cursor: grab; user-select: none; }
@@ -186,6 +192,81 @@ main {
   stroke-linejoin: round;
   stroke-width: 1.8;
 }
+.graph-controls {
+  position: absolute;
+  z-index: 2;
+  top: auto;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  pointer-events: none;
+}
+.graph-controls > * { pointer-events: auto; }
+.graph-control-group, .graph-controls > .export-menu {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+}
+.graph-control-group .icon-button, .graph-controls > .export-menu > summary,
+.icon-select {
+  width: 32px;
+  height: 32px;
+}
+.graph-control-group .icon-button, .icon-select {
+  background: var(--panel);
+}
+.graph-control-group .icon-button svg, .icon-select svg {
+  width: 17px;
+  height: 17px;
+}
+.icon-button[data-direction="LR"] svg { transform: rotate(-90deg); }
+.icon-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.icon-select svg { pointer-events: none; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.icon-select select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  padding: 0;
+  border: 0;
+}
+.icon-select:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.graph-legend {
+  position: absolute;
+  z-index: 2;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+}
 .export-menu { position: relative; }
 .export-menu > summary {
   list-style: none;
@@ -195,6 +276,7 @@ main {
   border-radius: 6px;
   cursor: pointer;
 }
+.graph-controls > .export-menu > summary { border: 0; }
 .export-menu > summary::-webkit-details-marker { display: none; }
 .export-menu > summary:hover, .export-menu[open] > summary { border-color: var(--accent); }
 .export-options {
@@ -203,14 +285,15 @@ main {
   top: calc(100% + 4px);
   right: 0;
   display: grid;
-  min-width: 150px;
+  grid-auto-flow: column;
+  min-width: 0;
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);
   box-shadow: var(--shadow);
 }
-.export-options button { border: 0; background: transparent; text-align: left; white-space: nowrap; }
+.export-options button.icon-button { border: 0; background: transparent; }
 .export-options button:hover { background: var(--panel); }
 .table-frame { flex: 1; overflow: auto; min-height: 0; padding: 0 0 14px; }
 .table-note { padding: 8px 12px; color: var(--muted); font-size: 12px; }
@@ -389,8 +472,29 @@ button.finding:hover { box-shadow: inset 0 0 0 1px var(--accent); }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
 .legend .legend-group { gap: 4px 8px; flex-wrap: wrap; }
 .legend .legend-group b { font-weight: 600; color: var(--fg); }
+.graph-legend .legend-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.graph-legend .legend-group + .legend-group {
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
+}
+.graph-legend .legend-group > span { display: inline-flex; align-items: center; gap: 4px; }
+.graph-legend .legend-group > b { font-weight: 600; color: var(--fg); }
 /* 見本の border-* は JS が凡例データから直接書き込む (種別=配色 / status=線種)。 */
-.legend .swatch { width: 12px; height: 12px; border: 1px solid; border-radius: 2px; flex: none; }
+.graph-legend .swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid;
+  border-radius: 2px;
+  flex: none;
+}
 footer { padding: 10px 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
 code { font-family: ui-monospace, monospace; background: var(--panel); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
@@ -441,35 +545,59 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
         <button id="tab-graph" role="tab" class="active" aria-selected="true" aria-controls="graph-frame">グラフ</button>
         <button id="tab-table" role="tab" aria-selected="false" aria-controls="table-frame" tabindex="-1">テーブル</button>
       </span>
-      <span class="tool-group graph-only" id="graph-tools">
-        <button id="zoom-out" title="縮小" aria-label="縮小">−</button>
-        <button id="zoom-in" title="拡大" aria-label="拡大">＋</button>
-        <button id="zoom-reset">等倍</button>
-        <button id="zoom-fit">全体表示</button>
-        <select id="direction" aria-label="図の向き">
-          <option value="TD">縦 (TD)</option>
-          <option value="LR">横 (LR)</option>
-        </select>
-        <!-- 選択肢は site_app.ts が FOCUS_DEPTHS から作る。 -->
-        <select id="focus" aria-label="フォーカス (近傍だけを描く)" title="選択したノードの近傍だけを図に描く (一覧・表・コピー本文は全体のまま)"></select>
-        <button id="relayout" title="表示中のノードだけで並べ直す">整列</button>
+      <span class="toolbar-actions" role="group" aria-label="ビュー共通操作">
+        <button id="clear">選択解除</button>
+        <button id="copy-link" class="icon-button" title="表示中のページへのリンクをコピー" aria-label="表示中のページへのリンクをコピー">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+        </button>
       </span>
-      <button id="clear">選択解除</button>
-      <button id="copy-link" class="icon-button" title="表示中のページへのリンクをコピー" aria-label="表示中のページへのリンクをコピー">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-      </button>
-      <details class="export-menu">
-        <summary title="図をダウンロード" aria-label="図をダウンロード">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5"></path><path d="M5 20h14"></path></svg>
-        </summary>
-        <span class="export-options">
-          <button id="export-svg" title="いま図に描かれているものを SVG で保存する">SVG をダウンロード</button>
-          <button id="export-mmd" title="いま見えているノードとエッジを Mermaid (.mmd) で保存する">Mermaid (.mmd) をダウンロード</button>
-        </span>
-      </details>
-      <span class="legend graph-only" id="legend"></span>
     </div>
-    <div class="graph-frame" id="graph-frame" role="tabpanel" aria-label="グラフ"><div id="graph"></div></div>
+    <div class="graph-frame" id="graph-frame" role="tabpanel" aria-label="グラフ">
+      <div id="graph"></div>
+      <div class="graph-controls graph-only" id="graph-tools" role="group" aria-label="グラフ操作">
+        <div class="graph-control-group" role="group" aria-label="表示操作">
+          <button id="zoom-out" class="icon-button" type="button" title="縮小" aria-label="縮小">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+          </button>
+          <button id="zoom-in" class="icon-button" type="button" title="拡大" aria-label="拡大">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+          </button>
+          <button id="zoom-reset" class="icon-button" type="button" title="等倍に戻す" aria-label="等倍に戻す">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+          </button>
+          <button id="zoom-fit" class="icon-button" type="button" title="全体表示" aria-label="全体表示">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M4 16v4h4M20 16v4h-4"></path></svg>
+          </button>
+        </div>
+        <div class="graph-control-group" role="group" aria-label="レイアウト">
+          <button id="direction" class="icon-button" type="button" title="図の向き" aria-label="図の向き">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"></path><path d="m8 8 4-4 4 4"></path><path d="m8 16 4 4 4-4"></path></svg>
+          </button>
+          <span id="focus-control" class="icon-select" title="フォーカス">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
+            <!-- 選択肢は site_app.ts が FOCUS_DEPTHS から作る。 -->
+            <select id="focus" aria-label="フォーカス (近傍だけを描く)"></select>
+          </span>
+          <button id="relayout" class="icon-button" type="button" title="表示中のノードだけで並べ直す" aria-label="表示中のノードだけで並べ直す">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.8-4L3 10"></path><path d="M3 5v5h5"></path><path d="M4 13a8 8 0 0 0 14.8 4L21 14"></path><path d="M21 19v-5h-5"></path></svg>
+          </button>
+        </div>
+        <details class="export-menu">
+          <summary class="icon-button" title="図をダウンロード" aria-label="図をダウンロード">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5"></path><path d="M5 20h14"></path></svg>
+          </summary>
+          <span class="export-options" role="group" aria-label="ダウンロード形式">
+            <button id="export-svg" class="icon-button" type="button" title="いま図に描かれているものを SVG で保存する" aria-label="SVG をダウンロード">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"></path><path d="M15 4v5h5"></path><path d="m8 17 2-3 2 2 2-3 2 4"></path></svg>
+            </button>
+            <button id="export-mmd" class="icon-button" type="button" title="いま見えているノードとエッジを Mermaid (.mmd) で保存する" aria-label="Mermaid をダウンロード">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 6-4 6 4 6M16 6l4 6-4 6M14 4l-4 16"></path></svg>
+            </button>
+          </span>
+        </details>
+      </div>
+      <div class="graph-legend graph-only" id="legend" role="group" aria-label="凡例"></div>
+    </div>
     <div class="table-frame" id="table-frame" role="tabpanel" aria-label="テーブル" hidden>
       <p class="table-note" id="table-note"></p>
       <table class="nodes" id="node-table"></table>

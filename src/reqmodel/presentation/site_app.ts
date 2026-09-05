@@ -745,6 +745,26 @@ function renderFocusOptions() {
   );
 }
 
+const directionName = (direction) => direction === "LR" ? "横 (LR)" : "縦 (TD)";
+const focusName = () => state.focus ? `近傍 ${state.focus} ホップ` : "フォーカス: 切";
+
+/** アイコンだけの向き・フォーカス操作にも現在値を伝える。 */
+function syncGraphControlLabels() {
+  const direction = getElement("direction");
+  const nextDirection = state.direction === "LR" ? "TD" : "LR";
+  const directionLabel = `図の向き: ${directionName(state.direction)} (クリックで${directionName(nextDirection)}へ)`;
+  direction.title = directionLabel;
+  direction.setAttribute("aria-label", directionLabel);
+  direction.dataset.direction = state.direction;
+
+  const focus = getElement("focus");
+  const focusControl = getElement("focus-control");
+  focus.value = String(state.focus);
+  const focusLabel = `${focusName()} (選択したノードの近傍だけを描く)`;
+  focus.title = focusLabel;
+  focusControl.title = focusLabel;
+}
+
 /**
  * 影響範囲の探索設定。深さの上限は `IMPACT_DEPTHS` を唯一の出典とする。
  *
@@ -765,8 +785,7 @@ const depthLabel = () => (state.depth ? `${state.depth} ホップ` : "無制限"
 /** 入力欄・チェック・タブを state に合わせ直す。ハッシュから復元したとき用。 */
 function syncControls() {
   getElement("search").value = state.query;
-  getElement("direction").value = state.direction;
-  getElement("focus").value = String(state.focus);
+  syncGraphControlLabels();
   getElement("depth").value = String(state.depth);
   getElement("depth-value").textContent = depthLabel();
   getElement("undirected").checked = state.undirected;
@@ -800,7 +819,7 @@ function renderStats() {
 function renderLegend() {
   const scheme = palette().dark ? "dark" : "light";
   const groups = legendGroups(DATA.meta, scheme).map((group) => {
-    const container = htmlEl("span", { class: "legend-group" }, htmlEl("b", {}, group.title));
+    const container = htmlEl("div", { class: "legend-group" }, htmlEl("b", {}, group.title));
     for (const { label, swatch } of group.items) {
       const mark = htmlEl("i", { class: "swatch" });
       mark.style.background = swatch.background;
@@ -1139,13 +1158,15 @@ getElement("clear").addEventListener("click", () => {
   refresh();
   writeHash();
 });
-getElement("direction").addEventListener("change", (event) => {
-  state.direction = (event.target as HTMLSelectElement).value === "LR" ? "LR" : "TD";
+getElement("direction").addEventListener("click", () => {
+  state.direction = state.direction === "LR" ? "TD" : "LR";
+  syncGraphControlLabels();
   relayout();
   writeHash();
 });
 getElement("focus").addEventListener("change", (event) => {
   state.focus = Number((event.target as HTMLInputElement).value);
+  syncGraphControlLabels();
   //: 描く範囲が変わるので、refresh() の中の syncFocusLayout() が並べ直す。
   refresh();
   writeHash();

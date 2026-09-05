@@ -1905,6 +1905,22 @@ ${text}`;
       ...FOCUS_DEPTHS.map((depth) => htmlEl("option", { value: depth }, `\u8FD1\u508D ${depth} \u30DB\u30C3\u30D7`))
     );
   }
+  var directionName = (direction) => direction === "LR" ? "\u6A2A (LR)" : "\u7E26 (TD)";
+  var focusName = () => state.focus ? `\u8FD1\u508D ${state.focus} \u30DB\u30C3\u30D7` : "\u30D5\u30A9\u30FC\u30AB\u30B9: \u5207";
+  function syncGraphControlLabels() {
+    const direction = getElement("direction");
+    const nextDirection = state.direction === "LR" ? "TD" : "LR";
+    const directionLabel = `\u56F3\u306E\u5411\u304D: ${directionName(state.direction)} (\u30AF\u30EA\u30C3\u30AF\u3067${directionName(nextDirection)}\u3078)`;
+    direction.title = directionLabel;
+    direction.setAttribute("aria-label", directionLabel);
+    direction.dataset.direction = state.direction;
+    const focus = getElement("focus");
+    const focusControl = getElement("focus-control");
+    focus.value = String(state.focus);
+    const focusLabel = `${focusName()} (\u9078\u629E\u3057\u305F\u30CE\u30FC\u30C9\u306E\u8FD1\u508D\u3060\u3051\u3092\u63CF\u304F)`;
+    focus.title = focusLabel;
+    focusControl.title = focusLabel;
+  }
   function renderImpactControls() {
     const slider = getElement("depth");
     slider.min = "0";
@@ -1914,8 +1930,7 @@ ${text}`;
   var depthLabel = () => state.depth ? `${state.depth} \u30DB\u30C3\u30D7` : "\u7121\u5236\u9650";
   function syncControls() {
     getElement("search").value = state.query;
-    getElement("direction").value = state.direction;
-    getElement("focus").value = String(state.focus);
+    syncGraphControlLabels();
     getElement("depth").value = String(state.depth);
     getElement("depth-value").textContent = depthLabel();
     getElement("undirected").checked = state.undirected;
@@ -1946,7 +1961,7 @@ ${text}`;
   function renderLegend() {
     const scheme = palette().dark ? "dark" : "light";
     const groups = legendGroups(DATA.meta, scheme).map((group) => {
-      const container = htmlEl("span", { class: "legend-group" }, htmlEl("b", {}, group.title));
+      const container = htmlEl("div", { class: "legend-group" }, htmlEl("b", {}, group.title));
       for (const { label, swatch } of group.items) {
         const mark = htmlEl("i", { class: "swatch" });
         mark.style.background = swatch.background;
@@ -2215,13 +2230,15 @@ ${text}`;
     refresh();
     writeHash();
   });
-  getElement("direction").addEventListener("change", (event) => {
-    state.direction = event.target.value === "LR" ? "LR" : "TD";
+  getElement("direction").addEventListener("click", () => {
+    state.direction = state.direction === "LR" ? "TD" : "LR";
+    syncGraphControlLabels();
     relayout();
     writeHash();
   });
   getElement("focus").addEventListener("change", (event) => {
     state.focus = Number(event.target.value);
+    syncGraphControlLabels();
     refresh();
     writeHash();
   });

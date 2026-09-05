@@ -422,6 +422,84 @@ def test_page_has_both_the_graph_and_the_table_view(tmp_path: Path):
         assert f'id="{element_id}"' in html
 
 
+def test_graph_only_controls_are_overlaid_inside_the_graph_frame(tmp_path: Path):
+    """グラフ専用の操作は上部ツールバーではなく、図の上に重ねて出す。"""
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+    toolbar = html.split('<div class="toolbar">', 1)[1].split(
+        '<div class="graph-frame"', 1
+    )[0]
+    graph_frame = html.split('<div class="graph-frame"', 1)[1].split(
+        '<div class="table-frame"', 1
+    )[0]
+
+    assert 'id="tab-graph"' in toolbar
+    assert 'id="tab-table"' in toolbar
+    assert 'id="copy-link"' in toolbar
+    assert '<span class="toolbar-actions" role="group" aria-label="ビュー共通操作">' in toolbar
+    assert 'margin-left: auto;' in html
+    for element_id in (
+        "zoom-out",
+        "zoom-in",
+        "zoom-reset",
+        "zoom-fit",
+        "direction",
+        "focus",
+        "relayout",
+        "export-svg",
+        "export-mmd",
+    ):
+        assert f'id="{element_id}"' in graph_frame
+        assert f'id="{element_id}"' not in toolbar
+
+    assert 'class="graph-controls graph-only"' in graph_frame
+    assert 'class="graph-controls graph-only" id="graph-tools"' in graph_frame
+    assert 'role="group" aria-label="表示操作"' in graph_frame
+    assert ".graph-controls {" in html
+    assert "top: auto;" in html
+    assert "bottom: 12px;" in html
+    assert 'class="graph-control-group" role="group" aria-label="レイアウト"' in graph_frame
+    assert 'class="export-menu"' in graph_frame
+
+
+def test_graph_only_controls_are_icon_buttons_with_accessible_names(tmp_path: Path):
+    """図上の操作は常設テキストを持たず、タイトルと読み上げ名を持つ。"""
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    for element_id in ("zoom-out", "zoom-in", "zoom-reset", "zoom-fit", "direction", "relayout"):
+        button = re.search(
+            rf'<button id="{element_id}"[^>]*aria-label="[^"]+"[^>]*>\s*<svg', html
+        )
+        assert button, element_id
+
+    for element_id in ("export-svg", "export-mmd"):
+        button = re.search(
+            rf'<button id="{element_id}"[^>]*aria-label="[^"]+"[^>]*>\s*<svg', html
+        )
+        assert button, element_id
+
+    assert 'id="direction" class="icon-button"' in html
+    assert 'id="focus-control" class="icon-select"' in html
+    assert 'select id="direction"' not in html
+    assert 'id="zoom-reset">等倍</button>' not in html
+    assert 'id="zoom-fit">全体表示</button>' not in html
+    assert 'id="export-svg" title="いま図に描かれているものを SVG で保存する">' not in html
+
+
+def test_graph_legend_separates_type_and_status_rows(tmp_path: Path):
+    """凡例の種別 (色) と status (線種) は別の段に置く。"""
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert 'id="legend"' in html
+    assert 'const container = htmlEl("div", { class: "legend-group" }' in html
+    assert ".graph-legend {" in html
+    assert "flex-direction: column;" in html
+    assert ".graph-legend .legend-group + .legend-group" in html
+    assert ".graph-legend .swatch {" in html
+    assert "display: inline-block;" in html
+    assert "width: 14px;" in html
+    assert "height: 14px;" in html
+
+
 def test_page_puts_the_view_state_in_the_url(tmp_path: Path):
     """選択・絞り込みは URL に載る。URL を渡せば相手にも同じ画面が出る。"""
     index = build_site(chain(), FindingList(), tmp_path)

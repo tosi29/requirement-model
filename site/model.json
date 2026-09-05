@@ -30,7 +30,7 @@
         "Need-2",
         "Need-8"
       ],
-      "location": "requirements.py:131"
+      "location": "requirements.py:135"
     },
     {
       "type": "Goal",
@@ -55,7 +55,7 @@
         "Need-3",
         "Need-4"
       ],
-      "location": "requirements.py:137"
+      "location": "requirements.py:141"
     },
     {
       "type": "Goal",
@@ -86,7 +86,7 @@
         "Need-6",
         "Need-7"
       ],
-      "location": "requirements.py:143"
+      "location": "requirements.py:147"
     },
     {
       "type": "Need",
@@ -106,7 +106,7 @@
         }
       ],
       "suppress": [],
-      "location": "requirements.py:87"
+      "location": "requirements.py:91"
     },
     {
       "type": "Need",
@@ -126,7 +126,7 @@
         }
       ],
       "suppress": [],
-      "location": "requirements.py:93"
+      "location": "requirements.py:97"
     },
     {
       "type": "Need",
@@ -146,7 +146,7 @@
         }
       ],
       "suppress": [],
-      "location": "requirements.py:98"
+      "location": "requirements.py:102"
     },
     {
       "type": "Need",
@@ -161,7 +161,7 @@
         }
       ],
       "suppress": [],
-      "location": "requirements.py:103"
+      "location": "requirements.py:107"
     },
     {
       "type": "Need",
@@ -181,7 +181,7 @@
         }
       ],
       "suppress": [],
-      "location": "requirements.py:108"
+      "location": "requirements.py:112"
     },
     {
       "type": "Need",
@@ -196,7 +196,7 @@
         }
       ],
       "suppress": [],
-      "location": "requirements.py:113"
+      "location": "requirements.py:117"
     },
     {
       "type": "Need",
@@ -211,7 +211,7 @@
         }
       ],
       "suppress": [],
-      "location": "requirements.py:118"
+      "location": "requirements.py:122"
     },
     {
       "type": "Need",
@@ -226,7 +226,7 @@
         }
       ],
       "suppress": [],
-      "location": "requirements.py:123"
+      "location": "requirements.py:127"
     },
     {
       "type": "FunctionalRequirement",
@@ -251,7 +251,7 @@
         "Need-1"
       ],
       "refines": [],
-      "location": "requirements.py:152"
+      "location": "requirements.py:156"
     },
     {
       "type": "FunctionalRequirement",
@@ -276,7 +276,7 @@
         "Need-4"
       ],
       "refines": [],
-      "location": "requirements.py:267"
+      "location": "requirements.py:271"
     },
     {
       "type": "FunctionalRequirement",
@@ -302,7 +302,7 @@
         "Need-6"
       ],
       "refines": [],
-      "location": "requirements.py:283"
+      "location": "requirements.py:287"
     },
     {
       "type": "FunctionalRequirement",
@@ -319,6 +319,11 @@
           "title": "要求を Markdown 文書と表計算ソフトで管理する現行の運用",
           "url": "https://github.com/tosi29/requirement-model/issues/123#SRC_LEGACY",
           "note": null
+        },
+        {
+          "title": "GitHub Issue #145: グラフ専用の操作コントロールをグラフ領域内へ移動する",
+          "url": "https://github.com/tosi29/requirement-model/issues/145",
+          "note": null
         }
       ],
       "suppress": [],
@@ -334,13 +339,15 @@
         "Requirements 段は機能枠内のノードだけを幅制限で折り返し、機能枠自体は同じ段に並べる",
         "Goal と Need は、横に並べた全 Requirements 機能枠の外端と同じ幅へ揃える",
         "Goal と Need は折り返さず、dagre の並び順だけを使って不要な横方向の空白を詰める",
-        "Requirements の各機能枠はグループ数にかかわらず個別の最大幅まで使用できる"
+        "Requirements の各機能枠はグループ数にかかわらず個別の最大幅まで使用できる",
+        "中央上部にはビュー切替と共通操作だけを置き、グラフ専用操作と出力はグラフ領域内に置く",
+        "テーブル表示中はグラフ専用操作と図のダウンロードを表示せず、グラフ領域内の操作はアイコンと title / aria-label で確認できる"
       ],
       "satisfies": [
         "Need-6"
       ],
       "refines": [],
-      "location": "requirements.py:294"
+      "location": "requirements.py:298"
     },
     {
       "type": "FunctionalRequirement",
@@ -366,7 +373,7 @@
       "refines": [
         "FR-12"
       ],
-      "location": "requirements.py:312"
+      "location": "requirements.py:318"
     },
     {
       "type": "FunctionalRequirement",
@@ -398,7 +405,7 @@
       "refines": [
         "FR-12"
       ],
-      "location": "requirements.py:324"
+      "location": "requirements.py:330"
     },
     {
       "type": "FunctionalRequirement",
@@ -425,7 +432,7 @@
       "refines": [
         "FR-12"
       ],
-      "location": "requirements.py:345"
+      "location": "requirements.py:351"
     },
     {
       "type": "FunctionalRequirement",
@@ -451,7 +458,7 @@
         "Need-7"
       ],
       "refines": [],
-      "location": "requirements.py:368"
+      "location": "requirements.py:374"
     },
     {
       "type": "FunctionalRequirement",
@@ -476,7 +483,7 @@
         "Need-6"
       ],
       "refines": [],
-      "location": "requirements.py:379"
+      "location": "requirements.py:385"
     },
     {
       "type": "FunctionalRequirement",
@@ -510,7 +517,7 @@
       "refines": [
         "FR-10"
       ],
-      "location": "requirements.py:405"
+      "location": "requirements.py:411"
     },
     {
       "type": "FunctionalRequirement",
@@ -541,7 +548,7 @@
         "Need-1"
       ],
       "refines": [],
-      "location": "requirements.py:418"
+      "location": "requirements.py:424"
     },
     {
       "type": "FunctionalRequirement",
@@ -571,7 +578,7 @@
         "Need-1"
       ],
       "refines": [],
-      "location": "requirements.py:162"
+      "location": "requirements.py:166"
     },
     {
       "type": "FunctionalRequirement",
@@ -601,7 +608,7 @@
         "Need-5"
       ],
       "refines": [],
-      "location": "requirements.py:429"
+      "location": "requirements.py:435"
     },
     {
       "type": "FunctionalRequirement",
@@ -636,7 +643,7 @@
         "Need-2"
       ],
       "refines": [],
-      "location": "requirements.py:439"
+      "location": "requirements.py:445"
     },
     {
       "type": "FunctionalRequirement",
@@ -666,7 +673,7 @@
         "Need-8"
       ],
       "refines": [],
-      "location": "requirements.py:449"
+      "location": "requirements.py:455"
     },
     {
       "type": "FunctionalRequirement",
@@ -695,7 +702,7 @@
         "Need-6"
       ],
       "refines": [],
-      "location": "requirements.py:459"
+      "location": "requirements.py:465"
     },
     {
       "type": "FunctionalRequirement",
@@ -719,7 +726,7 @@
         "Need-6"
       ],
       "refines": [],
-      "location": "requirements.py:468"
+      "location": "requirements.py:474"
     },
     {
       "type": "FunctionalRequirement",
@@ -747,7 +754,7 @@
         "Need-5"
       ],
       "refines": [],
-      "location": "requirements.py:477"
+      "location": "requirements.py:483"
     },
     {
       "type": "FunctionalRequirement",
@@ -779,7 +786,7 @@
       "refines": [
         "FR-12"
       ],
-      "location": "requirements.py:492"
+      "location": "requirements.py:498"
     },
     {
       "type": "FunctionalRequirement",
@@ -810,7 +817,7 @@
         "Need-1"
       ],
       "refines": [],
-      "location": "requirements.py:390"
+      "location": "requirements.py:396"
     },
     {
       "type": "FunctionalRequirement",
@@ -841,7 +848,7 @@
         "Need-2"
       ],
       "refines": [],
-      "location": "requirements.py:172"
+      "location": "requirements.py:176"
     },
     {
       "type": "FunctionalRequirement",
@@ -869,7 +876,7 @@
       "refines": [
         "FR-12"
       ],
-      "location": "requirements.py:356"
+      "location": "requirements.py:362"
     },
     {
       "type": "FunctionalRequirement",
@@ -899,7 +906,7 @@
         "Need-2"
       ],
       "refines": [],
-      "location": "requirements.py:186"
+      "location": "requirements.py:190"
     },
     {
       "type": "FunctionalRequirement",
@@ -929,7 +936,7 @@
         "Need-1"
       ],
       "refines": [],
-      "location": "requirements.py:199"
+      "location": "requirements.py:203"
     },
     {
       "type": "FunctionalRequirement",
@@ -956,7 +963,7 @@
         "Need-8"
       ],
       "refines": [],
-      "location": "requirements.py:216"
+      "location": "requirements.py:220"
     },
     {
       "type": "FunctionalRequirement",
@@ -982,7 +989,7 @@
         "Need-8"
       ],
       "refines": [],
-      "location": "requirements.py:231"
+      "location": "requirements.py:235"
     },
     {
       "type": "FunctionalRequirement",
@@ -1008,7 +1015,7 @@
         "Need-3"
       ],
       "refines": [],
-      "location": "requirements.py:245"
+      "location": "requirements.py:249"
     },
     {
       "type": "FunctionalRequirement",
@@ -1040,7 +1047,7 @@
       "refines": [
         "FR-8"
       ],
-      "location": "requirements.py:256"
+      "location": "requirements.py:260"
     },
     {
       "type": "QualityRequirement",
@@ -1068,7 +1075,7 @@
       "qualifies": [
         "FR-26"
       ],
-      "location": "requirements.py:506"
+      "location": "requirements.py:512"
     },
     {
       "type": "QualityRequirement",
@@ -1095,7 +1102,7 @@
       "qualifies": [
         "FR-12"
       ],
-      "location": "requirements.py:515"
+      "location": "requirements.py:521"
     },
     {
       "type": "QualityRequirement",
@@ -1120,7 +1127,7 @@
       "qualifies": [
         "FR-12"
       ],
-      "location": "requirements.py:522"
+      "location": "requirements.py:528"
     },
     {
       "type": "Constraint",
@@ -1139,7 +1146,7 @@
         "FR-1",
         "FR-10"
       ],
-      "location": "requirements.py:536"
+      "location": "requirements.py:542"
     },
     {
       "type": "Constraint",
@@ -1158,7 +1165,7 @@
         "FR-20",
         "FR-23"
       ],
-      "location": "requirements.py:542"
+      "location": "requirements.py:548"
     },
     {
       "type": "Constraint",
@@ -1176,7 +1183,7 @@
       "constrains": [
         "FR-10"
       ],
-      "location": "requirements.py:548"
+      "location": "requirements.py:554"
     },
     {
       "type": "Constraint",
@@ -1194,7 +1201,7 @@
       "constrains": [
         "FR-12"
       ],
-      "location": "requirements.py:554"
+      "location": "requirements.py:560"
     },
     {
       "type": "Constraint",
@@ -1213,7 +1220,7 @@
         "FR-9",
         "FR-20"
       ],
-      "location": "requirements.py:560"
+      "location": "requirements.py:566"
     }
   ]
 }

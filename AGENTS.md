@@ -76,13 +76,13 @@ definition
 開発依存を導入し、次を実行する。
 
 ```console
-pip install -e ".[dev]"
-pytest -q
-mypy
+uv sync --locked --extra dev
+uv run --locked pytest -q
+uv run --locked mypy
 
-req validate --strict requirements.py
-req validate --strict examples/sample.py
-req validate --strict examples/bench.py
+uv run --locked req validate --strict requirements.py
+uv run --locked req validate --strict examples/sample.py
+uv run --locked req validate --strict examples/bench.py
 
 npm run lint
 npm test

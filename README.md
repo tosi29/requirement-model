@@ -38,23 +38,14 @@ IREB の連鎖は Goal → Requirement で `Need` を持たず、INCOSE は `Goa
 ## インストール
 
 ```console
-$ PIP_UPLOADED_PRIOR_TO=P3D python -m pip install --uploaded-prior-to P3D --only-binary=:all: -e .
-$ req validate examples/sample.py
-```
-
-Python 3.14 以上と pip 26.2 以上が必要である。pip のオプションは PyPI など
-公開時刻を提供するインデックスに対して、公開から3日未満の版を解決対象から外す。
-`PIP_UPLOADED_PRIOR_TO=P3D` は子プロセスのビルド分離環境にも引き継ぐため、環境変数と
-`--uploaded-prior-to` の両方を指定する。pip は `pyproject.toml` の `[tool.uv]` を読まないので、
-pip を使うときはこの指定を省略しない。
-
-uv を使う場合は、`pyproject.toml` の `[tool.uv] exclude-newer = "3 days"` が同じ制約を適用し、
-コミット済みの `uv.lock` で解決結果も固定する。
-
-```console
-$ uv sync --locked --extra dev
+$ uv sync --locked
 $ uv run --locked req validate examples/sample.py
 ```
+
+Python 3.14 以上と uv が必要である。uv は `pyproject.toml` の
+`[tool.uv] exclude-newer = "3 days"` により、公開から3日未満の版を解決対象から外す。
+コミット済みの `uv.lock` と `--locked` を使うことで、CI とローカルで同じ解決結果を使い、
+コマンド実行時の再解決も行わない。
 
 Node の依存にはルートの `.npmrc` で `min-release-age=4320` (3日) を設定している。
 `npm install` は公開から3日経っていない版を解決せず、`npm ci` はコミット済みの
@@ -846,10 +837,11 @@ steps:
   - uses: actions/setup-python@v5
     with:
       python-version: "3.14"
-  - run: PIP_UPLOADED_PRIOR_TO=P3D python -m pip install --uploaded-prior-to P3D --only-binary=:all: reqmodel
+  - uses: astral-sh/setup-uv@v7
+  - run: uv sync --locked
   - id: validate
     continue-on-error: true
-    run: req validate --strict --sarif requirements.py > reqmodel.sarif
+    run: uv run --locked req validate --strict --sarif requirements.py > reqmodel.sarif
   - uses: github/codeql-action/upload-sarif@v4
     with:
       sarif_file: reqmodel.sarif
@@ -893,14 +885,6 @@ Source を **GitHub Actions** にする。これは API やワークフローか
 ワークフロー中の `req validate` / `req site` の引数を差し替える。
 
 ## 開発
-
-```console
-$ PIP_UPLOADED_PRIOR_TO=P3D python -m pip install --uploaded-prior-to P3D --only-binary=:all: -e ".[dev]"
-$ pytest
-$ mypy
-```
-
-uv で開発環境を作る場合は、次のようにロック済みの依存だけを使う。
 
 ```console
 $ uv sync --locked --extra dev

@@ -109,7 +109,13 @@ def test_verified_without_evidence_is_reported():
 
 
 def test_evidence_silences_the_verified_claim():
-    graph = build(fr("FR-1", status="verified", evidence=["受入テストで確認した"]))
+    graph = build(
+        fr(
+            "FR-1",
+            status="verified",
+            evidence=[source("EV-1", text="受入テストで確認した")],
+        )
+    )
     assert "structure.unverified_claim" not in codes_for(validate_structure(graph), "FR-1")
 
 
@@ -146,7 +152,7 @@ def test_verified_requirement_only_requires_approved_target():
         "FR-1",
         satisfies=[n],
         status="verified",
-        evidence=["受入テストで確認した"],
+        evidence=[source("EV-1", text="受入テストで確認した")],
     )
     findings = validate_structure(build(n, g, f))
     assert "structure.status_inconsistent" not in codes(findings)
@@ -177,7 +183,13 @@ def test_ambiguous_terms_are_detected_in_acceptance_criteria():
 
 def test_ambiguous_terms_are_detected_in_evidence():
     """「十分高速だった」の類は根拠の側に出る。"""
-    graph = build(fr("FR-1", status="verified", evidence=["計測したところ高速に終わった"]))
+    graph = build(
+        fr(
+            "FR-1",
+            status="verified",
+            evidence=[source("EV-1", text="計測したところ高速に終わった")],
+        )
+    )
     assert "semantics.ambiguous_term" in codes(validate_semantics_lexical(graph))
 
 

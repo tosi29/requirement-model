@@ -3,8 +3,7 @@
  *
  * 標準入力に `{"data": <site_data()>, "types": [...], "edges": [...]}` を渡すと、
  * その絞り込みでの Mermaid を標準出力に返す。types / edges を省略するとページの
- * 初期状態 (Source と源泉エッジが外れた状態 = `render_mermaid()` と同じ結果に
- * なるはず)。
+ * 初期状態 (`render_mermaid()` と同じ結果になるはず)。
  *
  * これ自体はテストではない (`tests/test_site_js.py` から呼ばれる)。
  */

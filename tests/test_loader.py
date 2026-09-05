@@ -19,7 +19,7 @@ def test_definition_file_is_never_executed(tmp_path: Path):
     definition.write_text(
         HEADER
         + f'open({str(marker)!r}, "w").write("x")\n'
-        + 's = Reference(title="経理部長", url="about:blank#S-1")\n',
+        + 's = Reference(title="経理部長", url="https://example.com/references/S-1")\n',
         encoding="utf-8",
     )
     result = load_paths([definition])
@@ -30,7 +30,7 @@ def test_definition_file_is_never_executed(tmp_path: Path):
 
 def test_node_locations_are_recorded():
     result = load(
-        's = Reference(title="経理部長", url="about:blank#S-1")\n'
+        's = Reference(title="経理部長", url="https://example.com/references/S-1")\n'
         'n = Need(\n'
         '    id="Need-1",\n'
         '    text="早く精算したい",\n'
@@ -45,7 +45,7 @@ def test_node_locations_are_recorded():
 def test_node_location_points_at_the_file(tmp_path: Path):
     definition = tmp_path / "requirements.py"
     definition.write_text(
-        HEADER + 's = Reference(title="経理部長", url="about:blank#S-1")\n',
+        HEADER + 's = Reference(title="経理部長", url="https://example.com/references/S-1")\n',
         encoding="utf-8",
     )
     result = load_paths([definition])
@@ -95,7 +95,7 @@ def test_duplicate_id_is_reported():
 
 def test_variable_references_are_resolved_to_ids():
     result = load(
-        's = Reference(title="経理部長", url="about:blank#S-1")\n'
+        's = Reference(title="経理部長", url="https://example.com/references/S-1")\n'
         'n = Need(id="Need-1", text="早く精算したい", source=[s])\n'
         'g = Goal(id="Goal-1", text="工数を半減する", motivates=[n], source=[s])\n'
     )
@@ -115,16 +115,22 @@ def test_id_strings_may_be_used_for_forward_references():
 
 def test_multiple_files_are_merged(tmp_path: Path):
     (tmp_path / "a.py").write_text(
-        HEADER + 's = Reference(title="経理部長", url="about:blank#S-1")\n',
+        HEADER + 'n = Need(id="Need-1", text="早く精算したい")\n',
         encoding="utf-8",
     )
     (tmp_path / "b.py").write_text(
-        HEADER + 'n = Need(id="Need-1", text="早く精算したい", source=["S-1"])\n',
+        HEADER + 'g = Goal(id="Goal-1", text="工数を半減する", motivates=["Need-1"])\n',
         encoding="utf-8",
     )
     result = load_paths(discover_paths([str(tmp_path)]))
     assert result.ok
-    assert set(result.graph.nodes) == {"Need-1"}
+    assert set(result.graph.nodes) == {"Goal-1", "Need-1"}
+
+
+def test_string_is_rejected_in_reference_field():
+    result = load('n = Need(id="Need-1", text="早く精算したい", source=["S-1"])\n')
+    assert not result.ok
+    assert any("source.0" in finding.message for finding in result.findings)
 
 
 def test_discover_paths_defaults_to_requirements_py(tmp_path: Path, monkeypatch):

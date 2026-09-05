@@ -31,11 +31,11 @@ def test_counts_nodes_by_type_and_status():
 
 
 def test_counts_edges_by_name():
+    ref = source()
     stats = collect_stats(
         build(
-            source(),
-            need(source=["S-1"]),
-            fr(satisfies=["Need-1"], source=["S-1"]),
+            need(source=[ref]),
+            fr(satisfies=["Need-1"], source=[ref]),
         )
     )
 
@@ -59,7 +59,7 @@ def test_need_satisfaction_ratio_lists_the_uncovered():
 def test_evidence_ratios_are_split_by_type():
     stats = collect_stats(
         build(
-            fr("FR-1", evidence=["受入テストで確認した"]),
+            fr("FR-1", evidence=[source("EV-1", text="受入テストで確認した")]),
             fr("FR-2"),
             qr("QR-1"),
         )
@@ -70,12 +70,12 @@ def test_evidence_ratios_are_split_by_type():
 
 
 def test_source_reference_ratio_counts_nodes_with_source():
+    ref = source()
     stats = collect_stats(
         build(
-            source(),
-            goal(source=["S-1"]),
-            need(source=["S-1"]),
-            fr(source=["S-1"]),
+            goal(source=[ref]),
+            need(source=[ref]),
+            fr(source=[ref]),
             qr(),
             constraint(),
         )

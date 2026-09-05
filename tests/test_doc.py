@@ -55,7 +55,7 @@ def test_spec_lists_attributes_criteria_and_references():
     assert "- 充足するニーズ: Need-1" in text
     assert "- Source:" in text
     assert "    - **経理部長**:" in text
-    assert "      URL: about:blank#S-1" in text
+    assert "      URL: https://example.com/references/S-1" in text
     assert "    - 読み取り率 95% 以上" in text
 
 

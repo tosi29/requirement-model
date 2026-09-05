@@ -14,14 +14,9 @@ from reqmodel import (
 
 
 def source(node_id: str = "S-1", **kwargs) -> Reference:
-    #: 旧 Source helper と同じ用途で、外部参照値を返す。
     text = kwargs.pop("text", "経理部長")
-    kwargs.pop("kind", None)
-    kwargs.pop("status", None)
-    kwargs.pop("part_of", None)
-    kwargs.pop("locator", None)
     kwargs.setdefault("title", text)
-    kwargs.setdefault("url", f"about:blank#{node_id}")
+    kwargs.setdefault("url", f"https://example.com/references/{node_id}")
     return Reference(**kwargs)
 
 

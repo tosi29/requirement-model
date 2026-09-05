@@ -17,7 +17,7 @@ def test_declaration_only_is_accepted():
     result = extract_source(
         HEADER
         + """
-src = Reference(title="経理部長", url="about:blank#S-1")
+src = Reference(title="経理部長", url="https://example.com/references/S-1")
 need = Need(id="Need-1", text="早く精算したい", source=[src])
 """
     )

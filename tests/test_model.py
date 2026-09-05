@@ -54,9 +54,20 @@ def test_goal_has_no_decomposition_mode():
         Goal(id="Goal-1", text="工数を半減する", decomposition="OR")
 
 
-def test_reference_accepts_node_or_id_string():
+def test_reference_fields_accept_reference_values():
     s = source("S-1")
     assert need("Need-1", source=[s]).source == [s]
+
+
+@pytest.mark.parametrize("field", ["source", "realized_by", "evidence"])
+@pytest.mark.parametrize(
+    "value",
+    ["legacy", need("Need-9")],
+)
+def test_reference_fields_reject_implicit_values(field, value):
+    factory = fr if field != "source" else need
+    with pytest.raises(ValidationError):
+        factory(**{field: [value]})
 
 
 def test_status_default_is_proposed():

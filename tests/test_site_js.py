@@ -165,11 +165,11 @@ def test_mermaid_export_drops_filtered_out_nodes():
     """種別を外すと、そのノードと端点を持つエッジが書き出しからも消える。"""
     graph = sample_graph()
     data = site_data(graph, FindingList(), "題名", [str(SAMPLE)])
-    types = [name for name in data["types"] if name != "Source"]
+    types = [name for name in data["types"] if name != "Goal"]
 
     text = mermaid_export(data, types=types)
     lines = text.splitlines()
 
-    assert not [line for line in lines if "[Source]" in line]
-    assert not [line for line in lines if line.startswith("    class n_") and line.endswith(" Source")]
-    assert "source" not in text
+    assert not [line for line in lines if "[Goal]" in line]
+    assert not [line for line in lines if line.startswith("    class n") and line.endswith(" Goal")]
+    assert "motivates" not in text

@@ -12,11 +12,8 @@ from ..definition import Reference
 __all__ = ["impact_set", "explain_text", "subgraph_edges", "traversed_edges"]
 
 
-def traversed_edges(
-    edge_names: Iterable[str] | None, include_sources: bool
-) -> list[str] | None:
+def traversed_edges(edge_names: Iterable[str] | None) -> list[str] | None:
     """実際に辿るエッジ種別。``None`` は「全種別」。"""
-    _ = include_sources
     if edge_names is not None:
         return list(edge_names)
     return list(DEFAULT_GRAPH_EDGE_NAMES)
@@ -28,10 +25,9 @@ def impact_set(
     edge_names: Iterable[str] | None = None,
     depth: int | None = None,
     undirected: bool = False,
-    include_sources: bool = False,
 ) -> tuple[set[str], set[str], set[str]]:
     """(上流, 下流, 全体) を返す。全体には対象ノード自身を含む。"""
-    names = traversed_edges(edge_names, include_sources)
+    names = traversed_edges(edge_names)
     known = set(targets) & set(graph.nodes)
 
     if undirected:
@@ -88,12 +84,11 @@ def explain_text(
     edge_names: Iterable[str] | None = None,
     depth: int | None = None,
     undirected: bool = False,
-    include_sources: bool = False,
 ) -> str:
     """影響部分グラフを LLM に渡せる形に整形する。"""
     missing = [t for t in targets if t not in graph.nodes]
     ancestors, descendants, whole = impact_set(
-        graph, targets, edge_names, depth, undirected, include_sources
+        graph, targets, edge_names, depth, undirected
     )
 
     lines: list[str] = []

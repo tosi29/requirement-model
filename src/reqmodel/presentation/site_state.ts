@@ -18,8 +18,8 @@ const DEFAULT_SORT = { key: "id", asc: true };
  * 1 か所で対応付ける。軸を足すときはここに 1 行足せば、既定値・URL への
  * 書き出し・復元の 3 つが揃って増える。
  *
- * `initial` は初期状態で選ばれているもの。`all` と違うのは種別とエッジで、
- * Source と源泉エッジは既定で外れている (`site_data()` の `hidden_by_default`)。
+ * `initial` は初期状態で選ばれているもの。`all` と違う値は
+ * `site_data()` の `hidden_by_default` で定義する。
  * 「既定と違うところだけ URL に載せる」という規則はこの `initial` が基準になる。
  */
 const SET_FILTERS = [
@@ -80,8 +80,7 @@ export function encodeHash(state, data) {
     const all = filter.all(data);
     // 持っていない軸は createView() と同じく「絞り込み無し」として扱う。
     if (!selected) continue;
-    // 既定と同じなら書かない。基準は「全選択」ではなく初期選択なので、既定で
-    // 隠している Source を出した状態は (全選択であっても) URL に載る。
+    // 既定と同じなら書かない。基準は「全選択」ではなく初期選択。
     const initial = initialOf(filter, data);
     if (selected.size === initial.length && initial.every((name) => selected.has(name))) {
       continue;

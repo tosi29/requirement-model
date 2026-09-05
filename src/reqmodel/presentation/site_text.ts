@@ -30,14 +30,13 @@ export function escapeAttr(text: unknown): string {
  * リンクとして DOM に設定してよい URL だけを返す。
  *
  * Reference は任意文字列を保持できるため、HTML escape では防げない
- * `javascript:` などの実行可能 scheme をここで落とす。既存の外部リンクと、旧 Source
- * から変換される `about:blank#...` だけを許可する。
+ * `javascript:` などの実行可能 scheme をここで落とし、HTTP(S) の外部リンクだけを許可する。
  */
 export function safeHref(value: unknown): string | null {
   if (!value) return null;
   try {
     const url = new URL(String(value));
-    return ["https:", "http:", "about:"].includes(url.protocol) ? String(value) : null;
+    return ["https:", "http:"].includes(url.protocol) ? String(value) : null;
   } catch {
     return null;
   }

@@ -3,7 +3,7 @@
  *
  * DOM にも描画 API にも一切触れない純関数だけを置く。ここに置いたものは
  * Node からそのまま import してテストできる (`tests/js/`)。ページに載せるときは
- * `site.py` が `site_app.js` と一緒に 1 枚の HTML へインライン化する。
+ * `site.py` が `site_app.ts` と一緒に 1 枚の HTML へインライン化する。
  *
  * `nodeContext()` の出力は CLI の `req explain` (`explain.py`) と一致させる。
  * ここを崩すと「サイトからコピーしたコンテキスト」と「CLI が出すコンテキスト」が
@@ -13,16 +13,16 @@
 // --- 文字列 ----------------------------------------------------------------
 
 /** 表示用に長い本文を切り詰める。 */
-export function truncate(text, limit = 42) {
+export function truncate(text: string, limit = 42): string {
   return text.length > limit ? text.slice(0, limit - 1) + "…" : text;
 }
 
-export function escapeHtml(text) {
+export function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /** 属性値に入れる文字列。引用符まで潰す。 */
-export function escapeAttr(text) {
+export function escapeAttr(text: unknown): string {
   return escapeHtml(String(text)).replace(/"/g, "&quot;");
 }
 
@@ -33,7 +33,7 @@ export function escapeAttr(text) {
  * `javascript:` などの実行可能 scheme をここで落とす。既存の外部リンクと、旧 Source
  * から変換される `about:blank#...` だけを許可する。
  */
-export function safeHref(value) {
+export function safeHref(value: unknown): string | null {
   if (!value) return null;
   try {
     const url = new URL(String(value));
@@ -76,7 +76,7 @@ const WIDE_CHAR =
  * 幅の概算 (px)。ブラウザでは canvas の実測を渡す (`measure` 引数) ので、これは
  * その代わり。全角を 1em・半角を 0.55em として数えるだけ。
  */
-export function estimateTextWidth(text, fontSize = LABEL_FONT.size) {
+export function estimateTextWidth(text: string, fontSize = LABEL_FONT.size): number {
   let width = 0;
   for (const char of text) width += (WIDE_CHAR.test(char) ? 1 : 0.55) * fontSize;
   return width;
@@ -141,7 +141,7 @@ function joins(last, token) {
  * 折り返し候補で切ったまとまり。区切りの空白は、その手前のまとまりの末尾に
  * 付けたまま返す (行末に来たら落とし、行の途中なら空白として残すため)。
  */
-export function labelChunks(text) {
+export function labelChunks(text: string): string[] {
   const tokens = tokenize(text);
   const chunks = [];
   let current = "";
@@ -203,10 +203,10 @@ function mergeLonelyNumbers(lines) {
  * measure は 1 行の幅 (px) を返す関数。ブラウザでは canvas の実測を渡す。
  */
 export function wrapLabel(
-  text,
+  text: string,
   maxWidth = LABEL_WRAP_WIDTH,
-  measure = estimateTextWidth,
-) {
+  measure: (text: string) => number = estimateTextWidth,
+): string {
   const lines = [];
   let line = "";
   for (const chunk of labelChunks(text)) {
@@ -235,7 +235,11 @@ const DEFAULT_FIT = { wmul: 1, wpad: 20, hmul: 1, hpad: 14 };
  * fit は `render_meta()` の `types[].fit`。図形ごとの係数の由来は Python 側
  * (`_SHAPE_FIT`) に書いてある。ここでは表を持たない。
  */
-export function nodeSize(label, fit, measure = estimateTextWidth) {
+export function nodeSize(
+  label: string,
+  fit: { wmul: number; wpad: number; hmul: number; hpad: number } | null | undefined,
+  measure: (text: string) => number = estimateTextWidth,
+): { w: number; h: number } {
   const lines = label.split("\n");
   const textWidth = Math.max(...lines.map((line) => measure(line)));
   const textHeight = lines.length * LABEL_FONT.size * LABEL_FONT.lineHeight;

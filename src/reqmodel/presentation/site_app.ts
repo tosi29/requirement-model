@@ -1,9 +1,29 @@
 /**
  * 静的サイトの表示層。DOM と SVG に触るのはこのファイルだけ。
  *
- * 計算は `site_logic.js` の純関数に任せ、ここは「受け取った値を貼る」「イベントを
+ * 計算は `site_logic.ts` の純関数に任せ、ここは「受け取った値を貼る」「イベントを
  * 繋ぐ」に徹する。esbuild が依存モジュールと bundle し、`site.py` は生成物を HTML に埋め込む。
  */
+
+import { applyGraphTheme, createGraphViewPrimitives, createPanZoom } from "./site_graph_view.ts";
+import type { PanZoomController } from "./site_graph_view.ts";
+import type {
+  GraphBandElement, GraphEdgeElement, GraphElementDefinition, GraphNodeElement,
+  SiteData, ViewState,
+} from "./site_types.ts";
+
+interface PageElement extends HTMLElement {
+  value: string;
+  checked: boolean;
+  disabled: boolean;
+  min: string;
+  max: string;
+  step: string;
+  select(): void;
+}
+const getElement = (id: string): PageElement => document.getElementById(id) as PageElement;
+const queryElements = (selector: string): NodeListOf<PageElement> =>
+  document.querySelectorAll<HTMLElement>(selector) as NodeListOf<PageElement>;
 
 import {
   ALL_SEVERITIES,
@@ -30,7 +50,6 @@ import {
   groupFindings,
   impactSets,
   initialHash,
-  isNodeVisible,
   layoutOptions,
   legendGroups,
   matchesQuery,
@@ -52,13 +71,21 @@ import {
   tableRows,
   truncate,
   visibleBandKeys,
-} from "./site_logic.js";
+} from "./site_logic.ts";
 
 const dagre = window.dagre;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-const DATA = JSON.parse(document.getElementById("model-data").textContent);
-const METRICS = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
+const DATA: SiteData = JSON.parse(getElement("model-data").textContent!);
+const METRICS: {
+  startedAt: number;
+  initialRenderMs: number | null;
+  layouts: { ms: number; nodes: number; edges: number; direction: string }[];
+  filters: { ms: number; nodes: number; edges: number }[];
+} = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
+const impactColors = () => DATA.meta.impact_colors ?? {
+  selected: "", upstream: "", downstream: "", related: "",
+};
 
 // --- 保存 (localStorage) ----------------------------------------------------
 //
@@ -90,158 +117,25 @@ function writeStore(key, value) {
  * `writeHash()` で書き戻す (戻る/進むは `applyHash()` で戻す)。ハッシュの無い
  * URL で開いたときだけ、前回の絞り込み (localStorage) を初期値に使う。
  */
-let state = decodeHash(initialHash(location.hash, readStore(VIEW_STORAGE_KEY)), DATA);
+let state: ViewState = decodeHash(initialHash(location.hash, readStore(VIEW_STORAGE_KEY)), DATA);
 
 /** 絞り込みを反映した現在のグラフ。refresh() で作り直す。 */
 let view = createView(DATA, state);
 
-// --- SVG DOM ---------------------------------------------------------------
-//
-// グラフは <svg> 配下の DOM として 1 度だけ構築し、以後は属性と class の更新だけを
-// 行う。フィルタや選択でレイアウトを回さないので、ノードの位置が動かない。
+// --- SVG graph view adapter -------------------------------------------------
 
-const graphEl = document.getElementById("graph");
-const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(name).trim();
-
-/** テーマ依存の色。CSS 変数から読むのでここだけ DOM に依存する。 */
-const palette = () => ({
-  fg: cssVar("--fg"),
-  bg: cssVar("--bg"),
-  panel: cssVar("--panel"),
-  border: cssVar("--border"),
-  muted: cssVar("--muted"),
-  dark: getComputedStyle(document.documentElement).colorScheme === "dark",
-});
-
-/** テーマに対応するノードの塗りと線を選ぶ。 */
-const typeColors = (typeMeta, pal) => ({
-  fill: pal.dark ? typeMeta.dark_fill || typeMeta.fill : typeMeta.fill,
-  stroke: pal.dark ? typeMeta.dark_stroke || typeMeta.stroke : typeMeta.stroke,
-});
-
-let svg = null;
-let viewport = null;
-let graphLayer = null;
-let defs = null;
-let graph = null;
-let zoom = 1;
-let pan = { x: 0, y: 0 };
-const nodeItems = new Map();
-const edgeItemsByKey = new Map();
-const bandItems = new Map();
-
-function svgEl(name, attrs = {}) {
-  const element = document.createElementNS(SVG_NS, name);
-  for (const [key, value] of Object.entries(attrs)) {
-    if (value !== undefined && value !== null && value !== "") element.setAttribute(key, String(value));
-  }
-  return element;
-}
-
-/** HTML を文字列として組み立てず、動的値を常にテキストノードとして追加する。 */
-function htmlEl(name, attrs = {}, ...children) {
-  const element = document.createElement(name);
-  for (const [key, value] of Object.entries(attrs)) {
-    if (value === undefined || value === null || value === false) continue;
-    if (key === "class") element.className = String(value);
-    else if (key === "checked") element.checked = Boolean(value);
-    else if (key === "value") element.value = String(value);
-    else element.setAttribute(key, String(value));
-  }
-  element.append(...children.filter((child) => child !== undefined && child !== null));
-  return element;
-}
-
-function setAttrs(element, attrs) {
-  for (const [key, value] of Object.entries(attrs)) {
-    if (value === undefined || value === null || value === "") element.removeAttribute(key);
-    else element.setAttribute(key, String(value));
-  }
-}
-
-function setTransform() {
-  if (graphLayer) graphLayer.setAttribute("transform", `translate(${pan.x} ${pan.y}) scale(${zoom})`);
-}
-
-function classed(element, name, enabled) {
-  element.classList.toggle(name, Boolean(enabled));
-}
-
-function labelMeasurer() {
-  const context = document.createElement("canvas").getContext("2d");
-  if (!context) return estimateTextWidth;
-  context.font = `${LABEL_FONT.size}px ${LABEL_FONT.family}`;
-  return (text) => context.measureText(String(text)).width;
-}
-
-function renderLabel(parent, label, x, y, size = LABEL_FONT.size, weight = null) {
-  const lines = String(label).split("\n");
-  const step = size * LABEL_FONT.lineHeight;
-  const top = y - ((lines.length - 1) * step) / 2 + size * 0.35;
-  parent.replaceChildren();
-  for (const [index, line] of lines.entries()) {
-    const tspan = svgEl("tspan", { x, y: top + index * step });
-    tspan.textContent = line;
-    parent.append(tspan);
-  }
-  setAttrs(parent, {
-    "text-anchor": "middle",
-    "font-family": LABEL_FONT.family,
-    "font-size": size,
-    "font-weight": weight,
-  });
-}
-
-function shapeEl(shape) {
-  if (shape === "ellipse") return svgEl("ellipse");
-  if (shape === "barrel") return svgEl("path");
-  if (["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape)) return svgEl("polygon");
-  return svgEl("rect");
-}
-
-const polygonCoords = (shape, w, h) => {
-  const points = {
-    hexagon: [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1],
-    rhomboid: [-1, -1, 0.333, -1, 1, 1, -0.333, 1],
-    diamond: [0, -1, 1, 0, 0, 1, -1, 0],
-    tag: [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1],
-  }[shape] || (() => {
-    const x = (Math.min(w, h) * 0.16) / (w / 2);
-    const y = (Math.min(w, h) * 0.16) / (h / 2);
-    return [-1 + x, -1, 1 - x, -1, 1, -1 + y, 1, 1 - y,
-      1 - x, 1, -1 + x, 1, -1, 1 - y, -1, -1 + y];
-  })();
-  const scaled = [];
-  for (let index = 0; index < points.length; index += 2) {
-    scaled.push({ x: (points[index] * w) / 2, y: (points[index + 1] * h) / 2 });
-  }
-  return scaled;
-};
-
-const polygonPoints = (shape, w, h) =>
-  polygonCoords(shape, w, h).map(({ x, y }) => `${x},${y}`).join(" ");
-
-function updateShape(element, shape, box) {
-  const { w, h } = box;
-  if (element.tagName === "ellipse") setAttrs(element, { cx: 0, cy: 0, rx: w / 2, ry: h / 2 });
-  else if (element.tagName === "polygon") setAttrs(element, { points: polygonPoints(shape, w, h) });
-  else if (element.tagName === "path") {
-    const curve = Math.min(w * 0.12, h * 0.45);
-    setAttrs(element, {
-      d: `M ${-w / 2 + curve} ${-h / 2} L ${w / 2 - curve} ${-h / 2}`
-        + ` C ${w / 2} ${-h / 2} ${w / 2} ${h / 2} ${w / 2 - curve} ${h / 2}`
-        + ` L ${-w / 2 + curve} ${h / 2}`
-        + ` C ${-w / 2} ${h / 2} ${-w / 2} ${-h / 2} ${-w / 2 + curve} ${-h / 2} Z`,
-    });
-  }
-  else setAttrs(element, {
-    x: -w / 2,
-    y: -h / 2,
-    width: w,
-    height: h,
-    rx: shape === "round-rectangle" ? 8 : Math.min(w, h) * 0.3,
-  });
-}
+const graphPrimitives = createGraphViewPrimitives();
+const { svgEl, htmlEl, setAttrs, classed, labelMeasurer, renderLabel, shapeEl, polygonCoords, updateShape, palette } = graphPrimitives;
+const graphEl = getElement("graph")!;
+let svg: SVGSVGElement | null = null;
+let viewport: SVGRectElement | null = null;
+let graphLayer: SVGGElement | null = null;
+let defs: SVGDefsElement | null = null;
+let graph: GraphElementDefinition[] = [];
+let panZoom: PanZoomController | null = null;
+const nodeItems = new Map<string, GraphNodeElement>();
+const edgeItemsByKey = new Map<string, GraphEdgeElement>();
+const bandItems = new Map<string, GraphBandElement>();
 
 function initGraph() {
   if (!dagre) {
@@ -262,10 +156,11 @@ function initGraph() {
   defs = svgEl("defs");
   viewport = svgEl("rect", { class: "graph-bg", x: -100000, y: -100000, width: 200000, height: 200000 });
   graphLayer = svgEl("g", { class: "graph-layer" });
+  panZoom = createPanZoom(graphEl, graphLayer);
   svg.append(defs, viewport, graphLayer);
   graphEl.append(svg);
   buildGraphDom();
-  bindPanZoom();
+  panZoom.bind(svg, viewport, () => selectNode(state.selected));
   runLayout();
 }
 
@@ -293,12 +188,12 @@ function buildGraphDom() {
     });
     group.append(path, label);
     edgeLayer.append(group);
-    edgeItemsByKey.set(item.data.id, { ...item.data, group, path, label, route: [] });
+    edgeItemsByKey.set(item.data.id, { ...item.data, group, path, label, points: [] } as GraphEdgeElement);
   }
 
   const types = DATA.meta.types || {};
   const statuses = DATA.meta.statuses || {};
-  const impact = DATA.meta.impact_colors || {};
+  const impact = impactColors();
   graphEl.style.setProperty("--impact-selected", impact.selected || pal.fg);
   graphEl.style.setProperty("--impact-upstream", impact.upstream || pal.fg);
   graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
@@ -315,7 +210,6 @@ function buildGraphDom() {
   }
   for (const item of graph.filter((element) => !element.classes && !element.data.source)) {
     const typeMeta = types[item.data.type] || {};
-    const statusMeta = statuses[item.data.status] || {};
     const group = svgEl("g", {
       class: `node status-${item.data.status || "unknown"}`,
       "data-node-id": item.data.id,
@@ -337,53 +231,9 @@ function buildGraphDom() {
       chooseNode(item.data.id);
     });
     nodeLayer.append(group);
-    nodeItems.set(item.data.id, { ...item.data, shapeName: typeMeta.shape, statusMeta, x: 0, y: 0, group, shape, statusRing, label });
+    nodeItems.set(item.data.id, { ...item.data, shapeName: typeMeta.shape, x: 0, y: 0, group, shape, statusRing, label } as GraphNodeElement);
   }
   restyleGraph();
-}
-
-function bindPanZoom() {
-  let ignoreClick = false;
-  svg.addEventListener("click", (event) => {
-    // pointerup の直後には click も発火する。パンを背景クリックとして扱うと
-    // 選択中のノードまで解除されるため、実際に移動した場合だけ 1 回捨てる。
-    if (ignoreClick) {
-      ignoreClick = false;
-      return;
-    }
-    if (event.target === svg || event.target === viewport) selectNode(state.selected);
-  });
-  let drag = null;
-  svg.addEventListener("pointerdown", (event) => {
-    if (event.target.closest(".node:not(.band)")) return;
-    drag = { x: event.clientX, y: event.clientY, pan: { ...pan }, moved: false };
-    svg.setPointerCapture(event.pointerId);
-  });
-  svg.addEventListener("pointermove", (event) => {
-    if (!drag) return;
-    const dx = event.clientX - drag.x;
-    const dy = event.clientY - drag.y;
-    if (Math.hypot(dx, dy) >= 3) drag.moved = true;
-    pan = { x: drag.pan.x + dx, y: drag.pan.y + dy };
-    setTransform();
-  });
-  svg.addEventListener("pointerup", () => {
-    if (drag?.moved) {
-      ignoreClick = true;
-      // ブラウザがドラッグ後の click 自体を抑止した場合は、次の通常クリックを
-      // 誤って捨てないよう同じイベントループの末尾で戻す。
-      setTimeout(() => (ignoreClick = false), 0);
-    }
-    drag = null;
-  });
-  svg.addEventListener("pointercancel", () => {
-    drag = null;
-    ignoreClick = false;
-  });
-  svg.addEventListener("wheel", (event) => {
-    event.preventDefault();
-    zoomBy(event.deltaY < 0 ? 1.12 : 1 / 1.12);
-  }, { passive: false });
 }
 
 // --- フォーカス (近傍だけを描く) --------------------------------------------
@@ -655,48 +505,23 @@ function graphBox() {
 }
 
 function fitToView() {
-  if (!svg) return;
-  const box = graphBox();
-  const width = graphEl.clientWidth || 800;
-  const height = graphEl.clientHeight || 480;
-  zoom = Math.min((width - 36) / (box.x2 - box.x1 || 1), (height - 36) / (box.y2 - box.y1 || 1));
-  pan = { x: 18 - box.x1 * zoom, y: 18 - box.y1 * zoom };
-  setTransform();
+  panZoom?.fit(graphBox());
 }
 
-const MIN_READABLE_ZOOM = 0.45;
 function fitInitial() {
-  fitToView();
-  if (zoom >= MIN_READABLE_ZOOM) return;
-  const box = graphBox();
-  zoom = MIN_READABLE_ZOOM;
-  pan = { x: 18 - box.x1 * zoom, y: 18 - box.y1 * zoom };
-  setTransform();
+  panZoom?.fit(graphBox(), true);
 }
 
-const REVEAL_MARGIN_PX = 40;
 function revealNode(id) {
   if (!svg || state.mode !== "graph") return;
   const item = nodeItems.get(id);
   if (!item || item.group.classList.contains("hidden")) return;
-  const extent = { x1: -pan.x / zoom, y1: -pan.y / zoom, x2: (graphEl.clientWidth - pan.x) / zoom, y2: (graphEl.clientHeight - pan.y) / zoom };
-  const box = { x1: item.x - item.w / 2, y1: item.y - item.h / 2, x2: item.x + item.w / 2, y2: item.y + item.h / 2 };
-  if (isNodeVisible(extent, box, REVEAL_MARGIN_PX / zoom)) return;
-  pan = { x: graphEl.clientWidth / 2 - item.x * zoom, y: graphEl.clientHeight / 2 - item.y * zoom };
-  setTransform();
+  panZoom?.reveal(item);
 }
 const revealSelected = () => revealNode(state.selected);
 
 function zoomBy(factor) {
-  if (!svg) return;
-  const next = Math.max(0.1, Math.min(3, zoom * factor));
-  const cx = (graphEl.clientWidth || 800) / 2;
-  const cy = (graphEl.clientHeight || 480) / 2;
-  const mx = (cx - pan.x) / zoom;
-  const my = (cy - pan.y) / zoom;
-  zoom = next;
-  pan = { x: cx - mx * zoom, y: cy - my * zoom };
-  setTransform();
+  panZoom?.zoomBy(factor);
 }
 
 // --- 詳細パネル ------------------------------------------------------------
@@ -725,7 +550,7 @@ function appendTerm(list, term, value, className = null) {
 }
 
 function renderDetail() {
-  const panel = document.getElementById("detail");
+  const panel = getElement("detail");
   panel.replaceChildren();
   if (!state.selected || !view.byId.has(state.selected)) {
     panel.append(htmlEl("p", { class: "empty" }, "グラフのノードをクリックすると、本文・根拠・影響範囲を表示する。"));
@@ -795,7 +620,7 @@ function renderDetail() {
       " と同じ内容をクリップボードに入れる。"),
   );
 
-  panel.querySelectorAll("button[data-goto]").forEach((button) => {
+  panel.querySelectorAll<HTMLElement>("button[data-goto]").forEach((button: HTMLElement) => {
     button.addEventListener("click", () => selectNode(button.dataset.goto));
   });
   copyButton.addEventListener("click", async () => {
@@ -837,7 +662,7 @@ function findingElement(finding, interactive = true) {
 // --- 左サイドバー ----------------------------------------------------------
 
 function renderNodeList() {
-  const list = document.getElementById("node-list");
+  const list = getElement("node-list");
   const matched = view.nodes.filter((node) => matchesQuery(node, state.query));
   list.replaceChildren(...matched.map((node) => {
     const marks = [node.id === state.selected ? "active" : "", node.id === cursor ? "cursor" : ""]
@@ -847,7 +672,7 @@ function renderNodeList() {
     }, htmlEl("span", { class: "id" }, node.id), " ",
     htmlEl("span", { class: "type" }, node.type), htmlEl("br"), truncate(node.text, 34)));
   }));
-  list.querySelectorAll("button[data-id]").forEach((button) => {
+  list.querySelectorAll<HTMLElement>("button[data-id]").forEach((button: HTMLElement) => {
     button.addEventListener("click", () => selectNode(button.dataset.id));
   });
 }
@@ -857,7 +682,7 @@ function renderNodeList() {
  * チェックの有無は state の集合から取る (ハッシュ付きの URL で開いたとき用)。
  */
 function renderToggles(containerId, attribute, items, set) {
-  document.getElementById(containerId).replaceChildren(...items.map((item) =>
+  getElement(containerId).replaceChildren(...items.map((item) =>
     htmlEl("label", { class: "toggle" },
       htmlEl("input", { type: "checkbox", [`data-${attribute}`]: item.key, checked: set.has(item.key) }),
       ` ${item.label}`, htmlEl("span", { class: "count" }, String(item.count)))));
@@ -868,7 +693,7 @@ function renderToggles(containerId, attribute, items, set) {
  * (`applyHash()` が state ごと差し替えるので、ここで掴んでおくと古い集合が残る)。
  */
 function bindToggles(attribute, key) {
-  document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
+  queryElements(`input[data-${attribute}]`).forEach((input) => {
     const value = input.dataset[attribute];
     input.addEventListener("change", () => {
       input.checked ? state[key].add(value) : state[key].delete(value);
@@ -914,7 +739,7 @@ function renderFilters() {
 
 /** 近傍の深さの選択肢。深さの一覧は `FOCUS_DEPTHS` を唯一の出典とする。 */
 function renderFocusOptions() {
-  document.getElementById("focus").replaceChildren(
+  getElement("focus").replaceChildren(
     htmlEl("option", { value: 0 }, "フォーカス: 切"),
     ...FOCUS_DEPTHS.map((depth) => htmlEl("option", { value: depth }, `近傍 ${depth} ホップ`)),
   );
@@ -928,7 +753,7 @@ function renderFocusOptions() {
  * 件数・コピー本文の 3 つに同じだけ効く。
  */
 function renderImpactControls() {
-  const slider = document.getElementById("depth");
+  const slider = getElement("depth");
   slider.min = "0";
   slider.max = String(Math.max(...IMPACT_DEPTHS));
   slider.step = "1";
@@ -939,14 +764,14 @@ const depthLabel = () => (state.depth ? `${state.depth} ホップ` : "無制限"
 
 /** 入力欄・チェック・タブを state に合わせ直す。ハッシュから復元したとき用。 */
 function syncControls() {
-  document.getElementById("search").value = state.query;
-  document.getElementById("direction").value = state.direction;
-  document.getElementById("focus").value = String(state.focus);
-  document.getElementById("depth").value = String(state.depth);
-  document.getElementById("depth-value").textContent = depthLabel();
-  document.getElementById("undirected").checked = state.undirected;
+  getElement("search").value = state.query;
+  getElement("direction").value = state.direction;
+  getElement("focus").value = String(state.focus);
+  getElement("depth").value = String(state.depth);
+  getElement("depth-value").textContent = depthLabel();
+  getElement("undirected").checked = state.undirected;
   for (const [attribute, key] of FILTER_SETS) {
-    document.querySelectorAll(`input[data-${attribute}]`).forEach((input) => {
+    queryElements(`input[data-${attribute}]`).forEach((input) => {
       input.checked = state[key].has(input.dataset[attribute]);
     });
   }
@@ -965,8 +790,8 @@ function renderStats() {
     chips.push(htmlEl("span", { class: "chip" }, "指摘なし"));
   }
   if (DATA.stats.suppressed) chips.push(htmlEl("span", { class: "chip" }, `抑制 ${DATA.stats.suppressed} 件`));
-  document.getElementById("stats").replaceChildren(...chips);
-  document.getElementById("sources").textContent = DATA.generated_from.join(", ");
+  getElement("stats").replaceChildren(...chips);
+  getElement("sources").textContent = DATA.generated_from.join(", ");
   renderLegend();
   renderFindings();
 }
@@ -986,7 +811,7 @@ function renderLegend() {
     }
     return container;
   });
-  document.getElementById("legend").replaceChildren(...groups);
+  getElement("legend").replaceChildren(...groups);
 }
 
 // --- 検証結果 ---------------------------------------------------------------
@@ -1009,7 +834,7 @@ function renderFindings() {
   const tabs = severityTabs(DATA.findings);
   if (!tabs.some((tab) => tab.key === findingSeverity)) findingSeverity = ALL_SEVERITIES;
 
-  const tabBar = document.getElementById("finding-tabs");
+  const tabBar = getElement("finding-tabs");
   const refocus = tabBar.contains(document.activeElement);
   tabBar.replaceChildren(...tabs.map((tab) => htmlEl("button", {
     type: "button",
@@ -1020,14 +845,14 @@ function renderFindings() {
     "aria-selected": tab.key === findingSeverity,
     tabindex: tab.key === findingSeverity ? 0 : -1,
   }, tab.label, htmlEl("span", { class: "count" }, String(tab.count)))));
-  tabBar.querySelectorAll("button[data-severity]").forEach((button) => {
+  tabBar.querySelectorAll<HTMLElement>("button[data-severity]").forEach((button: HTMLElement) => {
     button.addEventListener("click", () => showSeverity(button));
   });
   bindTabKeys(tabBar, showSeverity);
-  if (refocus) tabBar.querySelector("button.active")?.focus();
+  if (refocus) (tabBar.querySelector("button.active") as HTMLElement | null)?.focus();
 
   const groups = groupFindings(DATA.findings, findingSeverity);
-  const panel = document.getElementById("findings");
+  const panel = getElement("findings");
   if (!groups.length) panel.replaceChildren(htmlEl("p", { class: "empty" }, "指摘は無い。"));
   else {
     const children = [];
@@ -1038,7 +863,7 @@ function renderFindings() {
     }
     panel.replaceChildren(...children);
   }
-  panel.querySelectorAll("button.finding[data-id]").forEach((button) => {
+  panel.querySelectorAll<HTMLElement>("button.finding[data-id]").forEach((button: HTMLElement) => {
     button.addEventListener("click", () => selectNode(button.dataset.id));
   });
 }
@@ -1093,20 +918,20 @@ function renderTable() {
     }, "条件に合うノードは無い。")));
   }
 
-  const table = document.getElementById("node-table");
+  const table = getElement("node-table");
   table.replaceChildren(htmlEl("thead", {}, headRow), body);
-  document.getElementById("table-note").textContent =
+  getElement("table-note").textContent =
     `${rows.length} 件を表示中 (全 ${DATA.nodes.length} 件)。` +
     " 行をクリック (キーボードなら Enter) すると右ペインに詳細が出る。列見出しで並べ替える。";
 
-  table.querySelectorAll("thead button[data-key]").forEach((button) => {
+  table.querySelectorAll<HTMLElement>("thead button[data-key]").forEach((button: HTMLElement) => {
     button.addEventListener("click", () => {
       state.sort = nextSort(state.sort, button.dataset.key);
       renderTable();
       writeHash();
     });
   });
-  table.querySelectorAll("tbody tr[data-id]").forEach((tr) => {
+  table.querySelectorAll<HTMLElement>("tbody tr[data-id]").forEach((tr: HTMLElement) => {
     tr.addEventListener("click", () => selectNode(tr.dataset.id));
     tr.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -1114,7 +939,7 @@ function renderTable() {
       selectNode(tr.dataset.id);
     });
   });
-  table.querySelectorAll("button[data-findings]").forEach((button) => {
+  table.querySelectorAll<HTMLElement>("button[data-findings]").forEach((button: HTMLElement) => {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       showFindings(button.dataset.findings);
@@ -1125,7 +950,7 @@ function renderTable() {
 /** 指摘数から検証結果へ辿る。そのノードを選び、右ペインの指摘まで送る。 */
 function showFindings(id) {
   if (state.selected !== id) selectNode(id);
-  const heading = document.getElementById("node-findings");
+  const heading = getElement("node-findings");
   if (heading) heading.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
@@ -1138,11 +963,11 @@ function showFindings(id) {
  * tab キーで飛ぶ先は選択中の 1 つだけ (roving tabindex) なので、タブが増えても
  * キーボードでの移動距離が伸びない。
  */
-function bindTabKeys(container, activate) {
+function bindTabKeys(container: HTMLElement, activate: (tab: HTMLElement) => void) {
   const keys = { ArrowLeft: -1, ArrowRight: 1 };
   container.addEventListener("keydown", (event) => {
-    const buttons = [...container.querySelectorAll('[role="tab"]')];
-    const at = buttons.indexOf(event.target);
+    const buttons = [...container.querySelectorAll<HTMLElement>('[role="tab"]')];
+    const at = buttons.indexOf(event.target as HTMLElement);
     if (at < 0) return;
     let next = null;
     if (event.key in keys) next = buttons[(at + keys[event.key] + buttons.length) % buttons.length];
@@ -1164,13 +989,13 @@ const VIEW_TABS = [
 /** 中央ペインの表示切り替え。グラフは消さず、隠すだけ。 */
 function setMode(mode) {
   state.mode = mode;
-  document.getElementById("graph-frame").hidden = mode !== "graph";
-  document.getElementById("table-frame").hidden = mode !== "table";
-  for (const element of document.querySelectorAll(".graph-only")) {
+  getElement("graph-frame").hidden = mode !== "graph";
+  getElement("table-frame").hidden = mode !== "table";
+  for (const element of queryElements(".graph-only")) {
     element.hidden = mode !== "graph";
   }
   for (const [id, name] of VIEW_TABS) {
-    const tab = document.getElementById(id);
+    const tab = getElement(id);
     tab.classList.toggle("active", mode === name);
     tab.setAttribute("aria-selected", String(mode === name));
     //: tab キーで入る先は選択中のタブだけにする。
@@ -1262,7 +1087,7 @@ function refresh() {
 /** 検索語を差し替える。入力欄からも、キーボードの Esc からも通る。 */
 function applyQuery(value) {
   state.query = value;
-  document.getElementById("search").value = value;
+  getElement("search").value = value;
   //: 語が変われば候補も変わる。位置は先頭から数え直す。
   cursor = null;
   renderNodeList();
@@ -1272,7 +1097,7 @@ function applyQuery(value) {
 }
 
 for (const [id, name] of VIEW_TABS) {
-  document.getElementById(id).addEventListener("click", () => {
+  getElement(id).addEventListener("click", () => {
     setMode(name);
     writeHash();
   });
@@ -1281,11 +1106,11 @@ bindTabKeys(document.querySelector(".tabs"), (tab) => {
   setMode(VIEW_TABS.find(([id]) => id === tab.id)[1]);
   writeHash();
 });
-document.getElementById("search").addEventListener("input", (event) => {
-  applyQuery(event.target.value);
+getElement("search").addEventListener("input", (event) => {
+  applyQuery((event.target as HTMLInputElement).value);
 });
 //: ↑↓ で候補を送り、Enter で決める。入力欄から手を離さずに図を辿れるようにする。
-document.getElementById("search").addEventListener("keydown", (event) => {
+getElement("search").addEventListener("keydown", (event) => {
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
     moveCursor(event.key === "ArrowDown" ? 1 : -1);
@@ -1296,42 +1121,42 @@ document.getElementById("search").addEventListener("keydown", (event) => {
   const target = cursor === null ? hits()[0] : cursor;
   if (target) chooseNode(target);
 });
-document.getElementById("depth").addEventListener("input", (event) => {
-  state.depth = Number(event.target.value);
-  document.getElementById("depth-value").textContent = depthLabel();
+getElement("depth").addEventListener("input", (event) => {
+  state.depth = Number((event.target as HTMLInputElement).value);
+  getElement("depth-value").textContent = depthLabel();
   //: 描く要素は変わらないので再レイアウトは走らない (色分けと本文だけが変わる)。
   refresh();
   //: つまみを動かしている間の 1 段ごとに履歴を積まない。
   writeHash(false);
 });
-document.getElementById("undirected").addEventListener("change", (event) => {
-  state.undirected = event.target.checked;
+getElement("undirected").addEventListener("change", (event) => {
+  state.undirected = (event.target as HTMLInputElement).checked;
   refresh();
   writeHash();
 });
-document.getElementById("clear").addEventListener("click", () => {
+getElement("clear").addEventListener("click", () => {
   state.selected = null;
   refresh();
   writeHash();
 });
-document.getElementById("direction").addEventListener("change", (event) => {
-  state.direction = event.target.value;
+getElement("direction").addEventListener("change", (event) => {
+  state.direction = (event.target as HTMLSelectElement).value === "LR" ? "LR" : "TD";
   relayout();
   writeHash();
 });
-document.getElementById("focus").addEventListener("change", (event) => {
-  state.focus = Number(event.target.value);
+getElement("focus").addEventListener("change", (event) => {
+  state.focus = Number((event.target as HTMLInputElement).value);
   //: 描く範囲が変わるので、refresh() の中の syncFocusLayout() が並べ直す。
   refresh();
   writeHash();
 });
-document.getElementById("relayout").addEventListener("click", relayout);
-document.getElementById("zoom-in").addEventListener("click", () => zoomBy(1.2));
-document.getElementById("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
-document.getElementById("zoom-reset").addEventListener("click", () => {
-  if (svg) { zoom = 1; pan = { x: 0, y: 0 }; setTransform(); }
+getElement("relayout").addEventListener("click", relayout);
+getElement("zoom-in").addEventListener("click", () => zoomBy(1.2));
+getElement("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
+getElement("zoom-reset").addEventListener("click", () => {
+  panZoom?.reset();
 });
-document.getElementById("zoom-fit").addEventListener("click", fitToView);
+getElement("zoom-fit").addEventListener("click", fitToView);
 
 // --- テーマ ------------------------------------------------------------------
 //
@@ -1339,7 +1164,7 @@ document.getElementById("zoom-fit").addEventListener("click", fitToView);
 // ヘッダのボタンで固定できる。固定した選択は次回にも残す。
 
 let theme = normalizeTheme(readStore(THEME_STORAGE_KEY));
-const themeButton = document.getElementById("theme");
+const themeButton = getElement("theme");
 
 /** テーマを反映する。図の配色も CSS 変数から引き直す。 */
 function applyTheme() {
@@ -1352,37 +1177,8 @@ function applyTheme() {
 
 /** テーマ依存の色を SVG に入れ直す。 */
 function restyleGraph() {
-  if (!svg) return;
-  const pal = palette();
-  graphEl.style.setProperty("--graph-fg", pal.fg);
-  graphEl.style.setProperty("--graph-bg", pal.bg);
-  graphEl.style.setProperty("--graph-panel", pal.panel);
-  graphEl.style.setProperty("--graph-border", pal.border);
-  graphEl.style.setProperty("--graph-muted", pal.muted);
-  const arrow = defs?.querySelector("#req-arrow path");
-  if (arrow) arrow.setAttribute("fill", pal.border);
-  const types = DATA.meta.types || {};
-  const statuses = DATA.meta.statuses || {};
-  const impact = DATA.meta.impact_colors || {};
-  graphEl.style.setProperty("--impact-selected", impact.selected || pal.fg);
-  graphEl.style.setProperty("--impact-upstream", impact.upstream || pal.fg);
-  graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
-  graphEl.style.setProperty("--impact-related", impact.related || pal.fg);
-  graphEl.style.setProperty("--search-hit", (DATA.meta.search || {}).hit || pal.fg);
-  for (const item of nodeItems.values()) {
-    const typeMeta = types[item.type] || {};
-    const statusMeta = statuses[item.status] || {};
-    const colors = typeColors(typeMeta, pal);
-    item.shapeName = typeMeta.shape;
-    updateShape(item.shape, item.shapeName, item);
-    updateShape(item.statusRing, item.shapeName, item);
-    setAttrs(item.shape, { fill: colors.fill, stroke: colors.stroke, "stroke-width": statusMeta.border_width || 1.5, "stroke-dasharray": statusMeta.border_style === "dashed" ? "6 4" : statusMeta.border_style === "dotted" ? "1 3" : "" });
-    setAttrs(item.statusRing, { fill: "none", stroke: colors.stroke, "stroke-width": 1 });
-  }
-  for (const item of bandItems.values()) {
-    const colors = typeColors(types[item.bandType] || {}, pal);
-    setAttrs(item.shape, { fill: item.bandType === "RequirementGroup" ? pal.panel : colors.fill, stroke: colors.stroke || pal.border });
-  }
+  if (!svg || !defs) return;
+  applyGraphTheme(graphEl, defs, DATA, nodeItems.values(), bandItems.values(), graphPrimitives);
   renderLegend();
 }
 
@@ -1420,7 +1216,7 @@ function download(name, text, type) {
 /** Serialize the visible SVG DOM itself as a standalone document. */
 function currentSvg() {
   if (!svg) return null;
-  const copy = svg.cloneNode(true);
+  const copy = svg.cloneNode(true) as SVGSVGElement;
   copy.querySelectorAll(".hidden").forEach((element) => element.remove());
   copy.querySelectorAll("[tabindex], [role], [aria-label]").forEach((element) => {
     element.removeAttribute("tabindex");
@@ -1447,7 +1243,7 @@ function currentSvg() {
     height,
     fill: pal.bg,
   });
-  const impact = DATA.meta.impact_colors || {};
+  const impact = impactColors();
   const style = svgEl("style");
   style.textContent = `
     .node-label { fill: ${pal.fg}; font-family: ${LABEL_FONT.family}; }
@@ -1473,14 +1269,14 @@ function currentSvg() {
   return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(copy)}`;
 }
 
-const exportSvg = document.getElementById("export-svg");
+const exportSvg = getElement("export-svg");
 exportSvg.addEventListener("click", () => {
   const text = currentSvg();
   if (!text) return;
   download("graph.svg", text, "image/svg+xml;charset=utf-8");
   exportSvg.closest("details").open = false;
 });
-const exportMmd = document.getElementById("export-mmd");
+const exportMmd = getElement("export-mmd");
 exportMmd.addEventListener("click", () => {
   download("graph.mmd", mermaidText(view), "text/plain;charset=utf-8");
   exportMmd.closest("details").open = false;
@@ -1500,12 +1296,12 @@ document.addEventListener("keydown", (event) => {
     target instanceof HTMLElement &&
     (target.isContentEditable ||
       ["SELECT", "TEXTAREA"].includes(target.tagName) ||
-      (target.tagName === "INPUT" &&
+      (target instanceof HTMLInputElement &&
         !["checkbox", "radio", "range", "button"].includes(target.type)));
 
   if (event.key === "/" && !typing) {
     event.preventDefault();
-    const search = document.getElementById("search");
+    const search = getElement("search");
     search.focus();
     search.select();
     return;
@@ -1525,7 +1321,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-const copyLink = document.getElementById("copy-link");
+const copyLink = getElement("copy-link");
 copyLink.addEventListener("click", async () => {
   //: URL は writeHash() が常に最新にしているので、そのまま渡せばよい。
   try {

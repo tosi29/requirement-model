@@ -26,31 +26,135 @@ from reqmodel import (
 
 SRC_OWNER = Reference(
     title="このツールの作者であり、最初の利用者でもあるリポジトリオーナー",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_OWNER",
+    note="個人の利用背景であり、公開 URL はない。",
 )
 SRC_SPEC = Reference(
-    title="初回の実装指示書 (issue #1)",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_SPEC",
+    title="GitHub Issue #1: 要求グラフツール 実装指示書",
+    url="https://github.com/tosi29/requirement-model/issues/1",
 )
 SRC_IREB = Reference(
-    title="IREB (CPRE) の要求工学用語体系",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_IREB",
+    title="IREB CPRE Online Glossary",
+    url="https://cpre.ireb.org/en/downloads-and-resources/glossary",
 )
 SRC_INCOSE = Reference(
-    title="INCOSE による Need と Requirement の区別",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_INCOSE",
+    title="INCOSE Guide to Writing Requirements",
+    url=(
+        "https://www.incose.org/docs/default-source/working-groups/requirements-wg/"
+        "gtwr/incose_rwg_gtwr_v4_040423_final_drafts.pdf?sfvrsn=5c877fc7_2"
+    ),
 )
 SRC_LEGACY = Reference(
     title="要求を Markdown 文書と表計算ソフトで管理する現行の運用",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_LEGACY",
+    note="このリポジトリでの現行運用に関する背景情報。公開 URL はない。",
 )
 SRC_BENCH = Reference(
     title="300 ノードの合成モデル (examples/bench.py) による実測結果",
-    url="https://github.com/tosi29/requirement-model/issues/123#SRC_BENCH",
+    url="https://github.com/tosi29/requirement-model/blob/main/examples/bench.py",
+    note="このリポジトリに含まれる再現可能な合成ベンチマーク。",
+)
+ISSUE_SOURCE_LOCATION = Reference(
+    title="GitHub Issue #3: ノード定義位置の表示",
+    url="https://github.com/tosi29/requirement-model/issues/3",
+)
+ISSUE_NO_REDRAW = Reference(
+    title="GitHub Issue #4: ノード選択時の Mermaid 再描画を抑える",
+    url="https://github.com/tosi29/requirement-model/issues/4",
+)
+ISSUE_PERMALINK = Reference(
+    title="GitHub Issue #5: 選択状態の permalink",
+    url="https://github.com/tosi29/requirement-model/issues/5",
+)
+ISSUE_WAIVER = Reference(
+    title="GitHub Issue #8: 既知の指摘を waiver する",
+    url="https://github.com/tosi29/requirement-model/issues/8",
+)
+ISSUE_IMPACT = Reference(
+    title="GitHub Issue #11: 検索・影響範囲・深さ・無向探索",
+    url="https://github.com/tosi29/requirement-model/issues/11",
+)
+ISSUE_STATS = Reference(
+    title="GitHub Issue #15: モデル統計",
+    url="https://github.com/tosi29/requirement-model/issues/15",
+)
+ISSUE_LEXICON = Reference(
+    title="GitHub Issue #48: 曖昧語辞書の誤検出",
+    url="https://github.com/tosi29/requirement-model/issues/48",
+)
+ISSUE_DOC = Reference(
+    title="GitHub Issue #9: 文書・仕様・トレーサビリティ",
+    url="https://github.com/tosi29/requirement-model/issues/9",
+)
+ISSUE_SCALE = Reference(
+    title="GitHub Issue #17: 大規模モデルのスケールとフォーカス",
+    url="https://github.com/tosi29/requirement-model/issues/17",
+)
+ISSUE_TABLE = Reference(
+    title="GitHub Issue #18: 閲覧用テーブル",
+    url="https://github.com/tosi29/requirement-model/issues/18",
+)
+ISSUE_UI = Reference(
+    title="GitHub Issue #19: 小さな UI 改善",
+    url="https://github.com/tosi29/requirement-model/issues/19",
+)
+ISSUE_LABEL = Reference(
+    title="GitHub Issue #25: ラベルの可読性",
+    url="https://github.com/tosi29/requirement-model/issues/25",
+)
+ISSUE_PAN = Reference(
+    title="GitHub Issue #26: 画面外ノードへのパン",
+    url="https://github.com/tosi29/requirement-model/issues/26",
+)
+ISSUE_ID_COLLISION = Reference(
+    title="GitHub Issue #43: ID 衝突",
+    url="https://github.com/tosi29/requirement-model/issues/43",
+)
+ISSUE_SOURCE_ATTRIBUTE = Reference(
+    title="GitHub Issue #56: Source をグラフ外の属性にする",
+    url="https://github.com/tosi29/requirement-model/issues/56",
+)
+ISSUE_REFERENCE = Reference(
+    title="GitHub Issue #123: Source 共通外部参照",
+    url="https://github.com/tosi29/requirement-model/issues/123",
+)
+ISSUE_EVIDENCE = Reference(
+    title="GitHub Issue #62: verification を evidence に移す",
+    url="https://github.com/tosi29/requirement-model/issues/62",
 )
 ISSUE_STATUS_BY_TYPE = Reference(
     title="GitHub Issue #72: status をノード型ごとに分離する",
     url="https://github.com/tosi29/requirement-model/issues/72",
+)
+ISSUE_GROUP = Reference(
+    title="GitHub Issue #90: 要求の表示グループ",
+    url="https://github.com/tosi29/requirement-model/issues/90",
+)
+ISSUE_SVG_DOM = Reference(
+    title="GitHub Issue #94: SVG DOM 描画",
+    url="https://github.com/tosi29/requirement-model/issues/94",
+)
+ISSUE_SITE_LABELS = Reference(
+    title="GitHub Issue #125: 日本語の詳細ラベル",
+    url="https://github.com/tosi29/requirement-model/issues/125",
+)
+ISSUE_GROUP_ARCHITECTURE = Reference(
+    title="GitHub Issue #128: RequirementGroup の責務整理",
+    url="https://github.com/tosi29/requirement-model/issues/128",
+)
+ISSUE_JS_MODULES = Reference(
+    title="GitHub Issue #130: JavaScript モジュール分割",
+    url="https://github.com/tosi29/requirement-model/issues/130",
+)
+ISSUE_SARIF_UPLOAD = Reference(
+    title="GitHub Issue #135: SARIF の Code Scanning 連携",
+    url="https://github.com/tosi29/requirement-model/issues/135",
+)
+ISSUE_DOM_XSS = Reference(
+    title="GitHub Issue #136: DOM XSS 対策",
+    url="https://github.com/tosi29/requirement-model/issues/136",
+)
+ISSUE_TYPESCRIPT = Reference(
+    title="GitHub Issue #141: TypeScript 化と app 分割",
+    url="https://github.com/tosi29/requirement-model/issues/141",
 )
 ISSUE_PLAN_MARKDOWN = Reference(
     title="GitHub Issue #6: plan の Markdown 出力",
@@ -80,6 +184,215 @@ ISSUE_GRAPH_CONTROLS = Reference(
     title="GitHub Issue #145: グラフ専用の操作コントロールをグラフ領域内へ移動する",
     url="https://github.com/tosi29/requirement-model/issues/145",
 )
+PR_INITIAL = Reference(
+    title="Pull Request #2: 初回実装",
+    url="https://github.com/tosi29/requirement-model/pull/2",
+)
+PR_SOURCE_LOCATION = Reference(
+    title="Pull Request #27: 定義位置の表示",
+    url="https://github.com/tosi29/requirement-model/pull/27",
+)
+PR_WAIVER = Reference(
+    title="Pull Request #31: waiver",
+    url="https://github.com/tosi29/requirement-model/pull/31",
+)
+PR_DOC = Reference(
+    title="Pull Request #32: 仕様書とトレーサビリティ表",
+    url="https://github.com/tosi29/requirement-model/pull/32",
+)
+PR_STATS = Reference(
+    title="Pull Request #34: 統計出力",
+    url="https://github.com/tosi29/requirement-model/pull/34",
+)
+PR_TABLE = Reference(
+    title="Pull Request #35: 閲覧用テーブル",
+    url="https://github.com/tosi29/requirement-model/pull/35",
+)
+PR_PERMALINK = Reference(
+    title="Pull Request #36: permalink",
+    url="https://github.com/tosi29/requirement-model/pull/36",
+)
+PR_SCALE = Reference(
+    title="Pull Request #39: 大規模表示とフォーカス",
+    url="https://github.com/tosi29/requirement-model/pull/39",
+)
+PR_IMPACT = Reference(
+    title="Pull Request #41: 検索と影響範囲探索",
+    url="https://github.com/tosi29/requirement-model/pull/41",
+)
+PR_UI = Reference(
+    title="Pull Request #42: UI 改善",
+    url="https://github.com/tosi29/requirement-model/pull/42",
+)
+PR_PAN = Reference(
+    title="Pull Request #30: 画面外ノードへのパン",
+    url="https://github.com/tosi29/requirement-model/pull/30",
+)
+PR_GROUP = Reference(
+    title="Pull Request #97: 表示グループ",
+    url="https://github.com/tosi29/requirement-model/pull/97",
+)
+PR_GROUP_LAYOUT = Reference(
+    title="Pull Request #99: グループ配置",
+    url="https://github.com/tosi29/requirement-model/pull/99",
+)
+PR_GROUP_BACKGROUND = Reference(
+    title="Pull Request #103: グループ背景",
+    url="https://github.com/tosi29/requirement-model/pull/103",
+)
+PR_GROUP_COLORS = Reference(
+    title="Pull Request #104: グループ色",
+    url="https://github.com/tosi29/requirement-model/pull/104",
+)
+PR_GROUP_HEIGHT = Reference(
+    title="Pull Request #105: グループ高さ",
+    url="https://github.com/tosi29/requirement-model/pull/105",
+)
+PR_ID_COLLISION = Reference(
+    title="Pull Request #49: ID 衝突の解消",
+    url="https://github.com/tosi29/requirement-model/pull/49",
+)
+PR_SOURCE_ATTRIBUTE = Reference(
+    title="Pull Request #57: Source 属性化",
+    url="https://github.com/tosi29/requirement-model/pull/57",
+)
+PR_EVIDENCE = Reference(
+    title="Pull Request #63: evidence 導入",
+    url="https://github.com/tosi29/requirement-model/pull/63",
+)
+PR_ID_PREFIX = Reference(
+    title="Pull Request #91: ID 接頭辞",
+    url="https://github.com/tosi29/requirement-model/pull/91",
+)
+PR_LABEL = Reference(
+    title="Pull Request #93: ラベル改善",
+    url="https://github.com/tosi29/requirement-model/pull/93",
+)
+PR_SVG_DOM = Reference(
+    title="Pull Request #113: SVG DOM の確定実装",
+    url="https://github.com/tosi29/requirement-model/pull/113",
+)
+PR_SVG_PATH = Reference(
+    title="Pull Request #114: エッジ曲線の描画",
+    url="https://github.com/tosi29/requirement-model/pull/114",
+)
+PR_GROUP_WRAP = Reference(
+    title="Pull Request #115: Requirements 枠の折り返し",
+    url="https://github.com/tosi29/requirement-model/pull/115",
+)
+PR_REFERENCE = Reference(
+    title="Pull Request #124: Source から Reference へ移行",
+    url="https://github.com/tosi29/requirement-model/pull/124",
+)
+PR_STATUS = Reference(
+    title="Pull Request #131: ノード型ごとの status",
+    url="https://github.com/tosi29/requirement-model/pull/131",
+)
+PR_JS_MODULES = Reference(
+    title="Pull Request #132: JavaScript モジュール分割",
+    url="https://github.com/tosi29/requirement-model/pull/132",
+)
+PR_PLAN_MARKDOWN = Reference(
+    title="Pull Request #133: plan の Markdown 出力",
+    url="https://github.com/tosi29/requirement-model/pull/133",
+)
+PR_SARIF = Reference(
+    title="Pull Request #134: SARIF 出力",
+    url="https://github.com/tosi29/requirement-model/pull/134",
+)
+PR_SARIF_UPLOAD = Reference(
+    title="Pull Request #137: SARIF の Code Scanning upload",
+    url="https://github.com/tosi29/requirement-model/pull/137",
+)
+PR_DOM_XSS = Reference(
+    title="Pull Request #138: DOM XSS 対策",
+    url="https://github.com/tosi29/requirement-model/pull/138",
+)
+PR_SARIF_SAFETY = Reference(
+    title="Pull Request #140: SARIF workflow の安全化",
+    url="https://github.com/tosi29/requirement-model/pull/140",
+)
+PR_TYPESCRIPT = Reference(
+    title="Pull Request #144: TypeScript 化と app 分割の最終実装",
+    url="https://github.com/tosi29/requirement-model/pull/144",
+)
+PR_REFERENCE_CLEANUP = Reference(
+    title="Pull Request #148: Reference 互換層の削除",
+    url="https://github.com/tosi29/requirement-model/pull/148",
+)
+PR_GRAPH_CONTROLS = Reference(
+    title="Pull Request #149: グラフ操作コントロール",
+    url="https://github.com/tosi29/requirement-model/pull/149",
+)
+PR_ARROW_COLOR = Reference(
+    title="Pull Request #151: エッジ矢印色の調整",
+    url="https://github.com/tosi29/requirement-model/pull/151",
+)
+EVIDENCE_AST = Reference(
+    title="tests/test_astcheck.py",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_astcheck.py",
+    note="AST だけで定義を復元し、実行を禁止するテスト。",
+)
+EVIDENCE_LOADER = Reference(
+    title="tests/test_loader.py",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_loader.py",
+    note="正規化モデルへの読み込みと層 1 検証のテスト。",
+)
+EVIDENCE_VALIDATE = Reference(
+    title="tests/test_validate.py",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_validate.py",
+    note="構造・語彙・status 整合性のテスト。",
+)
+EVIDENCE_WAIVER = Reference(
+    title="tests/test_waivers.py",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_waivers.py",
+    note="抑制と stale waiver のテスト。",
+)
+EVIDENCE_EXPLAIN = Reference(
+    title="tests/test_plan_explain.py",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_plan_explain.py",
+    note="影響探索・explain・plan のテスト。",
+)
+EVIDENCE_DOC = Reference(
+    title="tests/test_doc.py",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_doc.py",
+    note="仕様書とトレーサビリティ表のテスト。",
+)
+EVIDENCE_SITE = Reference(
+    title="tests/test_site.py",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_site.py",
+    note="静的サイト生成と DOM 安全性のテスト。",
+)
+EVIDENCE_SITE_JS = Reference(
+    title="tests/test_site_js.py",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_site_js.py",
+    note="CLI とサイトの図・explain 出力の一致を検証するテスト。",
+)
+EVIDENCE_STATS = Reference(
+    title="tests/test_stats.py",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_stats.py",
+    note="統計の分母・分子・空集合の扱いを検証するテスト。",
+)
+EVIDENCE_CLI = Reference(
+    title="tests/test_cli.py",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_cli.py",
+    note="CLI の終了コードと各出力形式を検証するテスト。",
+)
+EVIDENCE_GRAPH = Reference(
+    title="tests/test_graph.py",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_graph.py",
+    note="グラフ構築・ID 衝突・探索のテスト。",
+)
+EVIDENCE_BENCH = Reference(
+    title="tests/test_bench_example.py",
+    url="https://github.com/tosi29/requirement-model/blob/main/tests/test_bench_example.py",
+    note="examples/bench.py の生成結果と実行可能性を検証するテスト。",
+)
+EVIDENCE_CI = Reference(
+    title=".github/workflows/ci.yml",
+    url="https://github.com/tosi29/requirement-model/blob/main/.github/workflows/ci.yml",
+    note="テスト・型検査・SARIF upload を実行する CI。",
+)
 EVIDENCE_SITE_CLI_PARITY = Reference(
     title="サイトと CLI の Mermaid 一致テスト",
     url="https://github.com/tosi29/requirement-model/blob/main/tests/test_site_js.py",
@@ -98,36 +411,43 @@ NEED_NO_DANGLING = Need(
     id="Need-2",
     text="要求をレビューする人は、どこにも繋がっていない要求が残っていないかを知りたい",
     source=[SRC_OWNER, SRC_IREB],
+    status="approved",
 )
 NEED_IMPACT = Need(
     id="Need-3",
     text="要求を変更する人は、その変更がどこまで波及するのかを変更前に把握したい",
     source=[SRC_OWNER, SRC_LEGACY],
+    status="approved",
 )
 NEED_REVIEW_DIFF = Need(
     id="Need-4",
     text="変更を審査する人は、差分から要求グラフの何が変わったのかを読み取りたい",
     source=[SRC_OWNER],
+    status="approved",
 )
 NEED_LLM_CONTEXT = Need(
     id="Need-5",
     text="要求の判断を LLM に委ねる人は、判断に要る文脈を欠けなく渡したい",
     source=[SRC_SPEC, SRC_OWNER],
+    status="approved",
 )
 NEED_READABLE = Need(
     id="Need-6",
     text="要求を読む関係者は、ツールを入れずに要求の全体像と個々のトレースを見たい",
     source=[SRC_LEGACY],
+    status="approved",
 )
 NEED_METRICS = Need(
     id="Need-7",
     text="要求を管理する人は、モデル全体の充足率と成熟度の分布を数値で把握したい",
     source=[SRC_OWNER],
+    status="approved",
 )
 NEED_CI = Need(
     id="Need-8",
     text="CI を回す人は、既知で意図的な指摘を残したまま、新しい指摘だけで失敗させたい",
     source=[SRC_OWNER],
+    status="approved",
 )
 
 # --- ゴール -----------------------------------------------------------------
@@ -137,18 +457,21 @@ GOAL_LESS_REWORK = Goal(
     text="要求の不備が後工程で見つかることによる手戻りを減らす",
     motivates=[NEED_SELF_CHECK, NEED_NO_DANGLING, NEED_CI],
     source=[SRC_SPEC, SRC_OWNER, SRC_LEGACY],
+    status="approved",
 )
 GOAL_LESS_SURVEY = Goal(
     id="Goal-2",
     text="要求を変えるたびに繰り返される影響調査の負荷を減らす",
     motivates=[NEED_IMPACT, NEED_REVIEW_DIFF],
     source=[SRC_SPEC, SRC_LEGACY],
+    status="approved",
 )
 GOAL_SHARED_UNDERSTANDING = Goal(
     id="Goal-3",
     text="要求の理解が書き手に依存する度合いを下げる",
     motivates=[NEED_LLM_CONTEXT, NEED_READABLE, NEED_METRICS],
     source=[SRC_SPEC, SRC_OWNER, SRC_LEGACY],
+    status="approved",
 )
 
 # --- 機能要求: 検証 (層0〜層3) -----------------------------------------------
@@ -158,6 +481,9 @@ FR_AST_ONLY = FunctionalRequirement(
     text="定義ファイルを実行せず、AST からノード集合を復元すること",
     satisfies=[NEED_SELF_CHECK],
     source=[SRC_SPEC],
+    status="implemented",
+    realized_by=[PR_INITIAL],
+    evidence=[EVIDENCE_AST, EVIDENCE_LOADER],
     acceptance_criteria=[
         "for 文・if 文・関数定義を含む定義ファイルは declarative.forbidden として報告される",
         "ノードの復元に exec と eval のどちらも用いない",
@@ -167,7 +493,10 @@ FR_SYNTAX = FunctionalRequirement(
     id="FR-2",
     text="ノードの必須属性・id の重複・語尾規則の違反を、定義した行番号とともに報告すること",
     satisfies=[NEED_SELF_CHECK],
-    source=[SRC_SPEC, SRC_IREB],
+    source=[SRC_SPEC, SRC_IREB, ISSUE_SOURCE_LOCATION],
+    status="implemented",
+    realized_by=[PR_INITIAL, PR_SOURCE_LOCATION],
+    evidence=[EVIDENCE_LOADER, EVIDENCE_VALIDATE],
     acceptance_criteria=[
         "「〜たい」で終わらない Need の text は syntax.invalid_field として報告される",
         "報告には定義ファイルのパスと行番号が付く",
@@ -181,6 +510,9 @@ FR_EDGE_RULES = FunctionalRequirement(
     ),
     satisfies=[NEED_NO_DANGLING],
     source=[SRC_SPEC, SRC_IREB],
+    status="implemented",
+    realized_by=[PR_INITIAL],
+    evidence=[EVIDENCE_VALIDATE],
     acceptance_criteria=[
         "Constraint から Goal へ張ったエッジは structure.edge_type として報告される",
         "存在しない id への参照は structure.dangling_ref として報告される",
@@ -195,6 +527,9 @@ FR_ORPHAN = FunctionalRequirement(
     ),
     satisfies=[NEED_NO_DANGLING],
     source=[SRC_SPEC, SRC_INCOSE],
+    status="implemented",
+    realized_by=[PR_INITIAL],
+    evidence=[EVIDENCE_VALIDATE],
     acceptance_criteria=[
         "Goal に到達できない FR は structure.orphan_fr として報告される",
         "孤立は FR と QR で別のコードとして報告される",
@@ -204,7 +539,10 @@ FR_LEXICON = FunctionalRequirement(
     id="FR-5",
     text="辞書に載っている曖昧語を含む本文を warning として報告すること",
     satisfies=[NEED_SELF_CHECK],
-    source=[SRC_SPEC],
+    source=[SRC_SPEC, ISSUE_LEXICON],
+    status="implemented",
+    realized_by=[PR_INITIAL],
+    evidence=[EVIDENCE_VALIDATE],
     acceptance_criteria=[
         "「高速に」を含む text は semantics.ambiguous_term として報告される",
         "報告には、その語をどう書き換えるかの助言が付く",
@@ -224,7 +562,10 @@ FR_WAIVER = FunctionalRequirement(
         "そのノードに出る当該コードの指摘だけを抑制すること"
     ),
     satisfies=[NEED_CI],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_WAIVER],
+    status="implemented",
+    realized_by=[PR_WAIVER],
+    evidence=[EVIDENCE_WAIVER],
     acceptance_criteria=[
         "理由の無い抑制は層1 のエラーになる",
         "error の抑制は層1 のエラーになる",
@@ -237,6 +578,9 @@ FR_EXIT_CODE = FunctionalRequirement(
     text="指摘の重大度に応じた終了コードを返し、CI にそのまま置けるようにすること",
     satisfies=[NEED_CI],
     source=[SRC_SPEC],
+    status="implemented",
+    realized_by=[PR_INITIAL],
+    evidence=[EVIDENCE_CLI],
     acceptance_criteria=[
         "error が 1 件でもあれば終了コードは 1 になる",
         "--strict では warning と severe でも終了コードは 1 になる",
@@ -250,7 +594,10 @@ FR_IMPACT = FunctionalRequirement(
     id="FR-8",
     text="指定したノードの上流と下流を辿り、影響部分グラフを抽出すること",
     satisfies=[NEED_IMPACT],
-    source=[SRC_SPEC],
+    source=[SRC_SPEC, ISSUE_IMPACT],
+    status="implemented",
+    realized_by=[PR_INITIAL, PR_IMPACT],
+    evidence=[EVIDENCE_EXPLAIN, EVIDENCE_SITE_JS],
     acceptance_criteria=[
         "辿るエッジ種別を --edges で限定できる",
         "探索の深さを --depth で打ち切れる",
@@ -262,7 +609,10 @@ FR_EXPLAIN = FunctionalRequirement(
     text="影響部分グラフの本文と根拠を、LLM に渡せる書式に整形して出力すること",
     refines=[FR_IMPACT],
     satisfies=[NEED_LLM_CONTEXT],
-    source=[SRC_SPEC, SRC_OWNER],
+    source=[SRC_SPEC, SRC_OWNER, ISSUE_EVIDENCE],
+    status="implemented",
+    realized_by=[PR_INITIAL, PR_EVIDENCE],
+    evidence=[EVIDENCE_EXPLAIN, EVIDENCE_SITE_JS],
     acceptance_criteria=[
         "出力には各ノードの text と evidence が含まれる",
         "--json で機械可読な形でも出せる",
@@ -276,6 +626,9 @@ FR_PLAN = FunctionalRequirement(
     ),
     satisfies=[NEED_REVIEW_DIFF],
     source=[SRC_SPEC],
+    status="implemented",
+    realized_by=[PR_INITIAL],
+    evidence=[EVIDENCE_EXPLAIN],
     acceptance_criteria=[
         "定義の並べ替えだけの変更は差分として出ない (出所は比較対象に含めない)",
         "比較先のリビジョンを --rev で指定できる",
@@ -288,7 +641,10 @@ FR_DOC = FunctionalRequirement(
     id="FR-11",
     text="モデルから仕様書とトレーサビリティ表を生成すること",
     satisfies=[NEED_READABLE],
-    source=[SRC_LEGACY],
+    source=[SRC_LEGACY, ISSUE_DOC],
+    status="implemented",
+    realized_by=[PR_INITIAL, PR_DOC],
+    evidence=[EVIDENCE_DOC],
     acceptance_criteria=[
         "仕様書は 5 節構成で、どのノードも必ずいずれかの節に現れる",
         "トレーサビリティ表はエッジ型ごとに 1 枚出て、トレースの無い行と列を併記する",
@@ -299,7 +655,41 @@ FR_SITE = FunctionalRequirement(
     id="FR-12",
     text="外部の実行環境を要さない 1 枚の HTML として、閲覧用サイトを生成すること",
     satisfies=[NEED_READABLE],
-    source=[SRC_OWNER, SRC_LEGACY, ISSUE_GRAPH_CONTROLS],
+    source=[
+        SRC_OWNER,
+        SRC_LEGACY,
+        ISSUE_NO_REDRAW,
+        ISSUE_UI,
+        ISSUE_LABEL,
+        ISSUE_PAN,
+        ISSUE_SVG_DOM,
+        ISSUE_GROUP,
+        ISSUE_GROUP_ARCHITECTURE,
+        ISSUE_JS_MODULES,
+        ISSUE_SITE_LABELS,
+        ISSUE_GRAPH_CONTROLS,
+        ISSUE_TYPESCRIPT,
+    ],
+    status="implemented",
+    realized_by=[
+        PR_INITIAL,
+        PR_UI,
+        PR_PAN,
+        PR_LABEL,
+        PR_GROUP,
+        PR_GROUP_LAYOUT,
+        PR_GROUP_BACKGROUND,
+        PR_GROUP_COLORS,
+        PR_GROUP_HEIGHT,
+        PR_SVG_DOM,
+        PR_SVG_PATH,
+        PR_GROUP_WRAP,
+        PR_JS_MODULES,
+        PR_TYPESCRIPT,
+        PR_GRAPH_CONTROLS,
+        PR_ARROW_COLOR,
+    ],
+    evidence=[EVIDENCE_SITE, EVIDENCE_SITE_JS],
     acceptance_criteria=[
         "生成物を静的ファイルとして配るだけでブラウザから閲覧できる",
         "ノードを選ぶと影響範囲が色分けされ、指摘の一覧から該当ノードへ飛べる",
@@ -322,7 +712,10 @@ FR_FIT_WHOLE = FunctionalRequirement(
     ),
     refines=[FR_SITE],
     satisfies=[NEED_READABLE],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_SCALE],
+    status="implemented",
+    realized_by=[PR_SCALE],
+    evidence=[EVIDENCE_SITE],
     acceptance_criteria=[
         "読み込み直後の倍率は、全ノードが表示領域に入る値になる",
     ],
@@ -335,7 +728,10 @@ FR_TABLE = FunctionalRequirement(
     ),
     refines=[FR_SITE],
     satisfies=[NEED_READABLE],
-    source=[SRC_LEGACY],
+    source=[SRC_LEGACY, ISSUE_TABLE],
+    status="implemented",
+    realized_by=[PR_TABLE],
+    evidence=[EVIDENCE_SITE, EVIDENCE_SITE_JS],
     acceptance_criteria=[
         "同値の行は正規化 JSON の並び (型順 → id 順) で決まり、押すたびに入れ替わらない",
         "値の無い行は昇順でも降順でも末尾に置かれる",
@@ -353,7 +749,10 @@ FR_PERMALINK = FunctionalRequirement(
     text="選択したノードと表示の絞り込みを URL に載せ、同じ画面を相手にも出せるようにすること",
     refines=[FR_SITE],
     satisfies=[NEED_READABLE],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_PERMALINK],
+    status="implemented",
+    realized_by=[PR_PERMALINK],
+    evidence=[EVIDENCE_SITE_JS],
     acceptance_criteria=[
         "既定値のままの項目は URL に書かれない",
         "解釈できない値は黙って捨て、読み込み後の URL は解釈できた形に直る",
@@ -364,7 +763,10 @@ FR_SITE_DOM_SAFETY = FunctionalRequirement(
     text="閲覧用サイトはモデル由来の値をHTMLとして解釈せず、安全なURLだけをリンクにすること",
     refines=[FR_SITE],
     satisfies=[NEED_READABLE],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_DOM_XSS],
+    status="implemented",
+    realized_by=[PR_DOM_XSS],
+    evidence=[EVIDENCE_SITE],
     acceptance_criteria=[
         "動的なUI生成はDOM APIとtextContentを用い、innerHTMLへモデル値を渡さない",
         "外部参照と出所のリンクはhttps、http、about schemeだけを許可する",
@@ -375,7 +777,10 @@ FR_STATS = FunctionalRequirement(
     id="FR-16",
     text="ノード数・エッジ数・充足率・曖昧語密度を数え、判定を伴わない形で出すこと",
     satisfies=[NEED_METRICS],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_STATS],
+    status="implemented",
+    realized_by=[PR_STATS],
+    evidence=[EVIDENCE_STATS],
     acceptance_criteria=[
         "閾値を持たず、終了コードは常に 0 になる",
         "率が 100% に満たない行には未達のノード id が並ぶ",
@@ -387,6 +792,9 @@ FR_EXPORT = FunctionalRequirement(
     text="正規化 JSON と Mermaid / DOT の図を出力すること",
     satisfies=[NEED_READABLE],
     source=[SRC_SPEC],
+    status="implemented",
+    realized_by=[PR_INITIAL],
+    evidence=[EVIDENCE_CLI, EVIDENCE_SITE],
     acceptance_criteria=[
         "正規化 JSON の各ノードに定義位置 (file:line) が入る",
         "Mermaid はそのまま Markdown に貼れる",
@@ -399,6 +807,8 @@ FR_STATUS_BY_TYPE = FunctionalRequirement(
     satisfies=[NEED_SELF_CHECK],
     source=[SRC_OWNER, ISSUE_STATUS_BY_TYPE],
     status="implemented",
+    realized_by=[PR_STATUS],
+    evidence=[EVIDENCE_VALIDATE, EVIDENCE_SITE],
     acceptance_criteria=[
         "Goal・Need・Constraint では proposed と approved だけを許可する",
         "FR・QR では proposed・approved・implemented・verified を許可する",
@@ -406,7 +816,7 @@ FR_STATUS_BY_TYPE = FunctionalRequirement(
     ],
 )
 
-# --- 機能要求: 未着手 -------------------------------------------------------
+# --- 機能要求: 後から追加された機能・未着手 ---------------------------------
 
 FR_PLAN_MARKDOWN = FunctionalRequirement(
     id="FR-18",
@@ -414,6 +824,9 @@ FR_PLAN_MARKDOWN = FunctionalRequirement(
     refines=[FR_PLAN],
     satisfies=[NEED_REVIEW_DIFF],
     source=[SRC_OWNER, ISSUE_PLAN_MARKDOWN],
+    status="implemented",
+    realized_by=[PR_PLAN_MARKDOWN],
+    evidence=[EVIDENCE_EXPLAIN, EVIDENCE_CI],
     acceptance_criteria=[
         "出力は GitHub の Markdown としてそのまま読める",
         "差分が無いときは、差分が無いことが 1 行で分かる",
@@ -456,7 +869,10 @@ FR_SARIF = FunctionalRequirement(
     id="FR-22",
     text="指摘を SARIF 形式で出力し、GitHub Code Scanning に載せられるようにすること",
     satisfies=[NEED_CI],
-    source=[SRC_OWNER, ISSUE_SARIF],
+    source=[SRC_OWNER, ISSUE_SARIF, ISSUE_SARIF_UPLOAD],
+    status="implemented",
+    realized_by=[PR_SARIF, PR_SARIF_UPLOAD, PR_SARIF_SAFETY],
+    evidence=[EVIDENCE_CLI, EVIDENCE_CI],
     acceptance_criteria=[
         "出力は SARIF 2.1.0 のスキーマに適合する",
         "指摘がファイルと行に紐づき、PR の差分上に表示される",
@@ -475,7 +891,10 @@ FR_ID_COLLISION = FunctionalRequirement(
     id="FR-24",
     text="記号だけが異なる id を持つノードを、図の上でも別のノードとして描き分けること",
     satisfies=[NEED_READABLE],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_ID_COLLISION],
+    status="implemented",
+    realized_by=[PR_ID_COLLISION, PR_ID_PREFIX],
+    evidence=[EVIDENCE_GRAPH, EVIDENCE_SITE],
     acceptance_criteria=[
         "FR.1 と FR-1 を含むモデルの Mermaid 出力に、2 つのノードが別々に現れる",
     ],
@@ -487,7 +906,10 @@ FR_SOURCE_AS_ATTRIBUTE = FunctionalRequirement(
         "出すこと"
     ),
     satisfies=[NEED_READABLE, NEED_LLM_CONTEXT],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_SOURCE_ATTRIBUTE, ISSUE_REFERENCE],
+    status="implemented",
+    realized_by=[PR_SOURCE_ATTRIBUTE, PR_REFERENCE, PR_REFERENCE_CLEANUP],
+    evidence=[EVIDENCE_EXPLAIN, EVIDENCE_SITE],
     acceptance_criteria=[
         "既定の Mermaid / DOT 出力に外部参照用のノードやエッジが現れない",
         "req explain の各ノードに Source / Realized by / Evidence の Reference 行が出る",
@@ -500,7 +922,10 @@ FR_FOCUS = FunctionalRequirement(
     text="選択したノードの近傍だけを図に描くフォーカス表示を設けること",
     refines=[FR_SITE],
     satisfies=[NEED_READABLE],
-    source=[SRC_OWNER, SRC_BENCH],
+    source=[SRC_OWNER, SRC_BENCH, ISSUE_SCALE, ISSUE_IMPACT],
+    status="implemented",
+    realized_by=[PR_SCALE, PR_IMPACT],
+    evidence=[EVIDENCE_SITE_JS, EVIDENCE_BENCH],
     acceptance_criteria=[
         "深さ (1〜3 ホップ) を選ぶと、図に描かれるのは選択ノードの近傍だけになる",
         "フォーカスは図の描画にしか効かず、一覧・テーブル・上流/下流の件数は全体のまま",
@@ -513,7 +938,10 @@ QR_READABLE_ZOOM = QualityRequirement(
     id="QR-1",
     text="図に描かれるノードのラベルが読める倍率 (0.5 倍以上) を保つこと",
     qualifies=[FR_FOCUS],
-    source=[SRC_BENCH, SRC_OWNER],
+    source=[SRC_BENCH, SRC_OWNER, ISSUE_SCALE],
+    status="approved",
+    realized_by=[PR_SCALE],
+    evidence=[EVIDENCE_BENCH],
     acceptance_criteria=[
         "300 ノードの合成モデルで、フォーカス 2 ホップ表示の倍率が 0.5 倍以上である",
     ],
@@ -523,13 +951,18 @@ QR_SITE_CLI_PARITY = QualityRequirement(
     text="閲覧用サイトが書き出す図と CLI が出す図を、一字一句一致させること",
     qualifies=[FR_SITE],
     source=[SRC_OWNER],
+    status="verified",
+    realized_by=[PR_INITIAL, PR_TYPESCRIPT],
     evidence=[EVIDENCE_SITE_CLI_PARITY],
 )
 QR_KEYBOARD = QualityRequirement(
     id="QR-4",
     text="閲覧用サイトのすべての操作要素を、キーボードだけで辿れるようにすること",
     qualifies=[FR_SITE],
-    source=[SRC_OWNER],
+    source=[SRC_OWNER, ISSUE_UI],
+    status="implemented",
+    realized_by=[PR_UI, PR_TYPESCRIPT],
+    evidence=[EVIDENCE_SITE, EVIDENCE_SITE_JS],
     acceptance_criteria=[
         "一覧・表・指摘の各行に tab キーだけで到達でき、Enter で開ける",
         "SVG の各ノードに tab キーで到達でき、Enter または Space で選択できる",
@@ -544,30 +977,35 @@ CONSTRAINT_NO_EXEC = Constraint(
     text="定義ファイルを実行しないこと",
     constrains=[FR_AST_ONLY, FR_PLAN],
     source=[SRC_SPEC],
+    status="approved",
 )
 CONSTRAINT_PYDANTIC_ONLY = Constraint(
     id="Constraint-2",
     text="実行時の依存を pydantic だけに保つこと",
     constrains=[FR_MCP, FR_SVG],
     source=[SRC_SPEC],
+    status="approved",
 )
 CONSTRAINT_GIT_ONLY = Constraint(
     id="Constraint-3",
     text="履歴とレビューの基盤を Git に置き、RDB と外部ストレージを持たないこと",
     constrains=[FR_PLAN],
     source=[SRC_SPEC],
+    status="approved",
 )
 CONSTRAINT_OFFLINE_SITE = Constraint(
     id="Constraint-4",
     text="公開する閲覧用サイトを、外部への通信なしで表示できるようにすること",
     constrains=[FR_SITE],
     source=[SRC_OWNER],
+    status="approved",
 )
 CONSTRAINT_NO_LLM_CALL = Constraint(
     id="Constraint-5",
     text="LLM API を直接呼ばず、LLM に渡す文脈の生成までに留めること",
     constrains=[FR_EXPLAIN, FR_MCP],
     source=[SRC_SPEC],
+    status="approved",
 )
 
 

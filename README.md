@@ -177,10 +177,14 @@ GROUP_CAPTURE = RequirementGroup(
 | `QualityRequirement` (QR) | 品質要求 (性能・可用性等) | 「非機能要求」の語は使わない |
 | `Constraint` | 解決策の自由度を制限する条件 | 要求ではない |
 
-外部情報へのトレースはノード型ではなく、値オブジェクト `Reference(title, url, note)` として持つ。
+外部情報へのトレースはノード型ではなく、値オブジェクト `Reference(title, url=None, note=None)` として持つ。
 `source` は Goal / Need / FR / QR / Constraint の共通属性で、FR / QR にはさらに
 `realized_by` と `evidence` がある。`note` は引用・要約・コメント・設計者の見解を分けず、
 リンクを開かなくても重要部分が分かる程度の補足を書く。
+
+`url` は任意である。作者の記憶や組織内の運用のように自然な公開 URL が無い参照は URL を省略し、
+無関係な Issue やダミー URL を割り当てない。URL がある一次資料・Issue・PR・テストは、実際の参照先を
+指定する。
 
 ```python
 SRC_POLICY_RECEIPT = Reference(

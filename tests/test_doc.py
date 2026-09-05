@@ -59,6 +59,12 @@ def test_spec_lists_attributes_criteria_and_references():
     assert "    - 読み取り率 95% 以上" in text
 
 
+def test_spec_omits_missing_reference_url():
+    text = render_spec(build(goal("Goal-1", source=[source(url=None)])))
+    assert "URL: None" not in text
+    assert "URL:" not in text
+
+
 def test_spec_shows_node_location_when_known():
     graph = sample()
     graph.locations["FR-1"] = "requirements.py:12"

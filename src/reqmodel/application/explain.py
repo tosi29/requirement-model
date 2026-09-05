@@ -57,7 +57,8 @@ def subgraph_edges(graph: RequirementGraph, node_ids: set[str]) -> list:
 
 
 def _reference_line(label: str, reference: Reference) -> list[str]:
-    lines = [f"    {label}: {reference.title} <{reference.url}>"]
+    suffix = f" <{reference.url}>" if reference.url else ""
+    lines = [f"    {label}: {reference.title}{suffix}"]
     if reference.note:
         lines.append(f"      note: {reference.note}")
     return lines

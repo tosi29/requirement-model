@@ -168,8 +168,8 @@ class Raw:
 
 def reference(key: str, note: str | None = None, detail: str | None = None) -> Raw:
     title = note or key
-    url = f"https://github.com/tosi29/requirement-model/issues/123#{key}"
-    args = [f'title={literal(title)}', f'url={literal(url)}']
+    # 合成ベンチの出典・受入結果は実在の外部文書ではないため、URLを捏造しない。
+    args = [f'title={literal(title)}']
     if detail:
         args.append(f'note={literal(detail)}')
     return Raw(f"Reference({', '.join(args)})")

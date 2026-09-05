@@ -1709,6 +1709,12 @@ test("SVG にはノードのラベル・配色・エッジ名が入る", () => {
   assert.ok(svg.includes('stroke-dasharray="1 3"')); // proposed = 点線
 });
 
+test("SVG の矢印先端は参照元の線色に追従する", () => {
+  const svg = graphSvg(scene());
+
+  assert.ok(svg.includes('fill="context-stroke"'));
+});
+
 test("ノードが 1 つも無くても SVG は壊れない", () => {
   const svg = graphSvg({ ...scene(), nodes: [], edges: [], bands: [] });
 

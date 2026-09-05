@@ -150,14 +150,13 @@
 
   // src/reqmodel/presentation/site_graph_view.ts
   var SVG_NS = "http://www.w3.org/2000/svg";
-  function applyGraphTheme(graphEl2, defs2, data, nodeItems2, bandItems2, primitives) {
+  function applyGraphTheme(graphEl2, data, nodeItems2, bandItems2, primitives) {
     const pal = primitives.palette();
     graphEl2.style.setProperty("--graph-fg", pal.fg);
     graphEl2.style.setProperty("--graph-bg", pal.bg);
     graphEl2.style.setProperty("--graph-panel", pal.panel);
     graphEl2.style.setProperty("--graph-border", pal.border);
     graphEl2.style.setProperty("--graph-muted", pal.muted);
-    defs2.querySelector("#req-arrow path")?.setAttribute("fill", pal.border);
     const impact = data.meta.impact_colors;
     graphEl2.style.setProperty("--impact-selected", impact?.selected || pal.fg);
     graphEl2.style.setProperty("--impact-upstream", impact?.upstream || pal.fg);
@@ -1399,7 +1398,7 @@ ${text}`;
   function buildGraphDom() {
     const pal = palette();
     const arrow = svgEl("marker", { id: "req-arrow", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: "auto" });
-    arrow.append(svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: pal.border }));
+    arrow.append(svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "context-stroke" }));
     defs.replaceChildren(arrow);
     const edgeLayer = svgEl("g", { class: "edges" });
     const bandLayer = svgEl("g", { class: "bands" });
@@ -2259,7 +2258,7 @@ ${text}`;
   }
   function restyleGraph() {
     if (!svg || !defs) return;
-    applyGraphTheme(graphEl, defs, DATA, nodeItems.values(), bandItems.values(), graphPrimitives);
+    applyGraphTheme(graphEl, DATA, nodeItems.values(), bandItems.values(), graphPrimitives);
     renderLegend();
   }
   themeButton.addEventListener("click", () => {

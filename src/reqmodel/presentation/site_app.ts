@@ -167,7 +167,8 @@ function initGraph() {
 function buildGraphDom() {
   const pal = palette();
   const arrow = svgEl("marker", { id: "req-arrow", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: "auto" });
-  arrow.append(svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: pal.border }));
+  // 強調時に線色が変わっても、先端が同じ色になるよう線の色を継承する。
+  arrow.append(svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "context-stroke" }));
   defs.replaceChildren(arrow);
 
   const edgeLayer = svgEl("g", { class: "edges" });
@@ -1199,7 +1200,7 @@ function applyTheme() {
 /** テーマ依存の色を SVG に入れ直す。 */
 function restyleGraph() {
   if (!svg || !defs) return;
-  applyGraphTheme(graphEl, defs, DATA, nodeItems.values(), bandItems.values(), graphPrimitives);
+  applyGraphTheme(graphEl, DATA, nodeItems.values(), bandItems.values(), graphPrimitives);
   renderLegend();
 }
 

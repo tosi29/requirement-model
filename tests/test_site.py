@@ -479,6 +479,17 @@ def test_graph_only_controls_are_icon_buttons_with_accessible_names(tmp_path: Pa
     assert 'id="export-svg" title="いま図に描かれているものを SVG で保存する">' not in html
 
 
+def test_graph_legend_separates_type_and_status_rows(tmp_path: Path):
+    """凡例の種別 (色) と status (線種) は別の段に置く。"""
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert 'id="legend"' in html
+    assert 'const container = htmlEl("div", { class: "legend-group" }' in html
+    assert ".graph-legend {" in html
+    assert "flex-direction: column;" in html
+    assert ".graph-legend .legend-group + .legend-group" in html
+
+
 def test_page_puts_the_view_state_in_the_url(tmp_path: Path):
     """選択・絞り込みは URL に載る。URL を渡せば相手にも同じ画面が出る。"""
     index = build_site(chain(), FindingList(), tmp_path)

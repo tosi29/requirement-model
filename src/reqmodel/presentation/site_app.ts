@@ -819,7 +819,7 @@ function renderStats() {
 function renderLegend() {
   const scheme = palette().dark ? "dark" : "light";
   const groups = legendGroups(DATA.meta, scheme).map((group) => {
-    const container = htmlEl("span", { class: "legend-group" }, htmlEl("b", {}, group.title));
+    const container = htmlEl("div", { class: "legend-group" }, htmlEl("b", {}, group.title));
     for (const { label, swatch } of group.items) {
       const mark = htmlEl("i", { class: "swatch" });
       mark.style.background = swatch.background;

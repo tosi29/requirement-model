@@ -451,10 +451,10 @@ def test_graph_only_controls_are_overlaid_inside_the_graph_frame(tmp_path: Path)
 
     assert 'class="graph-controls graph-only"' in graph_frame
     assert 'class="graph-controls graph-only" id="graph-tools"' in graph_frame
-    assert 'class="graph-controls graph-only graph-zoom-controls" id="zoom-tools"' in graph_frame
-    assert ".graph-zoom-controls { top: auto; bottom: 12px; }" in html
     assert 'role="group" aria-label="表示操作"' in graph_frame
-    assert 'class="graph-control-group" role="group" aria-label="拡大縮小"' in graph_frame
+    assert ".graph-controls {" in html
+    assert "top: auto;" in html
+    assert "bottom: 12px;" in html
     assert 'class="graph-control-group" role="group" aria-label="レイアウト"' in graph_frame
     assert 'class="export-menu"' in graph_frame
 

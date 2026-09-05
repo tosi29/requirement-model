@@ -57,7 +57,8 @@ $ uv run --locked req validate examples/sample.py
 ```
 
 Node の依存にはルートの `.npmrc` で `min-release-age=4320` (3日) を設定している。
-`npm install` の解決と `npm ci` のロック済みインストールは、この設定を自動的に読む。
+`npm install` は公開から3日経っていない版を解決せず、`npm ci` はコミット済みの
+`package-lock.json` を変更せず、そのロック済みの結果をインストールする。
 
 ## 使い方
 

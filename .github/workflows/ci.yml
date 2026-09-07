@@ -60,7 +60,7 @@ jobs:
           python-version: "3.14"
 
       # tests/test_site_js.py が node を呼ぶ (無ければ skip されてしまうので必ず入れる)。
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
 
@@ -91,7 +91,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
 

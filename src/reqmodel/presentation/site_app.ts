@@ -1154,11 +1154,6 @@ getElement("undirected").addEventListener("change", (event) => {
   refresh();
   writeHash();
 });
-getElement("clear").addEventListener("click", () => {
-  state.selected = null;
-  refresh();
-  writeHash();
-});
 getElement("direction").addEventListener("click", () => {
   state.direction = state.direction === "LR" ? "TD" : "LR";
   syncGraphControlLabels();
@@ -1341,23 +1336,6 @@ document.addEventListener("keydown", (event) => {
   } else if (typing) {
     target.blur();
   }
-});
-
-const copyLink = getElement("copy-link");
-copyLink.addEventListener("click", async () => {
-  //: URL は writeHash() が常に最新にしているので、そのまま渡せばよい。
-  try {
-    await navigator.clipboard.writeText(location.href);
-    copyLink.title = "リンクをコピーしました";
-    copyLink.setAttribute("aria-label", "リンクをコピーしました");
-  } catch {
-    copyLink.title = "リンクをコピーできませんでした";
-    copyLink.setAttribute("aria-label", "リンクをコピーできませんでした");
-  }
-  setTimeout(() => {
-    copyLink.title = "表示中のページへのリンクをコピー";
-    copyLink.setAttribute("aria-label", "表示中のページへのリンクをコピー");
-  }, 1600);
 });
 
 window.addEventListener("popstate", applyHash);

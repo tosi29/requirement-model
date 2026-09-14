@@ -435,9 +435,9 @@ def test_graph_only_controls_are_overlaid_inside_the_graph_frame(tmp_path: Path)
 
     assert 'id="tab-graph"' in toolbar
     assert 'id="tab-table"' in toolbar
-    assert 'id="copy-link"' in toolbar
-    assert '<span class="toolbar-actions" role="group" aria-label="ビュー共通操作">' in toolbar
-    assert 'margin-left: auto;' in html
+    assert 'id="copy-link"' not in toolbar
+    assert 'id="clear"' not in toolbar
+    assert "toolbar-actions" not in toolbar
     for element_id in (
         "zoom-out",
         "zoom-in",
@@ -509,7 +509,7 @@ def test_page_puts_the_view_state_in_the_url(tmp_path: Path):
     # 戻る/進む (popstate) と、URL を手で書き換えたとき (hashchange) の両方から戻す。
     assert '"popstate", applyHash' in html
     assert '"hashchange", applyHash' in html
-    assert 'id="copy-link"' in html
+    assert 'id="copy-link"' not in html
 
 
 def test_definition_text_is_never_treated_as_a_placeholder(tmp_path: Path):
@@ -693,15 +693,14 @@ def test_page_has_the_export_buttons(tmp_path: Path):
     assert 'aria-label="図をダウンロード"' in html
 
 
-def test_page_uses_an_icon_button_to_copy_the_link(tmp_path: Path):
-    """URL コピーは狭いツールバーを圧迫せず、読み上げ可能なアイコンで示す。"""
+def test_page_omits_obsolete_common_view_actions(tmp_path: Path):
+    """URL はアドレスバーから扱い、選択は Escape で解除するためボタンを置かない。"""
     index = build_site(chain(), FindingList(), tmp_path)
     html = index.read_text(encoding="utf-8")
 
-    assert 'id="copy-link" class="icon-button"' in html
-    assert 'aria-label="表示中のページへのリンクをコピー"' in html
-    assert '<path d="M10 13a5 5 0 0 0 7.54.54l3-3' in html
-    assert '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3' in html
+    assert 'id="copy-link"' not in html
+    assert 'id="clear"' not in html
+    assert "toolbar-actions" not in html
 
 
 def test_page_has_a_theme_toggle(tmp_path: Path):

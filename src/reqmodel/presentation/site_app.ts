@@ -1217,6 +1217,29 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", res
 // 出力先の graph.mmd / graph.dot は全体のグラフなので、絞り込んだ図はここで組む。
 // SVG は「いま図に描かれているもの」(フォーカス中なら近傍だけ) を写す。
 
+const exportMenu = document.querySelector<HTMLDetailsElement>(".export-menu");
+const exportOptions = exportMenu.querySelector<HTMLElement>(".export-options");
+
+/** 開いたメニューを画面内に収める。下に入らなければアイコンの上に開く。 */
+function positionExportMenu() {
+  if (!exportMenu.open) return;
+  const anchor = exportMenu.querySelector("summary").getBoundingClientRect();
+  const menu = exportOptions.getBoundingClientRect();
+  const margin = 8;
+  const gap = 4;
+  const width = document.documentElement.clientWidth;
+  const height = document.documentElement.clientHeight;
+  const top = anchor.bottom + gap + menu.height <= height - margin
+    ? anchor.bottom + gap
+    : anchor.top - gap - menu.height;
+  exportOptions.style.left = `${Math.max(margin, Math.min(anchor.right - menu.width, width - margin - menu.width))}px`;
+  exportOptions.style.top = `${Math.max(margin, Math.min(top, height - margin - menu.height))}px`;
+}
+
+exportMenu.addEventListener("toggle", positionExportMenu);
+window.addEventListener("resize", positionExportMenu);
+document.addEventListener("scroll", positionExportMenu, true);
+
 /** 文字列をファイルとして保存させる。 */
 let lastDownloadUrl = null;
 function download(name, text, type) {

@@ -2267,6 +2267,23 @@ ${text}`;
     applyTheme();
   });
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", restyleGraph);
+  var exportMenu = document.querySelector(".export-menu");
+  var exportOptions = exportMenu.querySelector(".export-options");
+  function positionExportMenu() {
+    if (!exportMenu.open) return;
+    const anchor = exportMenu.querySelector("summary").getBoundingClientRect();
+    const menu = exportOptions.getBoundingClientRect();
+    const margin = 8;
+    const gap = 4;
+    const width = document.documentElement.clientWidth;
+    const height = document.documentElement.clientHeight;
+    const top = anchor.bottom + gap + menu.height <= height - margin ? anchor.bottom + gap : anchor.top - gap - menu.height;
+    exportOptions.style.left = `${Math.max(margin, Math.min(anchor.right - menu.width, width - margin - menu.width))}px`;
+    exportOptions.style.top = `${Math.max(margin, Math.min(top, height - margin - menu.height))}px`;
+  }
+  exportMenu.addEventListener("toggle", positionExportMenu);
+  window.addEventListener("resize", positionExportMenu);
+  document.addEventListener("scroll", positionExportMenu, true);
   var lastDownloadUrl = null;
   function download(name, text, type) {
     document.querySelector("a[data-generated-download]")?.remove();

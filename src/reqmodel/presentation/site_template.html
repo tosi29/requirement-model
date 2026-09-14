@@ -168,7 +168,6 @@ main {
 #graph .node.detail-path:not(.sel) .node-shape { stroke: var(--impact-related); stroke-width: 4; }
 #graph .node.detail-target .node-shape { stroke-dasharray: 7 3; stroke-width: 5; }
 #graph .edge.detail-path .edge-line { stroke: var(--impact-related); stroke-width: 4; }
-.focus-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
 .icon-select.active { background: var(--panel); outline: 2px solid var(--accent); }
 
 [hidden] { display: none !important; }
@@ -547,11 +546,8 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
            そのため選択中のタブだけが tab 順に乗る (roving tabindex)。 -->
       <span class="tabs" role="tablist" aria-label="中央ペインの表示">
         <button id="tab-graph" role="tab" class="active" aria-selected="true" aria-controls="graph-frame">グラフ</button>
+        <button id="tab-analysis" role="tab" aria-selected="false" aria-controls="graph-frame" tabindex="-1" title="ノードを選択して影響範囲だけを分析する">フォーカス分析</button>
         <button id="tab-table" role="tab" aria-selected="false" aria-controls="table-frame" tabindex="-1">テーブル</button>
-      </span>
-      <span id="focus-status" class="focus-status" hidden>
-        <span id="focus-status-text" role="status"></span>
-        <button id="exit-focus" type="button" title="フォーカスを解除 (Esc)">フォーカスを解除</button>
       </span>
     </div>
     <div class="graph-frame" id="graph-frame" role="tabpanel" aria-label="グラフ">

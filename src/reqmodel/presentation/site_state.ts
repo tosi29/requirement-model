@@ -89,9 +89,9 @@ export function encodeHash(state, data) {
     put(filter.param, list(selected, all));
   }
   if (state.direction === "LR") put("dir", "LR");
-  if (state.mode === "table") put("view", "table");
+  if (state.mode === "table" || state.mode === "analysis") put("view", state.mode);
   if (parseFocus(String(state.focus))) put("focus", String(state.focus));
-  if (state.focus && state.selected && state.detail && state.detail !== state.selected) {
+  if (state.mode === "analysis" && state.selected && state.detail && state.detail !== state.selected) {
     put("detail", encodeURIComponent(state.detail));
   }
   if (IMPACT_DEPTHS.includes(state.depth)) put("depth", String(state.depth));
@@ -123,10 +123,10 @@ export function decodeHash(hash: string | null, data: SiteData): ViewState {
     state[filter.key] = subset(params.get(filter.param), filter.all(data));
   }
   if (params.get("dir") === "LR") state.direction = "LR";
-  if (params.get("view") === "table") state.mode = "table";
+  if (params.get("view") === "table" || params.get("view") === "analysis") state.mode = params.get("view");
   state.focus = parseFocus(params.get("focus") || "0");
   const detail = params.get("detail");
-  if (state.focus && state.selected && detail !== state.selected && data.nodes.some((node) => node.id === detail)) {
+  if (state.mode === "analysis" && state.selected && detail !== state.selected && data.nodes.some((node) => node.id === detail)) {
     state.detail = detail;
   }
   const depth = Number(params.get("depth"));
@@ -181,7 +181,7 @@ export const THEME_STORAGE_KEY = "reqmodel:site:theme";
 
 /** 次回に持ち越す状態を `#...` にしたもの。既定のままなら空文字。 */
 export function storableHash(state, data) {
-  return encodeHash({ ...state, selected: null, detail: null, query: "" }, data);
+  return encodeHash({ ...state, selected: null, detail: null, mode: state.mode === "analysis" ? "graph" : state.mode, query: "" }, data);
 }
 
 /** 開いたときに適用するハッシュ。URL に何か載っていればそれ、無ければ保存。 */
@@ -210,7 +210,7 @@ export function nextTheme(theme) {
 
 /** フォーカス中は起点を固定し、詳細の対象だけを切り替える。 */
 export function selectNodeState(state: ViewState, id: string | null): ViewState {
-  if (state.focus && state.selected) {
+  if (state.mode === "analysis" && state.selected) {
     return { ...state, detail: id && id !== state.selected ? id : null };
   }
   return { ...state, selected: state.selected === id ? null : id, detail: null };

@@ -1,6 +1,5 @@
 import { labelChunks, nodeSize, estimateTextWidth } from "./site_text.ts";
 import type {
-  FocusMode,
   GraphViewModel,
   NormalizedEdge,
   NormalizedNode,
@@ -195,7 +194,7 @@ export function impactScope(state: ViewState) {
   const depth = (state || {}).depth;
   return {
     depth: IMPACT_DEPTHS.includes(depth) ? depth : null,
-    undirected: typeof state?.focus !== "string" && Boolean((state || {}).undirected),
+    undirected: state?.mode !== "analysis" && Boolean((state || {}).undirected),
   };
 }
 
@@ -251,72 +250,40 @@ export function focusSet(view: GraphViewModel, start: string, depth: number): Se
   return new Set([start, ...related(view, start, depth)]);
 }
 
-/** 分析の向き。既存の近傍表示と同じフォーカス操作から選ぶ。 */
-export const ANALYSIS_FOCUS = {
-  impact: "上流＋下流",
-  upstream: "上流のみ",
-  downstream: "下流のみ",
-};
-
-export function parseFocus(value: string): FocusMode {
-  if (Object.hasOwn(ANALYSIS_FOCUS, value)) return value as FocusMode;
+export function parseFocus(value: string): number {
   const depth = Number(value);
   return FOCUS_DEPTHS.includes(depth) ? depth : 0;
 }
 
 /** 描画範囲だけを絞る。起点がフィルタで消えても全体表示には戻さない。 */
 export function focusedNodes(view: GraphViewModel): Set<string> | null {
-  const { focus, selected, depth } = view.state;
-  if (!focus || !selected) return null;
-  if (!view.adjacency.has(selected)) return new Set();
-  if (typeof focus === "number") return focusSet(view, selected, focus);
+  const { focus, selected, depth, mode } = view.state;
+  if (mode !== "analysis") return focus && selected ? focusSet(view, selected, focus) : null;
+  if (!selected || !view.adjacency.has(selected)) return new Set();
   const impact = impactSets(view, selected, { depth: depth || null, undirected: false });
-  if (focus === "impact") return impact.whole;
-  return new Set([selected, ...impact[focus]]);
+  return impact.whole;
 }
 
-/** 表示中の経路のうち最短の 1 本。分析では向きを途中で反転しない。 */
+/** 起点と detail を結ぶ表示中の全経路。各方向は独立に辿る。 */
 export function focusTrail(view: GraphViewModel, shown = focusedNodes(view)) {
-  const { selected, detail, focus } = view.state;
-  const empty = () => ({ nodes: new Set<string>(), edges: new Set<NormalizedEdge>() });
-  if (!shown || !selected || !detail || !shown.has(selected) || !shown.has(detail)) return empty();
-  const shortest = (direction: "in" | "out" | "both") => {
-    const links = new Map<string, { id: string; edge: NormalizedEdge }[]>();
-    for (const id of shown) links.set(id, []);
-    for (const edge of view.edges) {
-      if (!shown.has(edge.source) || !shown.has(edge.target)) continue;
-      if (direction !== "in") links.get(edge.source).push({ id: edge.target, edge });
-      if (direction !== "out") links.get(edge.target).push({ id: edge.source, edge });
+  const { selected, detail, mode } = view.state;
+  const result = { nodes: new Set<string>(), edges: new Set<NormalizedEdge>() };
+  if (mode !== "analysis" || !shown || !selected || !detail || !shown.has(selected) || !shown.has(detail)) return result;
+  const nodes = view.nodes.filter((node) => shown.has(node.id));
+  const edges = view.edges.filter((edge) => shown.has(edge.source) && shown.has(edge.target));
+  const scoped = { ...view, nodes, edges, adjacency: buildAdjacency(nodes, edges) };
+  for (const forward of [true, false]) {
+    const from = new Set([selected, ...reach(scoped, selected, forward)]);
+    if (!from.has(detail)) continue;
+    const to = new Set([detail, ...reach(scoped, detail, !forward)]);
+    for (const id of from) if (to.has(id)) result.nodes.add(id);
+    for (const edge of edges) {
+      const source = forward ? edge.source : edge.target;
+      const target = forward ? edge.target : edge.source;
+      if (from.has(source) && to.has(target)) result.edges.add(edge);
     }
-    const parents = new Map<string, { id: string; edge: NormalizedEdge }>();
-    const seen = new Set([selected]);
-    const queue = [selected];
-    for (let at = 0; at < queue.length && !seen.has(detail); at++) {
-      const id = queue[at];
-      for (const next of links.get(id)) {
-        if (seen.has(next.id)) continue;
-        seen.add(next.id);
-        parents.set(next.id, { id, edge: next.edge });
-        queue.push(next.id);
-      }
-    }
-    if (!seen.has(detail)) return null;
-    const result = empty();
-    result.nodes.add(detail);
-    for (let id = detail; id !== selected;) {
-      const parent = parents.get(id);
-      result.edges.add(parent.edge);
-      result.nodes.add(parent.id);
-      id = parent.id;
-    }
-    return result;
-  };
-  if (typeof focus === "number") return shortest("both") || empty();
-  if (focus === "upstream") return shortest("in") || empty();
-  if (focus === "downstream") return shortest("out") || empty();
-  const paths = [shortest("in"), shortest("out")].filter(Boolean);
-  paths.sort((a, b) => a.edges.size - b.edges.size);
-  return paths[0] || empty();
+  }
+  return result;
 }
 
 // --- 並びの土台 ------------------------------------------------------------

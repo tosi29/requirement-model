@@ -1,7 +1,7 @@
 /** Python の正規化モデルと Web UI の間にある読み取り専用データ境界。 */
 export type NodeId = string;
 export type Direction = "TD" | "LR";
-export type ViewMode = "graph" | "table";
+export type ViewMode = "graph" | "table" | "analysis";
 export type Theme = "auto" | "light" | "dark";
 export type Severity = "error" | "severe" | "warning" | "info";
 
@@ -78,8 +78,6 @@ export interface SiteData {
 }
 
 export interface SortState { key: string; asc: boolean }
-export type FocusMode = number | "impact" | "upstream" | "downstream";
-
 export interface ViewState {
   types: Set<string>;
   edges: Set<string>;
@@ -88,7 +86,7 @@ export interface ViewState {
   direction: Direction;
   mode: ViewMode;
   query: string;
-  focus: FocusMode;
+  focus: number;
   detail: NodeId | null;
   depth: number;
   undirected: boolean;

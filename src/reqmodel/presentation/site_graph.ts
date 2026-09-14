@@ -1,5 +1,6 @@
 import { labelChunks, nodeSize, estimateTextWidth } from "./site_text.ts";
 import type {
+  FocusMode,
   GraphViewModel,
   NormalizedEdge,
   NormalizedNode,
@@ -194,7 +195,7 @@ export function impactScope(state: ViewState) {
   const depth = (state || {}).depth;
   return {
     depth: IMPACT_DEPTHS.includes(depth) ? depth : null,
-    undirected: Boolean((state || {}).undirected),
+    undirected: typeof state?.focus !== "string" && Boolean((state || {}).undirected),
   };
 }
 
@@ -211,7 +212,7 @@ export function impactSets(view: GraphViewModel, id: string, scope: { depth: num
   if (undirected) {
     const neighbours = related(view, id, depth);
     return {
-      upstream: new Set(),
+      upstream: new Set<string>(),
       downstream: neighbours,
       whole: new Set([id, ...neighbours]),
       undirected: true,
@@ -248,6 +249,74 @@ export const FOCUS_DEPTHS = [1, 2, 3];
 export function focusSet(view: GraphViewModel, start: string, depth: number): Set<string> {
   if (!view.adjacency.has(start)) return new Set();
   return new Set([start, ...related(view, start, depth)]);
+}
+
+/** 分析の向き。既存の近傍表示と同じフォーカス操作から選ぶ。 */
+export const ANALYSIS_FOCUS = {
+  impact: "上流＋下流",
+  upstream: "上流のみ",
+  downstream: "下流のみ",
+};
+
+export function parseFocus(value: string): FocusMode {
+  if (Object.hasOwn(ANALYSIS_FOCUS, value)) return value as FocusMode;
+  const depth = Number(value);
+  return FOCUS_DEPTHS.includes(depth) ? depth : 0;
+}
+
+/** 描画範囲だけを絞る。起点がフィルタで消えても全体表示には戻さない。 */
+export function focusedNodes(view: GraphViewModel): Set<string> | null {
+  const { focus, selected, depth } = view.state;
+  if (!focus || !selected) return null;
+  if (!view.adjacency.has(selected)) return new Set();
+  if (typeof focus === "number") return focusSet(view, selected, focus);
+  const impact = impactSets(view, selected, { depth: depth || null, undirected: false });
+  if (focus === "impact") return impact.whole;
+  return new Set([selected, ...impact[focus]]);
+}
+
+/** 表示中の経路のうち最短の 1 本。分析では向きを途中で反転しない。 */
+export function focusTrail(view: GraphViewModel, shown = focusedNodes(view)) {
+  const { selected, detail, focus } = view.state;
+  const empty = () => ({ nodes: new Set<string>(), edges: new Set<NormalizedEdge>() });
+  if (!shown || !selected || !detail || !shown.has(selected) || !shown.has(detail)) return empty();
+  const shortest = (direction: "in" | "out" | "both") => {
+    const links = new Map<string, { id: string; edge: NormalizedEdge }[]>();
+    for (const id of shown) links.set(id, []);
+    for (const edge of view.edges) {
+      if (!shown.has(edge.source) || !shown.has(edge.target)) continue;
+      if (direction !== "in") links.get(edge.source).push({ id: edge.target, edge });
+      if (direction !== "out") links.get(edge.target).push({ id: edge.source, edge });
+    }
+    const parents = new Map<string, { id: string; edge: NormalizedEdge }>();
+    const seen = new Set([selected]);
+    const queue = [selected];
+    for (let at = 0; at < queue.length && !seen.has(detail); at++) {
+      const id = queue[at];
+      for (const next of links.get(id)) {
+        if (seen.has(next.id)) continue;
+        seen.add(next.id);
+        parents.set(next.id, { id, edge: next.edge });
+        queue.push(next.id);
+      }
+    }
+    if (!seen.has(detail)) return null;
+    const result = empty();
+    result.nodes.add(detail);
+    for (let id = detail; id !== selected;) {
+      const parent = parents.get(id);
+      result.edges.add(parent.edge);
+      result.nodes.add(parent.id);
+      id = parent.id;
+    }
+    return result;
+  };
+  if (typeof focus === "number") return shortest("both") || empty();
+  if (focus === "upstream") return shortest("in") || empty();
+  if (focus === "downstream") return shortest("out") || empty();
+  const paths = [shortest("in"), shortest("out")].filter(Boolean);
+  paths.sort((a, b) => a.edges.size - b.edges.size);
+  return paths[0] || empty();
 }
 
 // --- 並びの土台 ------------------------------------------------------------

@@ -164,6 +164,13 @@ main {
 #graph .hit .node-shape { filter: drop-shadow(0 0 8px var(--search-hit)); }
 #graph .hit-current .node-shape { filter: drop-shadow(0 0 12px var(--search-hit)); }
 #graph .dim.hit { opacity: .65; }
+#graph .trail-muted { opacity: .35; }
+#graph .node.detail-path:not(.sel) .node-shape { stroke: var(--impact-related); stroke-width: 4; }
+#graph .node.detail-target .node-shape { stroke-dasharray: 7 3; stroke-width: 5; }
+#graph .edge.detail-path .edge-line { stroke: var(--impact-related); stroke-width: 4; }
+.focus-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+.icon-select.active { background: var(--panel); outline: 2px solid var(--accent); }
+
 [hidden] { display: none !important; }
 .tabs, .tool-group { display: flex; gap: 6px; align-items: center; }
 .tabs { margin-right: 6px; }
@@ -542,6 +549,10 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
         <button id="tab-graph" role="tab" class="active" aria-selected="true" aria-controls="graph-frame">グラフ</button>
         <button id="tab-table" role="tab" aria-selected="false" aria-controls="table-frame" tabindex="-1">テーブル</button>
       </span>
+      <span id="focus-status" class="focus-status" hidden>
+        <span id="focus-status-text" role="status"></span>
+        <button id="exit-focus" type="button" title="フォーカスを解除 (Esc)">フォーカスを解除</button>
+      </span>
     </div>
     <div class="graph-frame" id="graph-frame" role="tabpanel" aria-label="グラフ">
       <div id="graph"></div>
@@ -566,8 +577,8 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
           </button>
           <span id="focus-control" class="icon-select" title="フォーカス">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
-            <!-- 選択肢は site_app.ts が FOCUS_DEPTHS から作る。 -->
-            <select id="focus" aria-label="フォーカス (近傍だけを描く)"></select>
+            <!-- 分析の向きと近傍の深さは site_app.ts が生成する。 -->
+            <select id="focus" aria-label="フォーカス"></select>
           </span>
           <button id="relayout" class="icon-button" type="button" title="表示中のノードだけで並べ直す" aria-label="表示中のノードだけで並べ直す">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.8-4L3 10"></path><path d="M3 5v5h5"></path><path d="M4 13a8 8 0 0 0 14.8 4L21 14"></path><path d="M21 19v-5h-5"></path></svg>

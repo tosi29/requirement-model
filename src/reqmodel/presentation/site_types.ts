@@ -78,6 +78,8 @@ export interface SiteData {
 }
 
 export interface SortState { key: string; asc: boolean }
+export type FocusMode = number | "impact" | "upstream" | "downstream";
+
 export interface ViewState {
   types: Set<string>;
   edges: Set<string>;
@@ -86,7 +88,8 @@ export interface ViewState {
   direction: Direction;
   mode: ViewMode;
   query: string;
-  focus: number;
+  focus: FocusMode;
+  detail: NodeId | null;
   depth: number;
   undirected: boolean;
   sort: SortState;

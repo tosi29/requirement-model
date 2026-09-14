@@ -27,6 +27,7 @@ const queryElements = (selector: string): NodeListOf<PageElement> =>
 
 import {
   ALL_SEVERITIES,
+  ANALYSIS_FOCUS,
   FOCUS_DEPTHS,
   IMPACT_DEPTHS,
   LABEL_FONT,
@@ -45,7 +46,8 @@ import {
   estimateTextWidth,
   explainCommand,
   fieldLabel,
-  focusSet,
+  focusedNodes,
+  focusTrail,
   graphElements,
   groupFindings,
   impactSets,
@@ -58,11 +60,13 @@ import {
   nextTheme,
   nodeContext,
   normalizeTheme,
+  parseFocus,
   quadraticPath,
   quadraticPoint,
   searchHits,
   safeHref,
   severityTabs,
+  selectNodeState,
   sortRows,
   sourceUrl,
   statusFilters,
@@ -160,7 +164,7 @@ function initGraph() {
   svg.append(defs, viewport, graphLayer);
   graphEl.append(svg);
   buildGraphDom();
-  panZoom.bind(svg, viewport, () => selectNode(state.selected));
+  panZoom.bind(svg, viewport, () => { if (!state.focus) selectNode(state.selected); });
   runLayout();
 }
 
@@ -249,14 +253,13 @@ function buildGraphDom() {
 
 /** 図に描くノードの id。フォーカス無し (または選択無し) なら null = 全部描く。 */
 function focusedIds() {
-  if (!state.focus || !state.selected || !view.byId.has(state.selected)) return null;
-  return focusSet(view, state.selected, state.focus);
+  return focusedNodes(view);
 }
 
 //: 直近のレイアウトが対象にしたフォーカス (`深さ:選択ノード`)。
 let laidOutFocus = "";
 
-const focusKey = () => (focusedIds() ? `${state.focus}:${state.selected}` : "");
+const focusKey = () => (focusedIds() ? `${state.focus}:${state.selected}:${typeof state.focus === "string" ? state.depth : ""}` : "");
 
 /**
  * 描く範囲が変わっていれば並べ直す。
@@ -452,7 +455,7 @@ function applyVisibility() {
 
 function applyHighlight() {
   if (!svg) return;
-  for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()]) item.group.classList.remove("sel", "up", "down", "rel", "dim", "on-path");
+  for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()]) item.group.classList.remove("sel", "up", "down", "rel", "dim", "on-path", "detail-target", "detail-path", "trail-muted");
   if (!state.selected || !view.byId.has(state.selected)) return;
   const { upstream, downstream, whole, undirected } = impactSets(view, state.selected);
   for (const item of nodeItems.values()) {
@@ -465,6 +468,20 @@ function applyHighlight() {
   for (const item of edgeItemsByKey.values()) {
     const linked = whole.has(item.source) && whole.has(item.target);
     item.group.classList.add(linked ? "on-path" : "dim");
+  }
+  if (state.focus && state.detail) {
+    const trail = focusTrail(view);
+    for (const item of nodeItems.values()) {
+      classed(item.group, "detail-target", item.id === state.detail);
+      classed(item.group, "detail-path", trail.nodes.has(item.id));
+      if (trail.nodes.has(item.id)) item.group.classList.remove("dim");
+      classed(item.group, "trail-muted", trail.nodes.size && !trail.nodes.has(item.id));
+    }
+    for (const item of edgeItemsByKey.values()) {
+      classed(item.group, "detail-path", trail.edges.has(DATA.edges[item.index]));
+      if (trail.edges.has(DATA.edges[item.index])) item.group.classList.remove("dim");
+      classed(item.group, "trail-muted", trail.nodes.size && !trail.edges.has(DATA.edges[item.index]));
+    }
   }
 }
 
@@ -553,12 +570,17 @@ function appendTerm(list, term, value, className = null) {
 function renderDetail() {
   const panel = getElement("detail");
   panel.replaceChildren();
-  if (!state.selected || !view.byId.has(state.selected)) {
+  const detailId = state.focus && state.detail ? state.detail : state.selected;
+  if (!detailId || !view.byId.has(detailId)) {
     panel.append(htmlEl("p", { class: "empty" }, "グラフのノードをクリックすると、本文・根拠・影響範囲を表示する。"));
     return;
   }
-  const node = view.byId.get(state.selected);
+  const node = view.byId.get(detailId);
   const impact = impactSets(view, node.id);
+  if (state.focus && state.selected) {
+    const outside = !focusedIds()?.has(node.id);
+    panel.append(htmlEl("p", { class: "hint" }, `フォーカス起点: ${state.selected}${outside ? " ／ このノードは図の表示範囲外です" : ""}`));
+  }
 
   panel.append(
     htmlEl("h3", {}, node.id, " ", htmlEl("span", { class: "node-btn type" }, `[${node.type}]`)),
@@ -738,16 +760,18 @@ function renderFilters() {
   }
 }
 
-/** 近傍の深さの選択肢。深さの一覧は `FOCUS_DEPTHS` を唯一の出典とする。 */
+/** 分析の向きと近傍の深さを同じフォーカス操作に並べる。 */
 function renderFocusOptions() {
   getElement("focus").replaceChildren(
     htmlEl("option", { value: 0 }, "フォーカス: 切"),
+    ...Object.entries(ANALYSIS_FOCUS).map(([value, label]) => htmlEl("option", { value }, label)),
     ...FOCUS_DEPTHS.map((depth) => htmlEl("option", { value: depth }, `近傍 ${depth} ホップ`)),
   );
 }
 
 const directionName = (direction) => direction === "LR" ? "横 (LR)" : "縦 (TD)";
-const focusName = () => state.focus ? `近傍 ${state.focus} ホップ` : "フォーカス: 切";
+const focusName = () => typeof state.focus === "string" ? ANALYSIS_FOCUS[state.focus]
+  : state.focus ? `近傍 ${state.focus} ホップ` : "フォーカス: 切";
 
 /** アイコンだけの向き・フォーカス操作にも現在値を伝える。 */
 function syncGraphControlLabels() {
@@ -761,9 +785,17 @@ function syncGraphControlLabels() {
   const focus = getElement("focus");
   const focusControl = getElement("focus-control");
   focus.value = String(state.focus);
-  const focusLabel = `${focusName()} (選択したノードの近傍だけを描く)`;
+  const focusLabel = `${focusName()} (起点を固定して図を絞る)`;
+  focus.setAttribute("aria-label", state.focus ? `フォーカス: ${focusName()}` : focusName());
+  focusControl.classList.toggle("active", Boolean(state.focus));
   focus.title = focusLabel;
   focusControl.title = focusLabel;
+  const status = getElement("focus-status");
+  status.hidden = !state.focus;
+  getElement("focus-status-text").textContent = state.selected
+    ? `${focusName()} · 起点: ${state.selected}` : "起点にするノードを選択してください";
+  getElement("undirected").disabled = typeof state.focus === "string";
+  getElement("undirected").checked = typeof state.focus !== "string" && state.undirected;
 }
 
 /**
@@ -789,7 +821,6 @@ function syncControls() {
   syncGraphControlLabels();
   getElement("depth").value = String(state.depth);
   getElement("depth-value").textContent = depthLabel();
-  getElement("undirected").checked = state.undirected;
   for (const [attribute, key] of FILTER_SETS) {
     queryElements(`input[data-${attribute}]`).forEach((input) => {
       input.checked = state[key].has(input.dataset[attribute]);
@@ -831,6 +862,22 @@ function renderLegend() {
     }
     return container;
   });
+  if (state.focus) {
+    const group = htmlEl("div", { class: "legend-group" }, htmlEl("b", {}, "フォーカス"));
+    const impact = impactColors();
+    for (const [label, color, dashed] of [
+      ["起点", impact.selected, false], ["上流", impact.upstream, false],
+      ["下流", impact.downstream, false], ["経路・関連", impact.related, false],
+      ["詳細の対象", impact.related, true],
+    ] as const) {
+      const mark = htmlEl("i", { class: "swatch" });
+      mark.style.borderColor = color || "currentColor";
+      mark.style.borderWidth = "3px";
+      if (dashed) mark.style.borderStyle = "dashed";
+      group.append(htmlEl("span", {}, mark, label));
+    }
+    groups.push(group);
+  }
   getElement("legend").replaceChildren(...groups);
 }
 
@@ -969,7 +1016,7 @@ function renderTable() {
 
 /** 指摘数から検証結果へ辿る。そのノードを選び、右ペインの指摘まで送る。 */
 function showFindings(id) {
-  if (state.selected !== id) selectNode(id);
+  if ((state.detail || state.selected) !== id) chooseNode(id);
   const heading = getElement("node-findings");
   if (heading) heading.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
@@ -1075,22 +1122,31 @@ function applyHash() {
 // --- 操作 ------------------------------------------------------------------
 
 function selectNode(id) {
-  state.selected = state.selected === id ? null : id;
-  refresh();
-  revealSelected();
+  const inspecting = Boolean(state.focus && state.selected);
+  state = selectNodeState(state, id);
+  if (inspecting) {
+    view.state = state;
+    renderDetail();
+    applyHighlight();
+  } else {
+    refresh();
+    revealSelected();
+  }
   writeHash();
 }
 
 /** 選択を決める (トグルしない)。キーボードの Enter から呼ぶ。 */
 function chooseNode(id) {
-  if (state.selected === id) {
-    revealNode(id);
+  if ((state.detail || state.selected) === id) {
+    if (!state.focus) revealNode(id);
     return;
   }
   selectNode(id);
 }
 
 function refresh() {
+  syncGraphControlLabels();
+  renderLegend();
   view = createView(DATA, state);
   //: 絞り込みや検索語の変更で候補から外れた位置は捨てる。
   if (cursor !== null && !hits().includes(cursor)) cursor = null;
@@ -1144,7 +1200,7 @@ getElement("search").addEventListener("keydown", (event) => {
 getElement("depth").addEventListener("input", (event) => {
   state.depth = Number((event.target as HTMLInputElement).value);
   getElement("depth-value").textContent = depthLabel();
-  //: 描く要素は変わらないので再レイアウトは走らない (色分けと本文だけが変わる)。
+  //: 分析フォーカス中だけは描画範囲も変わるため並べ直す。
   refresh();
   //: つまみを動かしている間の 1 段ごとに履歴を積まない。
   writeHash(false);
@@ -1161,12 +1217,20 @@ getElement("direction").addEventListener("click", () => {
   writeHash();
 });
 getElement("focus").addEventListener("change", (event) => {
-  state.focus = Number((event.target as HTMLInputElement).value);
+  state.focus = parseFocus((event.target as HTMLSelectElement).value);
+  state.detail = null;
   syncGraphControlLabels();
   //: 描く範囲が変わるので、refresh() の中の syncFocusLayout() が並べ直す。
   refresh();
   writeHash();
 });
+function exitFocus() {
+  state.focus = 0;
+  state.detail = null;
+  refresh();
+  writeHash();
+}
+getElement("exit-focus").addEventListener("click", exitFocus);
 getElement("relayout").addEventListener("click", relayout);
 getElement("zoom-in").addEventListener("click", () => zoomBy(1.2));
 getElement("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
@@ -1301,6 +1365,10 @@ function currentSvg() {
     .edge.on-path .edge-line { stroke: ${pal.fg}; stroke-width: 2; }
     .hit .node-shape { filter: drop-shadow(0 0 8px ${(DATA.meta.search || {}).hit || pal.fg}); }
     .dim.hit { opacity: .65; }
+    .trail-muted { opacity: .35; }
+    .node.detail-path:not(.sel) .node-shape { stroke: ${impact.related || pal.fg}; stroke-width: 4; }
+    .node.detail-target .node-shape { stroke-dasharray: 7 3; stroke-width: 5; }
+    .edge.detail-path .edge-line { stroke: ${impact.related || pal.fg}; stroke-width: 4; }
   `;
   copy.prepend(style);
   const title = svgEl("title");
@@ -1347,10 +1415,14 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key !== "Escape") return;
-  //: まず選択、無ければ検索語を解く。どちらも無ければ入力欄から手を離す。
-  if (state.selected) {
+  //: フォーカス → 選択 → 検索語の順に解除し、その後で入力欄から手を離す。
+  if (state.focus) {
+    event.preventDefault();
+    exitFocus();
+  } else if (state.selected) {
     event.preventDefault();
     state.selected = null;
+    state.detail = null;
     refresh();
     writeHash();
   } else if (state.query) {

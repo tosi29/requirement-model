@@ -748,6 +748,7 @@ test("状態 → ハッシュ → 状態で元に戻る", () => {
     edges: new Set(["satisfies", "qualifies"]),
     statuses: new Set(["approved"]),
     selected: "FR-1",
+    detail: null,
     direction: "LR",
     mode: "table",
     query: "領収書 画像",

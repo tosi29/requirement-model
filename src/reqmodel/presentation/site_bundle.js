@@ -496,7 +496,7 @@
     const depth = (state2 || {}).depth;
     return {
       depth: IMPACT_DEPTHS.includes(depth) ? depth : null,
-      undirected: Boolean((state2 || {}).undirected)
+      undirected: typeof state2?.focus !== "string" && Boolean((state2 || {}).undirected)
     };
   }
   function impactSets(view2, id, scope = null) {
@@ -523,6 +523,67 @@
   function focusSet(view2, start, depth) {
     if (!view2.adjacency.has(start)) return /* @__PURE__ */ new Set();
     return /* @__PURE__ */ new Set([start, ...related(view2, start, depth)]);
+  }
+  var ANALYSIS_FOCUS = {
+    impact: "\u4E0A\u6D41\uFF0B\u4E0B\u6D41",
+    upstream: "\u4E0A\u6D41\u306E\u307F",
+    downstream: "\u4E0B\u6D41\u306E\u307F"
+  };
+  function parseFocus(value) {
+    if (Object.hasOwn(ANALYSIS_FOCUS, value)) return value;
+    const depth = Number(value);
+    return FOCUS_DEPTHS.includes(depth) ? depth : 0;
+  }
+  function focusedNodes(view2) {
+    const { focus, selected, depth } = view2.state;
+    if (!focus || !selected) return null;
+    if (!view2.adjacency.has(selected)) return /* @__PURE__ */ new Set();
+    if (typeof focus === "number") return focusSet(view2, selected, focus);
+    const impact = impactSets(view2, selected, { depth: depth || null, undirected: false });
+    if (focus === "impact") return impact.whole;
+    return /* @__PURE__ */ new Set([selected, ...impact[focus]]);
+  }
+  function focusTrail(view2, shown = focusedNodes(view2)) {
+    const { selected, detail, focus } = view2.state;
+    const empty = () => ({ nodes: /* @__PURE__ */ new Set(), edges: /* @__PURE__ */ new Set() });
+    if (!shown || !selected || !detail || !shown.has(selected) || !shown.has(detail)) return empty();
+    const shortest = (direction) => {
+      const links = /* @__PURE__ */ new Map();
+      for (const id of shown) links.set(id, []);
+      for (const edge of view2.edges) {
+        if (!shown.has(edge.source) || !shown.has(edge.target)) continue;
+        if (direction !== "in") links.get(edge.source).push({ id: edge.target, edge });
+        if (direction !== "out") links.get(edge.target).push({ id: edge.source, edge });
+      }
+      const parents = /* @__PURE__ */ new Map();
+      const seen = /* @__PURE__ */ new Set([selected]);
+      const queue = [selected];
+      for (let at = 0; at < queue.length && !seen.has(detail); at++) {
+        const id = queue[at];
+        for (const next of links.get(id)) {
+          if (seen.has(next.id)) continue;
+          seen.add(next.id);
+          parents.set(next.id, { id, edge: next.edge });
+          queue.push(next.id);
+        }
+      }
+      if (!seen.has(detail)) return null;
+      const result = empty();
+      result.nodes.add(detail);
+      for (let id = detail; id !== selected; ) {
+        const parent = parents.get(id);
+        result.edges.add(parent.edge);
+        result.nodes.add(parent.id);
+        id = parent.id;
+      }
+      return result;
+    };
+    if (typeof focus === "number") return shortest("both") || empty();
+    if (focus === "upstream") return shortest("in") || empty();
+    if (focus === "downstream") return shortest("out") || empty();
+    const paths = [shortest("in"), shortest("out")].filter(Boolean);
+    paths.sort((a, b) => a.edges.size - b.edges.size);
+    return paths[0] || empty();
   }
   var MISSING_RANK = 10 ** 6;
   var rankOf = (view2, id) => view2.order.has(id) ? view2.order.get(id) : MISSING_RANK;
@@ -698,8 +759,9 @@
       direction: "TD",
       mode: "graph",
       query: "",
-      //: 近傍の深さ。0 ならフォーカス無し (全体を描く)。
+      //: 分析の向き、または近傍の深さ。0 は全体表示。
       focus: 0,
+      detail: null,
       //: 影響範囲の探索の深さ。0 なら無制限 (`req explain` に --depth を渡さない)。
       depth: 0,
       //: 影響範囲をエッジの向きを無視して辿るか (`req explain --undirected`)。
@@ -728,7 +790,10 @@
     }
     if (state2.direction === "LR") put("dir", "LR");
     if (state2.mode === "table") put("view", "table");
-    if (FOCUS_DEPTHS.includes(state2.focus)) put("focus", String(state2.focus));
+    if (parseFocus(String(state2.focus))) put("focus", String(state2.focus));
+    if (state2.focus && state2.selected && state2.detail && state2.detail !== state2.selected) {
+      put("detail", encodeURIComponent(state2.detail));
+    }
     if (IMPACT_DEPTHS.includes(state2.depth)) put("depth", String(state2.depth));
     if (state2.undirected) put("undir", "1");
     if (query) put("q", encodeURIComponent(query));
@@ -749,8 +814,11 @@
     }
     if (params.get("dir") === "LR") state2.direction = "LR";
     if (params.get("view") === "table") state2.mode = "table";
-    const focus = Number(params.get("focus"));
-    if (FOCUS_DEPTHS.includes(focus)) state2.focus = focus;
+    state2.focus = parseFocus(params.get("focus") || "0");
+    const detail = params.get("detail");
+    if (state2.focus && state2.selected && detail !== state2.selected && data.nodes.some((node2) => node2.id === detail)) {
+      state2.detail = detail;
+    }
     const depth = Number(params.get("depth"));
     if (IMPACT_DEPTHS.includes(depth)) state2.depth = depth;
     if (params.get("undir") === "1") state2.undirected = true;
@@ -784,7 +852,7 @@
   var VIEW_STORAGE_KEY = "reqmodel:site:view";
   var THEME_STORAGE_KEY = "reqmodel:site:theme";
   function storableHash(state2, data) {
-    return encodeHash({ ...state2, selected: null, query: "" }, data);
+    return encodeHash({ ...state2, selected: null, detail: null, query: "" }, data);
   }
   function initialHash(hash, stored) {
     return (hash || "").replace(/^#/, "") ? hash : stored || "";
@@ -794,6 +862,12 @@
   var normalizeTheme = (value) => THEMES.includes(value) ? value : "auto";
   function nextTheme(theme2) {
     return THEMES[(THEMES.indexOf(normalizeTheme(theme2)) + 1) % THEMES.length];
+  }
+  function selectNodeState(state2, id) {
+    if (state2.focus && state2.selected) {
+      return { ...state2, detail: id && id !== state2.selected ? id : null };
+    }
+    return { ...state2, selected: state2.selected === id ? null : id, detail: null };
   }
 
   // src/reqmodel/presentation/site_context.ts
@@ -1392,7 +1466,9 @@ ${text}`;
     svg.append(defs, viewport, graphLayer);
     graphEl.append(svg);
     buildGraphDom();
-    panZoom.bind(svg, viewport, () => selectNode(state.selected));
+    panZoom.bind(svg, viewport, () => {
+      if (!state.focus) selectNode(state.selected);
+    });
     runLayout();
   }
   function buildGraphDom() {
@@ -1464,11 +1540,10 @@ ${text}`;
     restyleGraph();
   }
   function focusedIds() {
-    if (!state.focus || !state.selected || !view.byId.has(state.selected)) return null;
-    return focusSet(view, state.selected, state.focus);
+    return focusedNodes(view);
   }
   var laidOutFocus = "";
-  var focusKey = () => focusedIds() ? `${state.focus}:${state.selected}` : "";
+  var focusKey = () => focusedIds() ? `${state.focus}:${state.selected}:${typeof state.focus === "string" ? state.depth : ""}` : "";
   function syncFocusLayout() {
     const key = focusKey();
     if (key === laidOutFocus) return;
@@ -1639,7 +1714,7 @@ ${text}`;
   }
   function applyHighlight() {
     if (!svg) return;
-    for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()]) item.group.classList.remove("sel", "up", "down", "rel", "dim", "on-path");
+    for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()]) item.group.classList.remove("sel", "up", "down", "rel", "dim", "on-path", "detail-target", "detail-path", "trail-muted");
     if (!state.selected || !view.byId.has(state.selected)) return;
     const { upstream, downstream, whole, undirected } = impactSets(view, state.selected);
     for (const item of nodeItems.values()) {
@@ -1652,6 +1727,20 @@ ${text}`;
     for (const item of edgeItemsByKey.values()) {
       const linked = whole.has(item.source) && whole.has(item.target);
       item.group.classList.add(linked ? "on-path" : "dim");
+    }
+    if (state.focus && state.detail) {
+      const trail = focusTrail(view);
+      for (const item of nodeItems.values()) {
+        classed(item.group, "detail-target", item.id === state.detail);
+        classed(item.group, "detail-path", trail.nodes.has(item.id));
+        if (trail.nodes.has(item.id)) item.group.classList.remove("dim");
+        classed(item.group, "trail-muted", trail.nodes.size && !trail.nodes.has(item.id));
+      }
+      for (const item of edgeItemsByKey.values()) {
+        classed(item.group, "detail-path", trail.edges.has(DATA.edges[item.index]));
+        if (trail.edges.has(DATA.edges[item.index])) item.group.classList.remove("dim");
+        classed(item.group, "trail-muted", trail.nodes.size && !trail.edges.has(DATA.edges[item.index]));
+      }
     }
   }
   var cursor = null;
@@ -1726,12 +1815,17 @@ ${text}`;
   function renderDetail() {
     const panel = getElement("detail");
     panel.replaceChildren();
-    if (!state.selected || !view.byId.has(state.selected)) {
+    const detailId = state.focus && state.detail ? state.detail : state.selected;
+    if (!detailId || !view.byId.has(detailId)) {
       panel.append(htmlEl("p", { class: "empty" }, "\u30B0\u30E9\u30D5\u306E\u30CE\u30FC\u30C9\u3092\u30AF\u30EA\u30C3\u30AF\u3059\u308B\u3068\u3001\u672C\u6587\u30FB\u6839\u62E0\u30FB\u5F71\u97FF\u7BC4\u56F2\u3092\u8868\u793A\u3059\u308B\u3002"));
       return;
     }
-    const node = view.byId.get(state.selected);
+    const node = view.byId.get(detailId);
     const impact = impactSets(view, node.id);
+    if (state.focus && state.selected) {
+      const outside = !focusedIds()?.has(node.id);
+      panel.append(htmlEl("p", { class: "hint" }, `\u30D5\u30A9\u30FC\u30AB\u30B9\u8D77\u70B9: ${state.selected}${outside ? " \uFF0F \u3053\u306E\u30CE\u30FC\u30C9\u306F\u56F3\u306E\u8868\u793A\u7BC4\u56F2\u5916\u3067\u3059" : ""}`));
+    }
     panel.append(
       htmlEl("h3", {}, node.id, " ", htmlEl("span", { class: "node-btn type" }, `[${node.type}]`)),
       htmlEl("p", { class: "text" }, node.text)
@@ -1901,11 +1995,12 @@ ${text}`;
   function renderFocusOptions() {
     getElement("focus").replaceChildren(
       htmlEl("option", { value: 0 }, "\u30D5\u30A9\u30FC\u30AB\u30B9: \u5207"),
+      ...Object.entries(ANALYSIS_FOCUS).map(([value, label]) => htmlEl("option", { value }, label)),
       ...FOCUS_DEPTHS.map((depth) => htmlEl("option", { value: depth }, `\u8FD1\u508D ${depth} \u30DB\u30C3\u30D7`))
     );
   }
   var directionName = (direction) => direction === "LR" ? "\u6A2A (LR)" : "\u7E26 (TD)";
-  var focusName = () => state.focus ? `\u8FD1\u508D ${state.focus} \u30DB\u30C3\u30D7` : "\u30D5\u30A9\u30FC\u30AB\u30B9: \u5207";
+  var focusName = () => typeof state.focus === "string" ? ANALYSIS_FOCUS[state.focus] : state.focus ? `\u8FD1\u508D ${state.focus} \u30DB\u30C3\u30D7` : "\u30D5\u30A9\u30FC\u30AB\u30B9: \u5207";
   function syncGraphControlLabels() {
     const direction = getElement("direction");
     const nextDirection = state.direction === "LR" ? "TD" : "LR";
@@ -1916,9 +2011,16 @@ ${text}`;
     const focus = getElement("focus");
     const focusControl = getElement("focus-control");
     focus.value = String(state.focus);
-    const focusLabel = `${focusName()} (\u9078\u629E\u3057\u305F\u30CE\u30FC\u30C9\u306E\u8FD1\u508D\u3060\u3051\u3092\u63CF\u304F)`;
+    const focusLabel = `${focusName()} (\u8D77\u70B9\u3092\u56FA\u5B9A\u3057\u3066\u56F3\u3092\u7D5E\u308B)`;
+    focus.setAttribute("aria-label", state.focus ? `\u30D5\u30A9\u30FC\u30AB\u30B9: ${focusName()}` : focusName());
+    focusControl.classList.toggle("active", Boolean(state.focus));
     focus.title = focusLabel;
     focusControl.title = focusLabel;
+    const status = getElement("focus-status");
+    status.hidden = !state.focus;
+    getElement("focus-status-text").textContent = state.selected ? `${focusName()} \xB7 \u8D77\u70B9: ${state.selected}` : "\u8D77\u70B9\u306B\u3059\u308B\u30CE\u30FC\u30C9\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044";
+    getElement("undirected").disabled = typeof state.focus === "string";
+    getElement("undirected").checked = typeof state.focus !== "string" && state.undirected;
   }
   function renderImpactControls() {
     const slider = getElement("depth");
@@ -1932,7 +2034,6 @@ ${text}`;
     syncGraphControlLabels();
     getElement("depth").value = String(state.depth);
     getElement("depth-value").textContent = depthLabel();
-    getElement("undirected").checked = state.undirected;
     for (const [attribute, key] of FILTER_SETS) {
       queryElements(`input[data-${attribute}]`).forEach((input) => {
         input.checked = state[key].has(input.dataset[attribute]);
@@ -1971,6 +2072,24 @@ ${text}`;
       }
       return container;
     });
+    if (state.focus) {
+      const group = htmlEl("div", { class: "legend-group" }, htmlEl("b", {}, "\u30D5\u30A9\u30FC\u30AB\u30B9"));
+      const impact = impactColors();
+      for (const [label, color, dashed] of [
+        ["\u8D77\u70B9", impact.selected, false],
+        ["\u4E0A\u6D41", impact.upstream, false],
+        ["\u4E0B\u6D41", impact.downstream, false],
+        ["\u7D4C\u8DEF\u30FB\u95A2\u9023", impact.related, false],
+        ["\u8A73\u7D30\u306E\u5BFE\u8C61", impact.related, true]
+      ]) {
+        const mark = htmlEl("i", { class: "swatch" });
+        mark.style.borderColor = color || "currentColor";
+        mark.style.borderWidth = "3px";
+        if (dashed) mark.style.borderStyle = "dashed";
+        group.append(htmlEl("span", {}, mark, label));
+      }
+      groups.push(group);
+    }
     getElement("legend").replaceChildren(...groups);
   }
   var findingSeverity = ALL_SEVERITIES;
@@ -2091,7 +2210,7 @@ ${text}`;
     });
   }
   function showFindings(id) {
-    if (state.selected !== id) selectNode(id);
+    if ((state.detail || state.selected) !== id) chooseNode(id);
     const heading = getElement("node-findings");
     if (heading) heading.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
@@ -2157,19 +2276,28 @@ ${text}`;
     writeHash(false);
   }
   function selectNode(id) {
-    state.selected = state.selected === id ? null : id;
-    refresh();
-    revealSelected();
+    const inspecting = Boolean(state.focus && state.selected);
+    state = selectNodeState(state, id);
+    if (inspecting) {
+      view.state = state;
+      renderDetail();
+      applyHighlight();
+    } else {
+      refresh();
+      revealSelected();
+    }
     writeHash();
   }
   function chooseNode(id) {
-    if (state.selected === id) {
-      revealNode(id);
+    if ((state.detail || state.selected) === id) {
+      if (!state.focus) revealNode(id);
       return;
     }
     selectNode(id);
   }
   function refresh() {
+    syncGraphControlLabels();
+    renderLegend();
     view = createView(DATA, state);
     if (cursor !== null && !hits().includes(cursor)) cursor = null;
     renderNodeList();
@@ -2231,11 +2359,19 @@ ${text}`;
     writeHash();
   });
   getElement("focus").addEventListener("change", (event) => {
-    state.focus = Number(event.target.value);
+    state.focus = parseFocus(event.target.value);
+    state.detail = null;
     syncGraphControlLabels();
     refresh();
     writeHash();
   });
+  function exitFocus() {
+    state.focus = 0;
+    state.detail = null;
+    refresh();
+    writeHash();
+  }
+  getElement("exit-focus").addEventListener("click", exitFocus);
   getElement("relayout").addEventListener("click", relayout);
   getElement("zoom-in").addEventListener("click", () => zoomBy(1.2));
   getElement("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
@@ -2340,6 +2476,10 @@ ${text}`;
     .edge.on-path .edge-line { stroke: ${pal.fg}; stroke-width: 2; }
     .hit .node-shape { filter: drop-shadow(0 0 8px ${(DATA.meta.search || {}).hit || pal.fg}); }
     .dim.hit { opacity: .65; }
+    .trail-muted { opacity: .35; }
+    .node.detail-path:not(.sel) .node-shape { stroke: ${impact.related || pal.fg}; stroke-width: 4; }
+    .node.detail-target .node-shape { stroke-dasharray: 7 3; stroke-width: 5; }
+    .edge.detail-path .edge-line { stroke: ${impact.related || pal.fg}; stroke-width: 4; }
   `;
     copy.prepend(style);
     const title = svgEl("title");
@@ -2372,9 +2512,13 @@ ${new XMLSerializer().serializeToString(copy)}`;
       return;
     }
     if (event.key !== "Escape") return;
-    if (state.selected) {
+    if (state.focus) {
+      event.preventDefault();
+      exitFocus();
+    } else if (state.selected) {
       event.preventDefault();
       state.selected = null;
+      state.detail = null;
       refresh();
       writeHash();
     } else if (state.query) {

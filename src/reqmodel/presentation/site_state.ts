@@ -1,5 +1,5 @@
 import { TABLE_COLUMNS } from "./site_table.ts";
-import { FOCUS_DEPTHS, IMPACT_DEPTHS, initialSelection, statusFilters, statusNames } from "./site_graph.ts";
+import { parseFocus, IMPACT_DEPTHS, initialSelection, statusFilters, statusNames } from "./site_graph.ts";
 import type { SiteData, ViewState } from "./site_types.ts";
 // --- URL ハッシュ ----------------------------------------------------------
 //
@@ -52,8 +52,9 @@ export function defaultState(data: SiteData): ViewState {
     direction: "TD",
     mode: "graph",
     query: "",
-    //: 近傍の深さ。0 ならフォーカス無し (全体を描く)。
+    //: 分析の向き、または近傍の深さ。0 は全体表示。
     focus: 0,
+    detail: null,
     //: 影響範囲の探索の深さ。0 なら無制限 (`req explain` に --depth を渡さない)。
     depth: 0,
     //: 影響範囲をエッジの向きを無視して辿るか (`req explain --undirected`)。
@@ -89,7 +90,10 @@ export function encodeHash(state, data) {
   }
   if (state.direction === "LR") put("dir", "LR");
   if (state.mode === "table") put("view", "table");
-  if (FOCUS_DEPTHS.includes(state.focus)) put("focus", String(state.focus));
+  if (parseFocus(String(state.focus))) put("focus", String(state.focus));
+  if (state.focus && state.selected && state.detail && state.detail !== state.selected) {
+    put("detail", encodeURIComponent(state.detail));
+  }
   if (IMPACT_DEPTHS.includes(state.depth)) put("depth", String(state.depth));
   if (state.undirected) put("undir", "1");
   if (query) put("q", encodeURIComponent(query));
@@ -120,8 +124,11 @@ export function decodeHash(hash: string | null, data: SiteData): ViewState {
   }
   if (params.get("dir") === "LR") state.direction = "LR";
   if (params.get("view") === "table") state.mode = "table";
-  const focus = Number(params.get("focus"));
-  if (FOCUS_DEPTHS.includes(focus)) state.focus = focus;
+  state.focus = parseFocus(params.get("focus") || "0");
+  const detail = params.get("detail");
+  if (state.focus && state.selected && detail !== state.selected && data.nodes.some((node) => node.id === detail)) {
+    state.detail = detail;
+  }
   const depth = Number(params.get("depth"));
   if (IMPACT_DEPTHS.includes(depth)) state.depth = depth;
   if (params.get("undir") === "1") state.undirected = true;
@@ -174,7 +181,7 @@ export const THEME_STORAGE_KEY = "reqmodel:site:theme";
 
 /** 次回に持ち越す状態を `#...` にしたもの。既定のままなら空文字。 */
 export function storableHash(state, data) {
-  return encodeHash({ ...state, selected: null, query: "" }, data);
+  return encodeHash({ ...state, selected: null, detail: null, query: "" }, data);
 }
 
 /** 開いたときに適用するハッシュ。URL に何か載っていればそれ、無ければ保存。 */
@@ -199,4 +206,12 @@ export const normalizeTheme = (value) => (THEMES.includes(value) ? value : "auto
 /** 次のテーマ。 */
 export function nextTheme(theme) {
   return THEMES[(THEMES.indexOf(normalizeTheme(theme)) + 1) % THEMES.length];
+}
+
+/** フォーカス中は起点を固定し、詳細の対象だけを切り替える。 */
+export function selectNodeState(state: ViewState, id: string | null): ViewState {
+  if (state.focus && state.selected) {
+    return { ...state, detail: id && id !== state.selected ? id : null };
+  }
+  return { ...state, selected: state.selected === id ? null : id, detail: null };
 }

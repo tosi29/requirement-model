@@ -280,10 +280,13 @@ main {
 .export-menu > summary::-webkit-details-marker { display: none; }
 .export-menu > summary:hover, .export-menu[open] > summary { border-color: var(--accent); }
 .export-options {
-  position: absolute;
-  z-index: 10;
-  top: calc(100% + 4px);
-  right: 0;
+  /* ペインの overflow: hidden に切られないよう、画面を基準に配置する。 */
+  position: fixed;
+  z-index: 20;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  overflow: auto;
   display: grid;
   grid-auto-flow: column;
   min-width: 0;

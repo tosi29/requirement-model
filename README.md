@@ -363,7 +363,9 @@ impact(n) = ancestors(n) ∪ descendants(n)   # --edges でエッジ型を絞れ
 
 PR でレビューする場合は `req plan --rev origin/main --format markdown` を使う。
 追加を緑、削除を赤、変更を青、影響範囲を黄で示す Mermaid 図と差分表を、そのまま
-PR 本文やコメントへ貼れる。`--fail-on-impact verified` を併用すると、影響範囲に
+PR 本文やコメントへ貼れる。エッジは追加を緑の実線、削除を赤の破線で示し、変更のない
+エッジは通常の線で描く。付け替え前の参照先も図に含める。
+`--fail-on-impact verified` を併用すると、影響範囲に
 検証済み要求が含まれる変更を CI で失敗させられる。このリポジトリで実際にコメントを
 更新するワークフローは [requirements-plan.yml](.github/workflows/requirements-plan.yml)
 を利用例として同梱している。

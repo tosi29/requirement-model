@@ -6,6 +6,8 @@ import re
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from conftest import build, fr, goal, need, qr, source
 from reqmodel.application.explain import explain_text, impact_set
 from reqmodel.application.loader import load_paths
@@ -88,6 +90,56 @@ def test_markdown_plan_contains_table_mermaid_and_diff_colors():
     assert "| 🟢 追加 | `QR-1`" in text
     assert "| 🔵 変更 | `FR-1` | `text`" in text
     assert "- 🟡 `Need-1`" in text
+
+
+@pytest.mark.parametrize("remove_old_node", [False, True])
+def test_markdown_plan_colors_rewired_edges_and_keeps_old_target(remove_old_node):
+    before = build(
+        need("Need-old"), need("Need-kept"),
+        fr("FR-1", satisfies=["Need-old", "Need-kept"]),
+    )
+    after_nodes = [
+        need("Need-new"), need("Need-kept"),
+        fr("FR-1", satisfies=["Need-new", "Need-kept"]),
+    ]
+    if not remove_old_node:
+        after_nodes.append(need("Need-old"))
+    after = build(*after_nodes)
+    text = render_plan_markdown(before, after, diff_graphs(before, after), "HEAD")
+    labels = dict(re.findall(r'    (n\d+)\["([^<]+)<br/>', text))
+    edges = re.findall(r"    (n\d+) -->\|([^|]+)\| (n\d+)", text)
+    styles = dict(re.findall(r"    linkStyle (\d+) ([^\n]+)", text))
+    by_edge = {
+        (labels[source], name, labels[target]): styles.get(str(index))
+        for index, (source, name, target) in enumerate(edges)
+    }
+    assert len(edges) == 3
+    assert by_edge == {
+        ("FR-1", "satisfies", "Need-new"): "stroke:#1a7f37,stroke-width:2px",
+        ("FR-1", "satisfies", "Need-old"):
+            "stroke:#cf222e,stroke-width:2px,stroke-dasharray:5 5",
+        ("FR-1", "satisfies", "Need-kept"): None,
+    }
+
+
+def test_markdown_plan_text_change_does_not_color_unchanged_edge():
+    before = build(need("Need-1"), fr("FR-1", satisfies=["Need-1"]))
+    after = build(
+        need("Need-1"),
+        fr("FR-1", text="変更後を読み取ること", satisfies=["Need-1"]),
+    )
+    text = render_plan_markdown(before, after, diff_graphs(before, after), "HEAD")
+    assert text.count("-->|satisfies|") == 1
+    assert "linkStyle" not in text
+
+
+def test_markdown_plan_skips_edge_to_undefined_target():
+    before = build(fr("FR-1"))
+    after = build(fr("FR-1", satisfies=["Need-missing"]))
+    text = render_plan_markdown(before, after, diff_graphs(before, after), "HEAD")
+    assert "-->|satisfies|" not in text
+    assert "linkStyle" not in text
+    assert "Need-missing" in text  # 差分表には未定義の参照先も残す。
 
 
 def test_load_revision_reads_the_previous_version(tmp_path: Path):

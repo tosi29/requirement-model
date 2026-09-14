@@ -29,7 +29,12 @@ def _mermaid(
     diff: GraphDiff,
     impacted: set[str],
 ) -> str:
+    before_edges = {(e.source, e.name, e.target) for e in before.edges}
+    after_edges = {(e.source, e.name, e.target) for e in after.edges}
     shown = set(diff.touched) | impacted
+    # 付け替えで影響範囲から外れた旧参照先も、削除エッジの表示に必要。
+    for source, _, target in before_edges ^ after_edges:
+        shown.update((source, target))
     ordered = [
         node.id
         for graph in (after, before)
@@ -45,11 +50,21 @@ def _mermaid(
     for graph in (after, before):
         for edge in graph.edges:
             key = (edge.source, edge.name, edge.target)
-            if edge.source in shown and edge.target in shown and key not in seen_edges:
+            if edge.source in ids and edge.target in ids and key not in seen_edges:
+                index = len(seen_edges)
                 seen_edges.add(key)
                 lines.append(
                     f"    {ids[edge.source]} -->|{edge.name}| {ids[edge.target]}"
                 )
+                if key not in before_edges:
+                    lines.append(
+                        f"    linkStyle {index} stroke:#1a7f37,stroke-width:2px"
+                    )
+                elif key not in after_edges:
+                    lines.append(
+                        f"    linkStyle {index} stroke:#cf222e,stroke-width:2px,"
+                        "stroke-dasharray:5 5"
+                    )
     lines.extend(
         [
             "    classDef added fill:#dafbe1,stroke:#1a7f37,color:#24292f",
@@ -93,6 +108,8 @@ def render_plan_markdown(
         "```mermaid",
         _mermaid(before, after, diff, impacted),
         "```",
+        "",
+        "エッジ: 緑の実線 = 追加 / 赤の破線 = 削除 / 通常の線 = 変更なし",
         "",
         "| 種別 | ノード | フィールド | 変更前 | 変更後 |",
         "|---|---|---|---|---|",

@@ -2224,11 +2224,6 @@ ${text}`;
     refresh();
     writeHash();
   });
-  getElement("clear").addEventListener("click", () => {
-    state.selected = null;
-    refresh();
-    writeHash();
-  });
   getElement("direction").addEventListener("click", () => {
     state.direction = state.direction === "LR" ? "TD" : "LR";
     syncGraphControlLabels();
@@ -2388,21 +2383,6 @@ ${new XMLSerializer().serializeToString(copy)}`;
     } else if (typing) {
       target.blur();
     }
-  });
-  var copyLink = getElement("copy-link");
-  copyLink.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(location.href);
-      copyLink.title = "\u30EA\u30F3\u30AF\u3092\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F";
-      copyLink.setAttribute("aria-label", "\u30EA\u30F3\u30AF\u3092\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F");
-    } catch {
-      copyLink.title = "\u30EA\u30F3\u30AF\u3092\u30B3\u30D4\u30FC\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F";
-      copyLink.setAttribute("aria-label", "\u30EA\u30F3\u30AF\u3092\u30B3\u30D4\u30FC\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F");
-    }
-    setTimeout(() => {
-      copyLink.title = "\u8868\u793A\u4E2D\u306E\u30DA\u30FC\u30B8\u3078\u306E\u30EA\u30F3\u30AF\u3092\u30B3\u30D4\u30FC";
-      copyLink.setAttribute("aria-label", "\u8868\u793A\u4E2D\u306E\u30DA\u30FC\u30B8\u3078\u306E\u30EA\u30F3\u30AF\u3092\u30B3\u30D4\u30FC");
-    }, 1600);
   });
   window.addEventListener("popstate", applyHash);
   window.addEventListener("hashchange", applyHash);

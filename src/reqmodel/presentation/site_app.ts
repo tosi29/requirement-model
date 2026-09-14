@@ -27,6 +27,8 @@ const queryElements = (selector: string): NodeListOf<PageElement> =>
 
 import {
   ALL_SEVERITIES,
+  ANALYSIS_BANDS,
+  analysisBandLayout,
   FOCUS_DEPTHS,
   IMPACT_DEPTHS,
   LABEL_FONT,
@@ -45,7 +47,8 @@ import {
   estimateTextWidth,
   explainCommand,
   fieldLabel,
-  focusSet,
+  focusedNodes,
+  focusTrail,
   graphElements,
   groupFindings,
   impactSets,
@@ -58,11 +61,13 @@ import {
   nextTheme,
   nodeContext,
   normalizeTheme,
+  parseFocus,
   quadraticPath,
   quadraticPoint,
   searchHits,
   safeHref,
   severityTabs,
+  selectNodeState,
   sortRows,
   sourceUrl,
   statusFilters,
@@ -160,7 +165,7 @@ function initGraph() {
   svg.append(defs, viewport, graphLayer);
   graphEl.append(svg);
   buildGraphDom();
-  panZoom.bind(svg, viewport, () => selectNode(state.selected));
+  panZoom.bind(svg, viewport, () => { if (state.mode !== "analysis") selectNode(state.selected); });
   runLayout();
 }
 
@@ -200,8 +205,11 @@ function buildGraphDom() {
   graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
   graphEl.style.setProperty("--impact-related", impact.related || pal.fg);
   graphEl.style.setProperty("--search-hit", (DATA.meta.search || {}).hit || pal.fg);
-  for (const item of graph.filter((element) => element.classes === "band")) {
-    const group = svgEl("g", { class: "node band", "data-id": item.data.id });
+  const analysisFrames = Object.entries(ANALYSIS_BANDS).map(([key, label]) => ({
+    data: { id: bandId(`analysis:${key}`), bandKey: `analysis:${key}`, label },
+  }));
+  for (const item of [...graph.filter((element) => element.classes === "band"), ...analysisFrames]) {
+    const group = svgEl("g", { class: "node band", "data-id": item.data.id, "data-band-key": item.data.bandKey });
     const shape = svgEl("rect", { class: "node-shape", rx: 8 });
     const label = svgEl("text", { class: "node-label band-label" });
     renderLabel(label, item.data.label, 0, -11, 11, "bold");
@@ -249,14 +257,23 @@ function buildGraphDom() {
 
 /** 図に描くノードの id。フォーカス無し (または選択無し) なら null = 全部描く。 */
 function focusedIds() {
-  if (!state.focus || !state.selected || !view.byId.has(state.selected)) return null;
-  return focusSet(view, state.selected, state.focus);
+  return focusedNodes(view);
 }
 
 //: 直近のレイアウトが対象にしたフォーカス (`深さ:選択ノード`)。
 let laidOutFocus = "";
 
-const focusKey = () => (focusedIds() ? `${state.focus}:${state.selected}` : "");
+const focusKey = () => state.mode === "analysis"
+  ? JSON.stringify(["analysis", state.selected, state.depth, [...state.types], [...state.statuses], [...state.edges]])
+  : focusedIds() ? `${state.focus}:${state.selected}` : "";
+
+/** 分析の図とその書き出しを起点の影響範囲に限定する。 */
+function analysisIds() { return state.mode === "analysis" ? focusedIds() : null; }
+function displayedView() {
+  const ids = analysisIds();
+  return ids ? { ...view, nodes: view.nodes.filter((node) => ids.has(node.id)),
+    edges: view.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target)) } : view;
+}
 
 /**
  * 描く範囲が変わっていれば並べ直す。
@@ -364,14 +381,15 @@ function updateEdges() {
 function applyBanding() {
   if (!svg) return;
   const bands = bandDefs(DATA);
-  if (!bands.length) return;
+  if (!bands.length && state.mode !== "analysis") return;
   const placed = shownNodeItems().map((item) => ({
     id: item.id, type: item.type, x: item.x, y: item.y, w: item.w, h: item.h,
   }));
   if (!placed.length) return;
-  const { positions, frames } = bandedLayout(bands, placed, view.edges, state.direction, {
-    groupMaxWidth: 600,
-  });
+  const { positions, frames } = state.mode === "analysis"
+    ? analysisBandLayout(view, placed, state.direction)
+    : bandedLayout(bands, placed, view.edges, state.direction, { groupMaxWidth: 600 });
+  for (const item of bandItems.values()) classed(item.group, "hidden", !frames.has(item.bandKey));
   for (const [id, position] of positions) {
     const item = nodeItems.get(id);
     if (item) moveItem(item, position.x, position.y);
@@ -442,7 +460,9 @@ function applyVisibility() {
   const shown = focused ? view.nodes.filter((node) => focused.has(node.id)) : view.nodes;
   const nodes = new Set(shown.map((node) => node.id));
   const edges = new Set(view.edges.filter((edge) => nodes.has(edge.source) && nodes.has(edge.target)));
-  const visibleBands = visibleBandKeys(DATA, shown);
+  const visibleBands = state.mode === "analysis"
+    ? new Set(analysisBandLayout(view, [...nodeItems.values()].filter((item) => nodes.has(item.id)), state.direction).frames.keys())
+    : visibleBandKeys(DATA, shown);
   for (const item of nodeItems.values()) classed(item.group, "hidden", !nodes.has(item.id));
   for (const item of bandItems.values()) classed(item.group, "hidden", !visibleBands.has(item.bandKey));
   for (const item of edgeItemsByKey.values()) classed(item.group, "hidden", !edges.has(DATA.edges[item.index]));
@@ -452,7 +472,7 @@ function applyVisibility() {
 
 function applyHighlight() {
   if (!svg) return;
-  for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()]) item.group.classList.remove("sel", "up", "down", "rel", "dim", "on-path");
+  for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()]) item.group.classList.remove("sel", "up", "down", "rel", "dim", "on-path", "detail-target", "detail-path", "trail-muted");
   if (!state.selected || !view.byId.has(state.selected)) return;
   const { upstream, downstream, whole, undirected } = impactSets(view, state.selected);
   for (const item of nodeItems.values()) {
@@ -465,6 +485,20 @@ function applyHighlight() {
   for (const item of edgeItemsByKey.values()) {
     const linked = whole.has(item.source) && whole.has(item.target);
     item.group.classList.add(linked ? "on-path" : "dim");
+  }
+  if (state.mode === "analysis" && state.detail) {
+    const trail = focusTrail(view);
+    for (const item of nodeItems.values()) {
+      classed(item.group, "detail-target", item.id === state.detail);
+      classed(item.group, "detail-path", trail.nodes.has(item.id));
+      if (trail.nodes.has(item.id)) item.group.classList.remove("dim");
+      classed(item.group, "trail-muted", trail.nodes.size && !trail.nodes.has(item.id));
+    }
+    for (const item of edgeItemsByKey.values()) {
+      classed(item.group, "detail-path", trail.edges.has(DATA.edges[item.index]));
+      if (trail.edges.has(DATA.edges[item.index])) item.group.classList.remove("dim");
+      classed(item.group, "trail-muted", trail.nodes.size && !trail.edges.has(DATA.edges[item.index]));
+    }
   }
 }
 
@@ -514,7 +548,7 @@ function fitInitial() {
 }
 
 function revealNode(id) {
-  if (!svg || state.mode !== "graph") return;
+  if (!svg || state.mode === "table") return;
   const item = nodeItems.get(id);
   if (!item || item.group.classList.contains("hidden")) return;
   panZoom?.reveal(item);
@@ -553,11 +587,12 @@ function appendTerm(list, term, value, className = null) {
 function renderDetail() {
   const panel = getElement("detail");
   panel.replaceChildren();
-  if (!state.selected || !view.byId.has(state.selected)) {
+  const detailId = state.mode === "analysis" && state.detail ? state.detail : state.selected;
+  if (!detailId || !view.byId.has(detailId)) {
     panel.append(htmlEl("p", { class: "empty" }, "グラフのノードをクリックすると、本文・根拠・影響範囲を表示する。"));
     return;
   }
-  const node = view.byId.get(state.selected);
+  const node = view.byId.get(detailId);
   const impact = impactSets(view, node.id);
 
   panel.append(
@@ -603,7 +638,7 @@ function renderDetail() {
     }
     panel.append(htmlEl("h2", {}, title), list);
   };
-  const links = edgeItems(view, node.id);
+  const links = edgeItems(displayedView(), node.id);
   appendEdges("出るエッジ", links.out);
   appendEdges("入るエッジ", links.in);
 
@@ -674,7 +709,7 @@ function renderNodeList() {
     htmlEl("span", { class: "type" }, node.type), htmlEl("br"), truncate(node.text, 34)));
   }));
   list.querySelectorAll<HTMLElement>("button[data-id]").forEach((button: HTMLElement) => {
-    button.addEventListener("click", () => selectNode(button.dataset.id));
+    button.addEventListener("click", () => selectRoot(button.dataset.id));
   });
 }
 
@@ -738,7 +773,7 @@ function renderFilters() {
   }
 }
 
-/** 近傍の深さの選択肢。深さの一覧は `FOCUS_DEPTHS` を唯一の出典とする。 */
+/** 通常グラフ用の近傍の深さを並べる。 */
 function renderFocusOptions() {
   getElement("focus").replaceChildren(
     htmlEl("option", { value: 0 }, "フォーカス: 切"),
@@ -761,9 +796,15 @@ function syncGraphControlLabels() {
   const focus = getElement("focus");
   const focusControl = getElement("focus-control");
   focus.value = String(state.focus);
-  const focusLabel = `${focusName()} (選択したノードの近傍だけを描く)`;
+  const focusLabel = `${focusName()} (選択したノードの近傍を描く)`;
+  focus.setAttribute("aria-label", state.focus ? `フォーカス: ${focusName()}` : focusName());
+  focusControl.classList.toggle("active", Boolean(state.focus));
   focus.title = focusLabel;
   focusControl.title = focusLabel;
+  focusControl.hidden = state.mode === "analysis";
+  getElement("tab-analysis").disabled = !state.selected && state.mode !== "analysis";
+  getElement("undirected").disabled = state.mode === "analysis";
+  getElement("undirected").checked = state.mode !== "analysis" && state.undirected;
 }
 
 /**
@@ -789,7 +830,6 @@ function syncControls() {
   syncGraphControlLabels();
   getElement("depth").value = String(state.depth);
   getElement("depth-value").textContent = depthLabel();
-  getElement("undirected").checked = state.undirected;
   for (const [attribute, key] of FILTER_SETS) {
     queryElements(`input[data-${attribute}]`).forEach((input) => {
       input.checked = state[key].has(input.dataset[attribute]);
@@ -884,7 +924,7 @@ function renderFindings() {
     panel.replaceChildren(...children);
   }
   panel.querySelectorAll<HTMLElement>("button.finding[data-id]").forEach((button: HTMLElement) => {
-    button.addEventListener("click", () => selectNode(button.dataset.id));
+    button.addEventListener("click", () => selectRoot(button.dataset.id));
   });
 }
 
@@ -969,7 +1009,7 @@ function renderTable() {
 
 /** 指摘数から検証結果へ辿る。そのノードを選び、右ペインの指摘まで送る。 */
 function showFindings(id) {
-  if (state.selected !== id) selectNode(id);
+  if ((state.detail || state.selected) !== id) chooseNode(id);
   const heading = getElement("node-findings");
   if (heading) heading.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
@@ -985,8 +1025,8 @@ function showFindings(id) {
  */
 function bindTabKeys(container: HTMLElement, activate: (tab: HTMLElement) => void) {
   const keys = { ArrowLeft: -1, ArrowRight: 1 };
-  container.addEventListener("keydown", (event) => {
-    const buttons = [...container.querySelectorAll<HTMLElement>('[role="tab"]')];
+  container.onkeydown = (event) => {
+    const buttons = [...container.querySelectorAll<HTMLElement>('[role="tab"]')].filter((button) => !button.hasAttribute("disabled"));
     const at = buttons.indexOf(event.target as HTMLElement);
     if (at < 0) return;
     let next = null;
@@ -997,22 +1037,25 @@ function bindTabKeys(container: HTMLElement, activate: (tab: HTMLElement) => voi
     event.preventDefault();
     next.focus();
     activate(next);
-  });
+  };
 }
 
 //: 中央ペインのタブ [ボタンの id, 表示]。
 const VIEW_TABS = [
   ["tab-graph", "graph"],
+  ["tab-analysis", "analysis"],
   ["tab-table", "table"],
 ];
 
 /** 中央ペインの表示切り替え。グラフは消さず、隠すだけ。 */
 function setMode(mode) {
+  if (mode !== state.mode) state.detail = null;
   state.mode = mode;
-  getElement("graph-frame").hidden = mode !== "graph";
+  getElement("graph-frame").hidden = mode === "table";
+  getElement("graph-frame").setAttribute("aria-label", mode === "analysis" ? "フォーカス分析" : "グラフ");
   getElement("table-frame").hidden = mode !== "table";
   for (const element of queryElements(".graph-only")) {
-    element.hidden = mode !== "graph";
+    element.hidden = mode === "table";
   }
   for (const [id, name] of VIEW_TABS) {
     const tab = getElement(id);
@@ -1021,6 +1064,7 @@ function setMode(mode) {
     //: tab キーで入る先は選択中のタブだけにする。
     tab.tabIndex = mode === name ? 0 : -1;
   }
+  refresh();
   if (mode === "table") {
     renderTable();
     return;
@@ -1065,7 +1109,6 @@ function applyHash() {
   const turned = next.direction !== state.direction;
   state = next;
   syncControls();
-  refresh();
   setMode(state.mode);
   if (turned) relayout();
   // 手で書かれた URL はここで正しい形に直す。履歴は増やさない。
@@ -1074,17 +1117,34 @@ function applyHash() {
 
 // --- 操作 ------------------------------------------------------------------
 
-function selectNode(id) {
-  state.selected = state.selected === id ? null : id;
+/** 一覧・検索・指摘からの選択は通常画面と同様に起点を切り替える。 */
+function selectRoot(id, toggle = true) {
+  state.selected = toggle && state.selected === id ? null : id;
+  state.detail = null;
   refresh();
   revealSelected();
   writeHash();
 }
 
+function selectNode(id) {
+  const inspecting = state.mode === "analysis" && Boolean(state.selected);
+  if (inspecting && !analysisIds()?.has(id)) return;
+  state = selectNodeState(state, id);
+  if (inspecting) {
+    view.state = state;
+    renderDetail();
+    applyHighlight();
+  } else {
+    refresh();
+    revealSelected();
+  }
+  writeHash();
+}
+
 /** 選択を決める (トグルしない)。キーボードの Enter から呼ぶ。 */
 function chooseNode(id) {
-  if (state.selected === id) {
-    revealNode(id);
+  if ((state.detail || state.selected) === id) {
+    if (state.mode !== "analysis") revealNode(id);
     return;
   }
   selectNode(id);
@@ -1092,6 +1152,10 @@ function chooseNode(id) {
 
 function refresh() {
   view = createView(DATA, state);
+  if (state.mode === "analysis" && state.detail && !analysisIds()?.has(state.detail)) state.detail = null;
+  syncGraphControlLabels();
+  renderLegend();
+  renderFindings();
   //: 絞り込みや検索語の変更で候補から外れた位置は捨てる。
   if (cursor !== null && !hits().includes(cursor)) cursor = null;
   renderNodeList();
@@ -1139,12 +1203,12 @@ getElement("search").addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
   event.preventDefault();
   const target = cursor === null ? hits()[0] : cursor;
-  if (target) chooseNode(target);
+  if (target) selectRoot(target, false);
 });
 getElement("depth").addEventListener("input", (event) => {
   state.depth = Number((event.target as HTMLInputElement).value);
   getElement("depth-value").textContent = depthLabel();
-  //: 描く要素は変わらないので再レイアウトは走らない (色分けと本文だけが変わる)。
+  //: 分析フォーカス中だけは描画範囲も変わるため並べ直す。
   refresh();
   //: つまみを動かしている間の 1 段ごとに履歴を積まない。
   writeHash(false);
@@ -1161,12 +1225,17 @@ getElement("direction").addEventListener("click", () => {
   writeHash();
 });
 getElement("focus").addEventListener("change", (event) => {
-  state.focus = Number((event.target as HTMLInputElement).value);
+  state.focus = parseFocus((event.target as HTMLSelectElement).value);
+  state.detail = null;
   syncGraphControlLabels();
   //: 描く範囲が変わるので、refresh() の中の syncFocusLayout() が並べ直す。
   refresh();
   writeHash();
 });
+function exitFocus() {
+  setMode("graph");
+  writeHash();
+}
 getElement("relayout").addEventListener("click", relayout);
 getElement("zoom-in").addEventListener("click", () => zoomBy(1.2));
 getElement("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
@@ -1301,6 +1370,10 @@ function currentSvg() {
     .edge.on-path .edge-line { stroke: ${pal.fg}; stroke-width: 2; }
     .hit .node-shape { filter: drop-shadow(0 0 8px ${(DATA.meta.search || {}).hit || pal.fg}); }
     .dim.hit { opacity: .65; }
+    .trail-muted { opacity: .35; }
+    .node.detail-path:not(.sel) .node-shape { stroke: ${impact.related || pal.fg}; stroke-width: 4; }
+    .node.detail-target .node-shape { stroke-dasharray: 7 3; stroke-width: 5; }
+    .edge.detail-path .edge-line { stroke: ${impact.related || pal.fg}; stroke-width: 4; }
   `;
   copy.prepend(style);
   const title = svgEl("title");
@@ -1318,7 +1391,7 @@ exportSvg.addEventListener("click", () => {
 });
 const exportMmd = getElement("export-mmd");
 exportMmd.addEventListener("click", () => {
-  download("graph.mmd", mermaidText(view), "text/plain;charset=utf-8");
+  download("graph.mmd", mermaidText(displayedView()), "text/plain;charset=utf-8");
   exportMmd.closest("details").open = false;
 });
 
@@ -1347,10 +1420,14 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key !== "Escape") return;
-  //: まず選択、無ければ検索語を解く。どちらも無ければ入力欄から手を離す。
-  if (state.selected) {
+  //: フォーカス → 選択 → 検索語の順に解除し、その後で入力欄から手を離す。
+  if (state.mode === "analysis") {
+    event.preventDefault();
+    exitFocus();
+  } else if (state.selected) {
     event.preventDefault();
     state.selected = null;
+    state.detail = null;
     refresh();
     writeHash();
   } else if (state.query) {
@@ -1374,7 +1451,6 @@ renderFocusOptions();
 renderImpactControls();
 syncControls();
 renderStats();
-refresh();
 setMode(state.mode);
 // 解釈できない項目を落とした後の正しい URL に直す (履歴は増やさない)。
 writeHash(false);

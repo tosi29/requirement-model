@@ -496,7 +496,7 @@
     const depth = (state2 || {}).depth;
     return {
       depth: IMPACT_DEPTHS.includes(depth) ? depth : null,
-      undirected: Boolean((state2 || {}).undirected)
+      undirected: state2?.mode !== "analysis" && Boolean((state2 || {}).undirected)
     };
   }
   function impactSets(view2, id, scope = null) {
@@ -523,6 +523,37 @@
   function focusSet(view2, start, depth) {
     if (!view2.adjacency.has(start)) return /* @__PURE__ */ new Set();
     return /* @__PURE__ */ new Set([start, ...related(view2, start, depth)]);
+  }
+  function parseFocus(value) {
+    const depth = Number(value);
+    return FOCUS_DEPTHS.includes(depth) ? depth : 0;
+  }
+  function focusedNodes(view2) {
+    const { focus, selected, depth, mode } = view2.state;
+    if (mode !== "analysis") return focus && selected ? focusSet(view2, selected, focus) : null;
+    if (!selected || !view2.adjacency.has(selected)) return /* @__PURE__ */ new Set();
+    const impact = impactSets(view2, selected, { depth: depth || null, undirected: false });
+    return impact.whole;
+  }
+  function focusTrail(view2, shown = focusedNodes(view2)) {
+    const { selected, detail, mode } = view2.state;
+    const result = { nodes: /* @__PURE__ */ new Set(), edges: /* @__PURE__ */ new Set() };
+    if (mode !== "analysis" || !shown || !selected || !detail || !shown.has(selected) || !shown.has(detail)) return result;
+    const nodes = view2.nodes.filter((node) => shown.has(node.id));
+    const edges = view2.edges.filter((edge) => shown.has(edge.source) && shown.has(edge.target));
+    const scoped = { ...view2, nodes, edges, adjacency: buildAdjacency(nodes, edges) };
+    for (const forward of [true, false]) {
+      const from = /* @__PURE__ */ new Set([selected, ...reach(scoped, selected, forward)]);
+      if (!from.has(detail)) continue;
+      const to = /* @__PURE__ */ new Set([detail, ...reach(scoped, detail, !forward)]);
+      for (const id of from) if (to.has(id)) result.nodes.add(id);
+      for (const edge of edges) {
+        const source = forward ? edge.source : edge.target;
+        const target = forward ? edge.target : edge.source;
+        if (from.has(source) && to.has(target)) result.edges.add(edge);
+      }
+    }
+    return result;
   }
   var MISSING_RANK = 10 ** 6;
   var rankOf = (view2, id) => view2.order.has(id) ? view2.order.get(id) : MISSING_RANK;
@@ -698,8 +729,9 @@
       direction: "TD",
       mode: "graph",
       query: "",
-      //: 近傍の深さ。0 ならフォーカス無し (全体を描く)。
+      //: 分析の向き、または近傍の深さ。0 は全体表示。
       focus: 0,
+      detail: null,
       //: 影響範囲の探索の深さ。0 なら無制限 (`req explain` に --depth を渡さない)。
       depth: 0,
       //: 影響範囲をエッジの向きを無視して辿るか (`req explain --undirected`)。
@@ -727,8 +759,11 @@
       put(filter.param, list(selected, all));
     }
     if (state2.direction === "LR") put("dir", "LR");
-    if (state2.mode === "table") put("view", "table");
-    if (FOCUS_DEPTHS.includes(state2.focus)) put("focus", String(state2.focus));
+    if (state2.mode === "table" || state2.mode === "analysis") put("view", state2.mode);
+    if (parseFocus(String(state2.focus))) put("focus", String(state2.focus));
+    if (state2.mode === "analysis" && state2.selected && state2.detail && state2.detail !== state2.selected) {
+      put("detail", encodeURIComponent(state2.detail));
+    }
     if (IMPACT_DEPTHS.includes(state2.depth)) put("depth", String(state2.depth));
     if (state2.undirected) put("undir", "1");
     if (query) put("q", encodeURIComponent(query));
@@ -748,9 +783,12 @@
       state2[filter.key] = subset(params.get(filter.param), filter.all(data));
     }
     if (params.get("dir") === "LR") state2.direction = "LR";
-    if (params.get("view") === "table") state2.mode = "table";
-    const focus = Number(params.get("focus"));
-    if (FOCUS_DEPTHS.includes(focus)) state2.focus = focus;
+    if (params.get("view") === "table" || params.get("view") === "analysis") state2.mode = params.get("view");
+    state2.focus = parseFocus(params.get("focus") || "0");
+    const detail = params.get("detail");
+    if (state2.mode === "analysis" && state2.selected && detail !== state2.selected && data.nodes.some((node2) => node2.id === detail)) {
+      state2.detail = detail;
+    }
     const depth = Number(params.get("depth"));
     if (IMPACT_DEPTHS.includes(depth)) state2.depth = depth;
     if (params.get("undir") === "1") state2.undirected = true;
@@ -784,7 +822,7 @@
   var VIEW_STORAGE_KEY = "reqmodel:site:view";
   var THEME_STORAGE_KEY = "reqmodel:site:theme";
   function storableHash(state2, data) {
-    return encodeHash({ ...state2, selected: null, query: "" }, data);
+    return encodeHash({ ...state2, selected: null, detail: null, mode: state2.mode === "analysis" ? "graph" : state2.mode, query: "" }, data);
   }
   function initialHash(hash, stored) {
     return (hash || "").replace(/^#/, "") ? hash : stored || "";
@@ -794,6 +832,12 @@
   var normalizeTheme = (value) => THEMES.includes(value) ? value : "auto";
   function nextTheme(theme2) {
     return THEMES[(THEMES.indexOf(normalizeTheme(theme2)) + 1) % THEMES.length];
+  }
+  function selectNodeState(state2, id) {
+    if (state2.mode === "analysis" && state2.selected) {
+      return { ...state2, detail: id && id !== state2.selected ? id : null };
+    }
+    return { ...state2, selected: state2.selected === id ? null : id, detail: null };
   }
 
   // src/reqmodel/presentation/site_context.ts
@@ -1327,6 +1371,53 @@ ${text}`;
     for (const node of view2.nodes) lines.push(`    class ${ids.get(node.id)} ${node.type}`);
     return lines.join("\n") + "\n";
   }
+  var ANALYSIS_BANDS = {
+    upstream: "\u4E0A\u6D41",
+    shared: "\u4E0A\u6D41\u30FB\u4E0B\u6D41\uFF08\u5FAA\u74B0\uFF09",
+    downstream: "\u4E0B\u6D41"
+  };
+  function analysisBandLayout(view2, placed, direction) {
+    const positions = /* @__PURE__ */ new Map();
+    const frames = /* @__PURE__ */ new Map();
+    const { selected } = view2.state;
+    if (!selected || !placed.length) return { positions, frames };
+    const { upstream, downstream } = impactSets(view2, selected);
+    const vertical = direction !== "LR";
+    const pri = (node) => vertical ? node.y : node.x;
+    const sec = (node) => vertical ? node.x : node.y;
+    const priSize = (node) => vertical ? node.h : node.w;
+    const secSize = (node) => vertical ? node.w : node.h;
+    const at = (primary, secondary) => vertical ? { x: secondary, y: primary } : { x: primary, y: secondary };
+    const bucket = (node) => node.id === selected ? "root" : upstream.has(node.id) && downstream.has(node.id) ? "shared" : upstream.has(node.id) ? "upstream" : "downstream";
+    let cursor2 = 0;
+    for (const key of ["upstream", "shared", "root", "downstream"]) {
+      const members = placed.filter((node) => bucket(node) === key);
+      if (!members.length) continue;
+      const minPri = Math.min(...members.map((node) => pri(node) - priSize(node) / 2));
+      const maxPri = Math.max(...members.map((node) => pri(node) + priSize(node) / 2));
+      const minSec = Math.min(...members.map((node) => sec(node) - secSize(node) / 2));
+      const maxSec = Math.max(...members.map((node) => sec(node) + secSize(node) / 2));
+      const padding = key === "root" ? 0 : 24;
+      const labelSpace = key === "root" ? 0 : 20;
+      const primaryBefore = padding + (vertical ? labelSpace : 0);
+      const secondaryBefore = padding + (vertical ? 0 : labelSpace);
+      const length = maxPri - minPri + primaryBefore + padding;
+      const width = maxSec - minSec + secondaryBefore + padding;
+      for (const node of members) {
+        positions.set(node.id, at(
+          cursor2 + primaryBefore + pri(node) - minPri,
+          sec(node) - (minSec + maxSec) / 2 + (vertical ? 0 : labelSpace / 2)
+        ));
+      }
+      if (key !== "root") frames.set(`analysis:${key}`, {
+        ...at(cursor2 + length / 2, 0),
+        w: vertical ? width : length,
+        h: vertical ? length : width
+      });
+      cursor2 += length + 56;
+    }
+    return { positions, frames };
+  }
 
   // src/reqmodel/presentation/site_app.ts
   var getElement = (id) => document.getElementById(id);
@@ -1392,7 +1483,9 @@ ${text}`;
     svg.append(defs, viewport, graphLayer);
     graphEl.append(svg);
     buildGraphDom();
-    panZoom.bind(svg, viewport, () => selectNode(state.selected));
+    panZoom.bind(svg, viewport, () => {
+      if (state.mode !== "analysis") selectNode(state.selected);
+    });
     runLayout();
   }
   function buildGraphDom() {
@@ -1427,8 +1520,11 @@ ${text}`;
     graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
     graphEl.style.setProperty("--impact-related", impact.related || pal.fg);
     graphEl.style.setProperty("--search-hit", (DATA.meta.search || {}).hit || pal.fg);
-    for (const item of graph.filter((element) => element.classes === "band")) {
-      const group = svgEl("g", { class: "node band", "data-id": item.data.id });
+    const analysisFrames = Object.entries(ANALYSIS_BANDS).map(([key, label]) => ({
+      data: { id: bandId(`analysis:${key}`), bandKey: `analysis:${key}`, label }
+    }));
+    for (const item of [...graph.filter((element) => element.classes === "band"), ...analysisFrames]) {
+      const group = svgEl("g", { class: "node band", "data-id": item.data.id, "data-band-key": item.data.bandKey });
       const shape = svgEl("rect", { class: "node-shape", rx: 8 });
       const label = svgEl("text", { class: "node-label band-label" });
       renderLabel(label, item.data.label, 0, -11, 11, "bold");
@@ -1464,11 +1560,21 @@ ${text}`;
     restyleGraph();
   }
   function focusedIds() {
-    if (!state.focus || !state.selected || !view.byId.has(state.selected)) return null;
-    return focusSet(view, state.selected, state.focus);
+    return focusedNodes(view);
   }
   var laidOutFocus = "";
-  var focusKey = () => focusedIds() ? `${state.focus}:${state.selected}` : "";
+  var focusKey = () => state.mode === "analysis" ? JSON.stringify(["analysis", state.selected, state.depth, [...state.types], [...state.statuses], [...state.edges]]) : focusedIds() ? `${state.focus}:${state.selected}` : "";
+  function analysisIds() {
+    return state.mode === "analysis" ? focusedIds() : null;
+  }
+  function displayedView() {
+    const ids = analysisIds();
+    return ids ? {
+      ...view,
+      nodes: view.nodes.filter((node) => ids.has(node.id)),
+      edges: view.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target))
+    } : view;
+  }
   function syncFocusLayout() {
     const key = focusKey();
     if (key === laidOutFocus) return;
@@ -1554,7 +1660,7 @@ ${text}`;
   function applyBanding() {
     if (!svg) return;
     const bands = bandDefs(DATA);
-    if (!bands.length) return;
+    if (!bands.length && state.mode !== "analysis") return;
     const placed = shownNodeItems().map((item) => ({
       id: item.id,
       type: item.type,
@@ -1564,9 +1670,8 @@ ${text}`;
       h: item.h
     }));
     if (!placed.length) return;
-    const { positions, frames } = bandedLayout(bands, placed, view.edges, state.direction, {
-      groupMaxWidth: 600
-    });
+    const { positions, frames } = state.mode === "analysis" ? analysisBandLayout(view, placed, state.direction) : bandedLayout(bands, placed, view.edges, state.direction, { groupMaxWidth: 600 });
+    for (const item of bandItems.values()) classed(item.group, "hidden", !frames.has(item.bandKey));
     for (const [id, position] of positions) {
       const item = nodeItems.get(id);
       if (item) moveItem(item, position.x, position.y);
@@ -1630,7 +1735,7 @@ ${text}`;
     const shown = focused ? view.nodes.filter((node) => focused.has(node.id)) : view.nodes;
     const nodes = new Set(shown.map((node) => node.id));
     const edges = new Set(view.edges.filter((edge) => nodes.has(edge.source) && nodes.has(edge.target)));
-    const visibleBands = visibleBandKeys(DATA, shown);
+    const visibleBands = state.mode === "analysis" ? new Set(analysisBandLayout(view, [...nodeItems.values()].filter((item) => nodes.has(item.id)), state.direction).frames.keys()) : visibleBandKeys(DATA, shown);
     for (const item of nodeItems.values()) classed(item.group, "hidden", !nodes.has(item.id));
     for (const item of bandItems.values()) classed(item.group, "hidden", !visibleBands.has(item.bandKey));
     for (const item of edgeItemsByKey.values()) classed(item.group, "hidden", !edges.has(DATA.edges[item.index]));
@@ -1639,7 +1744,7 @@ ${text}`;
   }
   function applyHighlight() {
     if (!svg) return;
-    for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()]) item.group.classList.remove("sel", "up", "down", "rel", "dim", "on-path");
+    for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()]) item.group.classList.remove("sel", "up", "down", "rel", "dim", "on-path", "detail-target", "detail-path", "trail-muted");
     if (!state.selected || !view.byId.has(state.selected)) return;
     const { upstream, downstream, whole, undirected } = impactSets(view, state.selected);
     for (const item of nodeItems.values()) {
@@ -1652,6 +1757,20 @@ ${text}`;
     for (const item of edgeItemsByKey.values()) {
       const linked = whole.has(item.source) && whole.has(item.target);
       item.group.classList.add(linked ? "on-path" : "dim");
+    }
+    if (state.mode === "analysis" && state.detail) {
+      const trail = focusTrail(view);
+      for (const item of nodeItems.values()) {
+        classed(item.group, "detail-target", item.id === state.detail);
+        classed(item.group, "detail-path", trail.nodes.has(item.id));
+        if (trail.nodes.has(item.id)) item.group.classList.remove("dim");
+        classed(item.group, "trail-muted", trail.nodes.size && !trail.nodes.has(item.id));
+      }
+      for (const item of edgeItemsByKey.values()) {
+        classed(item.group, "detail-path", trail.edges.has(DATA.edges[item.index]));
+        if (trail.edges.has(DATA.edges[item.index])) item.group.classList.remove("dim");
+        classed(item.group, "trail-muted", trail.nodes.size && !trail.edges.has(DATA.edges[item.index]));
+      }
     }
   }
   var cursor = null;
@@ -1694,7 +1813,7 @@ ${text}`;
     panZoom?.fit(graphBox(), true);
   }
   function revealNode(id) {
-    if (!svg || state.mode !== "graph") return;
+    if (!svg || state.mode === "table") return;
     const item = nodeItems.get(id);
     if (!item || item.group.classList.contains("hidden")) return;
     panZoom?.reveal(item);
@@ -1726,11 +1845,12 @@ ${text}`;
   function renderDetail() {
     const panel = getElement("detail");
     panel.replaceChildren();
-    if (!state.selected || !view.byId.has(state.selected)) {
+    const detailId = state.mode === "analysis" && state.detail ? state.detail : state.selected;
+    if (!detailId || !view.byId.has(detailId)) {
       panel.append(htmlEl("p", { class: "empty" }, "\u30B0\u30E9\u30D5\u306E\u30CE\u30FC\u30C9\u3092\u30AF\u30EA\u30C3\u30AF\u3059\u308B\u3068\u3001\u672C\u6587\u30FB\u6839\u62E0\u30FB\u5F71\u97FF\u7BC4\u56F2\u3092\u8868\u793A\u3059\u308B\u3002"));
       return;
     }
-    const node = view.byId.get(state.selected);
+    const node = view.byId.get(detailId);
     const impact = impactSets(view, node.id);
     panel.append(
       htmlEl("h3", {}, node.id, " ", htmlEl("span", { class: "node-btn type" }, `[${node.type}]`)),
@@ -1776,7 +1896,7 @@ ${text}`;
       }
       panel.append(htmlEl("h2", {}, title), list);
     };
-    const links = edgeItems(view, node.id);
+    const links = edgeItems(displayedView(), node.id);
     appendEdges("\u51FA\u308B\u30A8\u30C3\u30B8", links.out);
     appendEdges("\u5165\u308B\u30A8\u30C3\u30B8", links.in);
     const nodeFindings = DATA.findings.filter((finding) => finding.node_id === node.id);
@@ -1848,7 +1968,7 @@ ${text}`;
       ));
     }));
     list.querySelectorAll("button[data-id]").forEach((button) => {
-      button.addEventListener("click", () => selectNode(button.dataset.id));
+      button.addEventListener("click", () => selectRoot(button.dataset.id));
     });
   }
   function renderToggles(containerId, attribute, items, set) {
@@ -1916,9 +2036,15 @@ ${text}`;
     const focus = getElement("focus");
     const focusControl = getElement("focus-control");
     focus.value = String(state.focus);
-    const focusLabel = `${focusName()} (\u9078\u629E\u3057\u305F\u30CE\u30FC\u30C9\u306E\u8FD1\u508D\u3060\u3051\u3092\u63CF\u304F)`;
+    const focusLabel = `${focusName()} (\u9078\u629E\u3057\u305F\u30CE\u30FC\u30C9\u306E\u8FD1\u508D\u3092\u63CF\u304F)`;
+    focus.setAttribute("aria-label", state.focus ? `\u30D5\u30A9\u30FC\u30AB\u30B9: ${focusName()}` : focusName());
+    focusControl.classList.toggle("active", Boolean(state.focus));
     focus.title = focusLabel;
     focusControl.title = focusLabel;
+    focusControl.hidden = state.mode === "analysis";
+    getElement("tab-analysis").disabled = !state.selected && state.mode !== "analysis";
+    getElement("undirected").disabled = state.mode === "analysis";
+    getElement("undirected").checked = state.mode !== "analysis" && state.undirected;
   }
   function renderImpactControls() {
     const slider = getElement("depth");
@@ -1932,7 +2058,6 @@ ${text}`;
     syncGraphControlLabels();
     getElement("depth").value = String(state.depth);
     getElement("depth-value").textContent = depthLabel();
-    getElement("undirected").checked = state.undirected;
     for (const [attribute, key] of FILTER_SETS) {
       queryElements(`input[data-${attribute}]`).forEach((input) => {
         input.checked = state[key].has(input.dataset[attribute]);
@@ -2014,7 +2139,7 @@ ${text}`;
       panel.replaceChildren(...children);
     }
     panel.querySelectorAll("button.finding[data-id]").forEach((button) => {
-      button.addEventListener("click", () => selectNode(button.dataset.id));
+      button.addEventListener("click", () => selectRoot(button.dataset.id));
     });
   }
   function renderTable() {
@@ -2091,14 +2216,14 @@ ${text}`;
     });
   }
   function showFindings(id) {
-    if (state.selected !== id) selectNode(id);
+    if ((state.detail || state.selected) !== id) chooseNode(id);
     const heading = getElement("node-findings");
     if (heading) heading.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
   function bindTabKeys(container, activate) {
     const keys = { ArrowLeft: -1, ArrowRight: 1 };
-    container.addEventListener("keydown", (event) => {
-      const buttons = [...container.querySelectorAll('[role="tab"]')];
+    container.onkeydown = (event) => {
+      const buttons = [...container.querySelectorAll('[role="tab"]')].filter((button) => !button.hasAttribute("disabled"));
       const at = buttons.indexOf(event.target);
       if (at < 0) return;
       let next = null;
@@ -2109,18 +2234,21 @@ ${text}`;
       event.preventDefault();
       next.focus();
       activate(next);
-    });
+    };
   }
   var VIEW_TABS = [
     ["tab-graph", "graph"],
+    ["tab-analysis", "analysis"],
     ["tab-table", "table"]
   ];
   function setMode(mode) {
+    if (mode !== state.mode) state.detail = null;
     state.mode = mode;
-    getElement("graph-frame").hidden = mode !== "graph";
+    getElement("graph-frame").hidden = mode === "table";
+    getElement("graph-frame").setAttribute("aria-label", mode === "analysis" ? "\u30D5\u30A9\u30FC\u30AB\u30B9\u5206\u6790" : "\u30B0\u30E9\u30D5");
     getElement("table-frame").hidden = mode !== "table";
     for (const element of queryElements(".graph-only")) {
-      element.hidden = mode !== "graph";
+      element.hidden = mode === "table";
     }
     for (const [id, name] of VIEW_TABS) {
       const tab = getElement(id);
@@ -2128,6 +2256,7 @@ ${text}`;
       tab.setAttribute("aria-selected", String(mode === name));
       tab.tabIndex = mode === name ? 0 : -1;
     }
+    refresh();
     if (mode === "table") {
       renderTable();
       return;
@@ -2151,26 +2280,44 @@ ${text}`;
     const turned = next.direction !== state.direction;
     state = next;
     syncControls();
-    refresh();
     setMode(state.mode);
     if (turned) relayout();
     writeHash(false);
   }
-  function selectNode(id) {
-    state.selected = state.selected === id ? null : id;
+  function selectRoot(id, toggle = true) {
+    state.selected = toggle && state.selected === id ? null : id;
+    state.detail = null;
     refresh();
     revealSelected();
     writeHash();
   }
+  function selectNode(id) {
+    const inspecting = state.mode === "analysis" && Boolean(state.selected);
+    if (inspecting && !analysisIds()?.has(id)) return;
+    state = selectNodeState(state, id);
+    if (inspecting) {
+      view.state = state;
+      renderDetail();
+      applyHighlight();
+    } else {
+      refresh();
+      revealSelected();
+    }
+    writeHash();
+  }
   function chooseNode(id) {
-    if (state.selected === id) {
-      revealNode(id);
+    if ((state.detail || state.selected) === id) {
+      if (state.mode !== "analysis") revealNode(id);
       return;
     }
     selectNode(id);
   }
   function refresh() {
     view = createView(DATA, state);
+    if (state.mode === "analysis" && state.detail && !analysisIds()?.has(state.detail)) state.detail = null;
+    syncGraphControlLabels();
+    renderLegend();
+    renderFindings();
     if (cursor !== null && !hits().includes(cursor)) cursor = null;
     renderNodeList();
     renderDetail();
@@ -2211,7 +2358,7 @@ ${text}`;
     if (event.key !== "Enter") return;
     event.preventDefault();
     const target = cursor === null ? hits()[0] : cursor;
-    if (target) chooseNode(target);
+    if (target) selectRoot(target, false);
   });
   getElement("depth").addEventListener("input", (event) => {
     state.depth = Number(event.target.value);
@@ -2231,11 +2378,16 @@ ${text}`;
     writeHash();
   });
   getElement("focus").addEventListener("change", (event) => {
-    state.focus = Number(event.target.value);
+    state.focus = parseFocus(event.target.value);
+    state.detail = null;
     syncGraphControlLabels();
     refresh();
     writeHash();
   });
+  function exitFocus() {
+    setMode("graph");
+    writeHash();
+  }
   getElement("relayout").addEventListener("click", relayout);
   getElement("zoom-in").addEventListener("click", () => zoomBy(1.2));
   getElement("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
@@ -2340,6 +2492,10 @@ ${text}`;
     .edge.on-path .edge-line { stroke: ${pal.fg}; stroke-width: 2; }
     .hit .node-shape { filter: drop-shadow(0 0 8px ${(DATA.meta.search || {}).hit || pal.fg}); }
     .dim.hit { opacity: .65; }
+    .trail-muted { opacity: .35; }
+    .node.detail-path:not(.sel) .node-shape { stroke: ${impact.related || pal.fg}; stroke-width: 4; }
+    .node.detail-target .node-shape { stroke-dasharray: 7 3; stroke-width: 5; }
+    .edge.detail-path .edge-line { stroke: ${impact.related || pal.fg}; stroke-width: 4; }
   `;
     copy.prepend(style);
     const title = svgEl("title");
@@ -2357,7 +2513,7 @@ ${new XMLSerializer().serializeToString(copy)}`;
   });
   var exportMmd = getElement("export-mmd");
   exportMmd.addEventListener("click", () => {
-    download("graph.mmd", mermaidText(view), "text/plain;charset=utf-8");
+    download("graph.mmd", mermaidText(displayedView()), "text/plain;charset=utf-8");
     exportMmd.closest("details").open = false;
   });
   document.addEventListener("keydown", (event) => {
@@ -2372,9 +2528,13 @@ ${new XMLSerializer().serializeToString(copy)}`;
       return;
     }
     if (event.key !== "Escape") return;
-    if (state.selected) {
+    if (state.mode === "analysis") {
+      event.preventDefault();
+      exitFocus();
+    } else if (state.selected) {
       event.preventDefault();
       state.selected = null;
+      state.detail = null;
       refresh();
       writeHash();
     } else if (state.query) {
@@ -2394,7 +2554,6 @@ ${new XMLSerializer().serializeToString(copy)}`;
   renderImpactControls();
   syncControls();
   renderStats();
-  refresh();
   setMode(state.mode);
   writeHash(false);
   METRICS.initialRenderMs = Date.now() - METRICS.startedAt;

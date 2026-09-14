@@ -194,7 +194,7 @@ export function impactScope(state: ViewState) {
   const depth = (state || {}).depth;
   return {
     depth: IMPACT_DEPTHS.includes(depth) ? depth : null,
-    undirected: Boolean((state || {}).undirected),
+    undirected: state?.mode !== "analysis" && Boolean((state || {}).undirected),
   };
 }
 
@@ -211,7 +211,7 @@ export function impactSets(view: GraphViewModel, id: string, scope: { depth: num
   if (undirected) {
     const neighbours = related(view, id, depth);
     return {
-      upstream: new Set(),
+      upstream: new Set<string>(),
       downstream: neighbours,
       whole: new Set([id, ...neighbours]),
       undirected: true,
@@ -248,6 +248,42 @@ export const FOCUS_DEPTHS = [1, 2, 3];
 export function focusSet(view: GraphViewModel, start: string, depth: number): Set<string> {
   if (!view.adjacency.has(start)) return new Set();
   return new Set([start, ...related(view, start, depth)]);
+}
+
+export function parseFocus(value: string): number {
+  const depth = Number(value);
+  return FOCUS_DEPTHS.includes(depth) ? depth : 0;
+}
+
+/** 描画範囲だけを絞る。起点がフィルタで消えても全体表示には戻さない。 */
+export function focusedNodes(view: GraphViewModel): Set<string> | null {
+  const { focus, selected, depth, mode } = view.state;
+  if (mode !== "analysis") return focus && selected ? focusSet(view, selected, focus) : null;
+  if (!selected || !view.adjacency.has(selected)) return new Set();
+  const impact = impactSets(view, selected, { depth: depth || null, undirected: false });
+  return impact.whole;
+}
+
+/** 起点と detail を結ぶ表示中の全経路。各方向は独立に辿る。 */
+export function focusTrail(view: GraphViewModel, shown = focusedNodes(view)) {
+  const { selected, detail, mode } = view.state;
+  const result = { nodes: new Set<string>(), edges: new Set<NormalizedEdge>() };
+  if (mode !== "analysis" || !shown || !selected || !detail || !shown.has(selected) || !shown.has(detail)) return result;
+  const nodes = view.nodes.filter((node) => shown.has(node.id));
+  const edges = view.edges.filter((edge) => shown.has(edge.source) && shown.has(edge.target));
+  const scoped = { ...view, nodes, edges, adjacency: buildAdjacency(nodes, edges) };
+  for (const forward of [true, false]) {
+    const from = new Set([selected, ...reach(scoped, selected, forward)]);
+    if (!from.has(detail)) continue;
+    const to = new Set([detail, ...reach(scoped, detail, !forward)]);
+    for (const id of from) if (to.has(id)) result.nodes.add(id);
+    for (const edge of edges) {
+      const source = forward ? edge.source : edge.target;
+      const target = forward ? edge.target : edge.source;
+      if (from.has(source) && to.has(target)) result.edges.add(edge);
+    }
+  }
+  return result;
 }
 
 // --- 並びの土台 ------------------------------------------------------------

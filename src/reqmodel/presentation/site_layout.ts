@@ -1,5 +1,5 @@
 import { LABEL_FONT, LABEL_MAX_LENGTH, LABEL_WRAP_WIDTH, escapeAttr, escapeHtml, labelChunks, nodeSize, truncate, estimateTextWidth, wrapLabel } from "./site_text.ts";
-import { compare, fieldLabel } from "./site_graph.ts";
+import { compare, fieldLabel, impactSets } from "./site_graph.ts";
 import type { GraphElementDefinition, GraphViewModel, RenderMetadata, SiteData } from "./site_types.ts";
 // --- SVG 描画に渡す値 -------------------------------------------------------
 //
@@ -879,4 +879,53 @@ export function graphSvg(scene) {
       `\n${element("title", {}, escapeHtml(scene.title || "要求グラフ"))}\n${defs}\n${body.join("\n")}\n`,
     ) + "\n"
   );
+}
+
+/** 分析では要求グループでなく、起点からの到達方向で枠を作る。 */
+export const ANALYSIS_BANDS = {
+  upstream: "上流",
+  shared: "上流・下流（循環）",
+  downstream: "下流",
+};
+
+/** dagre の領域内の配置を保ち、上流 → 起点 → 下流の順に領域を並べる。 */
+export function analysisBandLayout(view: GraphViewModel, placed, direction: string) {
+  const positions = new Map();
+  const frames = new Map();
+  const { selected } = view.state;
+  if (!selected || !placed.length) return { positions, frames };
+  const { upstream, downstream } = impactSets(view, selected);
+  const vertical = direction !== "LR";
+  const pri = (node) => vertical ? node.y : node.x;
+  const sec = (node) => vertical ? node.x : node.y;
+  const priSize = (node) => vertical ? node.h : node.w;
+  const secSize = (node) => vertical ? node.w : node.h;
+  const at = (primary, secondary) => vertical ? { x: secondary, y: primary } : { x: primary, y: secondary };
+  const bucket = (node) => node.id === selected ? "root"
+    : upstream.has(node.id) && downstream.has(node.id) ? "shared"
+    : upstream.has(node.id) ? "upstream" : "downstream";
+  let cursor = 0;
+  for (const key of ["upstream", "shared", "root", "downstream"]) {
+    const members = placed.filter((node) => bucket(node) === key);
+    if (!members.length) continue;
+    const minPri = Math.min(...members.map((node) => pri(node) - priSize(node) / 2));
+    const maxPri = Math.max(...members.map((node) => pri(node) + priSize(node) / 2));
+    const minSec = Math.min(...members.map((node) => sec(node) - secSize(node) / 2));
+    const maxSec = Math.max(...members.map((node) => sec(node) + secSize(node) / 2));
+    const padding = key === "root" ? 0 : 24;
+    const labelSpace = key === "root" ? 0 : 20;
+    const primaryBefore = padding + (vertical ? labelSpace : 0);
+    const secondaryBefore = padding + (vertical ? 0 : labelSpace);
+    const length = maxPri - minPri + primaryBefore + padding;
+    const width = maxSec - minSec + secondaryBefore + padding;
+    for (const node of members) {
+      positions.set(node.id, at(cursor + primaryBefore + pri(node) - minPri,
+        sec(node) - (minSec + maxSec) / 2 + (vertical ? 0 : labelSpace / 2)));
+    }
+    if (key !== "root") frames.set(`analysis:${key}`, {
+      ...at(cursor + length / 2, 0), w: vertical ? width : length, h: vertical ? length : width,
+    });
+    cursor += length + 56;
+  }
+  return { positions, frames };
 }

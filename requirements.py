@@ -920,7 +920,7 @@ FR_SOURCE_AS_ATTRIBUTE = FunctionalRequirement(
 )
 FR_FOCUS = FunctionalRequirement(
     id="FR-26",
-    text="起点を固定して上流・下流または近傍に図を絞り、周辺ノードの詳細と経路を確認できること",
+    text="独立した分析タブで起点を固定し、影響するノードだけを表示して詳細と経路を確認できること",
     refines=[FR_SITE],
     satisfies=[NEED_READABLE],
     source=[SRC_OWNER, SRC_BENCH, ISSUE_SCALE, ISSUE_IMPACT],
@@ -930,20 +930,23 @@ FR_FOCUS = FunctionalRequirement(
         EVIDENCE_SITE_JS,
         EVIDENCE_BENCH,
         Reference(
-            title="tests/js/focus.test.mjs",
-            url="https://github.com/tosi29/requirement-model/blob/main/tests/js/focus.test.mjs",
-            note="起点固定・有向の表示範囲・最短経路・URL 復元を検証するテスト。",
+            title="フォーカス分析のロジック・DOM 操作テスト",
+            url="https://github.com/tosi29/requirement-model/tree/main/tests/js",
+            note="focus.test.mjs と focus_ui.test.mjs が起点固定・影響範囲・タブ操作・経路・URL 復元を検証する。",
         ),
     ],
     acceptance_criteria=[
         "深さ (1〜3 ホップ) を選ぶと、図に描かれるのは選択ノードの近傍だけになる",
-        "上流＋下流・上流のみ・下流のみを選べ、影響範囲の深さと種別・status・エッジの絞り込みが効く",
-        "別のノードを選んでも起点・配置・パン・倍率は変わらず、detail の対象と経路の強調だけが変わる",
-        "detail の対象と、表示範囲内で起点を結ぶ最短経路 1 本のノード・エッジが強調される",
-        "一覧・テーブルはフォーカスで絞らず、詳細の件数とコピー本文は detail の対象と影響範囲設定に従う",
+        "グラフでノードを選択してフォーカス分析タブに入ると、影響するノードとその間のエッジだけが表示される",
+        "分析では常に上流と下流の両方を描き、要求グループではなく上流・下流の枠で区別する",
+        "深さと種別・status・エッジの絞り込みが分析の探索に効く",
+        "図内の別のノードを選んでも起点・配置・パン・倍率は変わらず、detail の対象と経路の強調だけが変わる",
+        "detail の対象と、表示範囲内で起点を結ぶ接続するすべての経路のノード・エッジが強調される",
+        "左のノード一覧・検索・指摘は通常画面と同じ範囲を保ち、そこで選ぶと分析の起点が切り替わる",
+        "詳細の件数とコピー本文は detail の対象と影響範囲設定に従い、描画範囲では切らない",
         "操作アイコン・パン・ズーム・再配置・書き出し・凡例はグラフ画面と共通である",
         "フォーカスの起点・範囲・detail の対象を URL で復元できる",
-        "背景クリックでは起点を解除せず、解除操作で起点を選択した全体表示に戻る",
+        "背景クリックでは起点を解除せず、グラフタブ・Esc で起点を選択した通常グラフに戻る",
     ],
 )
 

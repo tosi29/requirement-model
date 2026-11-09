@@ -6,6 +6,10 @@ updates:
       interval: "daily"
     cooldown:
       default-days: 3
+    groups:
+      npm:
+        patterns:
+          - "*"
 
   - package-ecosystem: "uv"
     directory: "/"
@@ -13,6 +17,10 @@ updates:
       interval: "daily"
     cooldown:
       default-days: 3
+    groups:
+      uv:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -20,3 +28,7 @@ updates:
       interval: "daily"
     cooldown:
       default-days: 3
+    groups:
+      github-actions:
+        patterns:
+          - "*"

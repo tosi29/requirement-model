@@ -49,9 +49,12 @@ export interface RenderMetadata {
   statuses: Readonly<Record<string, RenderStatusMetadata>>;
   bands?: readonly { type: string; label: string }[];
   dashed_edges?: readonly string[];
-  impact_colors?: Readonly<Record<"selected" | "upstream" | "downstream" | "related", string>>;
+  impact_colors?: ImpactColors;
+  dark_impact_colors?: ImpactColors;
   search?: { hit?: string };
 }
+
+export type ImpactColors = Readonly<Record<"selected" | "upstream" | "downstream" | "related", string>>;
 
 export interface SiteStats {
   nodes: number;

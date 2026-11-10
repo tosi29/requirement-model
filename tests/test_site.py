@@ -115,6 +115,49 @@ def test_quality_requirement_and_constraint_use_semantic_palette():
     assert types["Constraint"]["stroke"] != meta["impact_colors"]["selected"]
 
 
+def _contrast(foreground: str, background: str) -> float:
+    def luminance(color: str) -> float:
+        channels = [int(color[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+        r, g, b = (
+            c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+            for c in channels
+        )
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+    hi, lo = sorted((luminance(foreground), luminance(background)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def test_impact_colors_have_a_dark_palette_readable_on_the_dark_background():
+    """影響範囲の色は枠線だけで読ませるので、ダークでも背景との明度差を保つ。"""
+    meta = render_meta()
+
+    assert set(meta["dark_impact_colors"]) == set(meta["impact_colors"])
+    for name, color in meta["dark_impact_colors"].items():
+        assert _contrast(color, "#0f1216") >= 4.5, name
+        assert color != meta["types"]["Constraint"]["dark_stroke"]
+
+
+def test_dark_theme_uses_the_dark_impact_palette(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert "pal.dark ? data.meta.dark_impact_colors : null" in html
+    assert "palette().dark ? DATA.meta.dark_impact_colors : null" in html
+
+
+def test_analysis_frame_titles_sit_in_the_corner_clear_of_edges(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert 'line.setAttribute("x", String(-item.w / 2 + 10))' in html
+    assert 'item.label.setAttribute("text-anchor", "start")' in html
+
+
+def test_acceptance_criteria_match_the_detail_pane_text_size(tmp_path: Path):
+    html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
+
+    assert ".detail ul:not([class]) { font-size: 13px; }" in html
+
+
 #: ノード形状の多角形 (外形の矩形に内接するよう正規化された座標)。
 #: 係数の検算をこの形状と突き合わせるための写し。
 #: ellipse だけは多角形ではないので別に見る。

@@ -461,6 +461,8 @@ button.finding:hover { box-shadow: inset 0 0 0 1px var(--accent); }
 .detail .edge .arrow { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--muted); }
 .detail .edge .text { display: block; color: var(--muted); font-size: 12px; }
 .detail .loc a { overflow-wrap: anywhere; }
+/* 受け入れ基準。クラスの無い素の ul なので、他の項目と同じ大きさをここで決める。 */
+.detail ul:not([class]) { font-size: 13px; }
 /* 源泉は図に描かないので、ここが唯一の出口になる。飛び先ではないので
    ボタンにせず、id・種別・位置を 1 行目、引用文と引用元を続く行に出す。 */
 .detail .sources { list-style: none; margin: 0 0 12px; padding: 0; }

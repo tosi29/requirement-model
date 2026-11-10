@@ -88,6 +88,15 @@ _IMPACT_COLORS = {
     "related": "#8430ce",
 }
 
+#: ダークテーマ用の影響範囲の色。ライト用は暗い背景 (``#0f1216``) に対して
+#: コントラスト比が 4.5 を下回るため、色相を保ったまま明度を上げる。
+_DARK_IMPACT_COLORS = {
+    "selected": "#ff5c5c",
+    "upstream": "#58a6ff",
+    "downstream": "#3fb950",
+    "related": "#d28bff",
+}
+
 #: 検索ヒットの暈し (halo) の色。枠線は型 (色) と status (線種)、枠線の色と太さは
 #: 影響範囲で埋まっているので、検索はノードの周囲に敷く halo を使う。
 #: 他のどの表現とも property が衝突しない。
@@ -176,5 +185,6 @@ def render_meta() -> dict[str, Any]:
             name for name, arrow in _EDGE_STYLE_MERMAID.items() if arrow == "-.->"
         ],
         "impact_colors": dict(_IMPACT_COLORS),
+        "dark_impact_colors": dict(_DARK_IMPACT_COLORS),
         "search": {"hit": _SEARCH_HIT},
     }

@@ -223,6 +223,12 @@ export const META = {
     downstream: "#188038",
     related: "#8430ce",
   },
+  dark_impact_colors: {
+    selected: "#ff5c5c",
+    upstream: "#58a6ff",
+    downstream: "#3fb950",
+    related: "#d28bff",
+  },
   search: { hit: "#00b8d4" },
 };
 

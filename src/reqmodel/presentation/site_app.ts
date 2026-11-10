@@ -88,9 +88,10 @@ const METRICS: {
   layouts: { ms: number; nodes: number; edges: number; direction: string }[];
   filters: { ms: number; nodes: number; edges: number }[];
 } = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
-const impactColors = () => DATA.meta.impact_colors ?? {
-  selected: "", upstream: "", downstream: "", related: "",
-};
+// 影響範囲の色は背景に対する明度差で読ませるので、ノードの配色と同じくテーマ別に持つ。
+const impactColors = () => (palette().dark ? DATA.meta.dark_impact_colors : null)
+  ?? DATA.meta.impact_colors
+  ?? { selected: "", upstream: "", downstream: "", related: "" };
 
 // --- 保存 (localStorage) ----------------------------------------------------
 //
@@ -405,6 +406,11 @@ function applyBanding() {
     // Use the frame's existing top padding as a header instead: the title is
     // kept inside the group while remaining clear of its first node row.
     renderLabel(item.label, item.label.textContent, 0, -item.h / 2 + 7, 11, "bold");
+    // 分析の枠は起点と結ぶエッジが辺の中央を通るので、見出しを隅へ寄せて重ねない。
+    if (state.mode === "analysis") {
+      for (const line of item.label.children) line.setAttribute("x", String(-item.w / 2 + 10));
+      item.label.setAttribute("text-anchor", "start");
+    }
   }
   updateEdges();
 }

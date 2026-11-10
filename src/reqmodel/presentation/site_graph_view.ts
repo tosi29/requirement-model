@@ -28,7 +28,7 @@ export function applyGraphTheme(
   graphEl.style.setProperty("--graph-panel", pal.panel);
   graphEl.style.setProperty("--graph-border", pal.border);
   graphEl.style.setProperty("--graph-muted", pal.muted);
-  const impact = data.meta.impact_colors;
+  const impact = (pal.dark ? data.meta.dark_impact_colors : null) ?? data.meta.impact_colors;
   graphEl.style.setProperty("--impact-selected", impact?.selected || pal.fg);
   graphEl.style.setProperty("--impact-upstream", impact?.upstream || pal.fg);
   graphEl.style.setProperty("--impact-downstream", impact?.downstream || pal.fg);

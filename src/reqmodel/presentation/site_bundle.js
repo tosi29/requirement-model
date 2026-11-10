@@ -157,7 +157,7 @@
     graphEl2.style.setProperty("--graph-panel", pal.panel);
     graphEl2.style.setProperty("--graph-border", pal.border);
     graphEl2.style.setProperty("--graph-muted", pal.muted);
-    const impact = data.meta.impact_colors;
+    const impact = (pal.dark ? data.meta.dark_impact_colors : null) ?? data.meta.impact_colors;
     graphEl2.style.setProperty("--impact-selected", impact?.selected || pal.fg);
     graphEl2.style.setProperty("--impact-upstream", impact?.upstream || pal.fg);
     graphEl2.style.setProperty("--impact-downstream", impact?.downstream || pal.fg);
@@ -1426,12 +1426,7 @@ ${text}`;
   var SVG_NS2 = "http://www.w3.org/2000/svg";
   var DATA = JSON.parse(getElement("model-data").textContent);
   var METRICS = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
-  var impactColors = () => DATA.meta.impact_colors ?? {
-    selected: "",
-    upstream: "",
-    downstream: "",
-    related: ""
-  };
+  var impactColors = () => (palette().dark ? DATA.meta.dark_impact_colors : null) ?? DATA.meta.impact_colors ?? { selected: "", upstream: "", downstream: "", related: "" };
   function readStore(key) {
     try {
       return localStorage.getItem(key);
@@ -1684,6 +1679,10 @@ ${text}`;
       updateShape(item.shape, "round-rectangle", item);
       moveItem(item, frame.x, frame.y);
       renderLabel(item.label, item.label.textContent, 0, -item.h / 2 + 7, 11, "bold");
+      if (state.mode === "analysis") {
+        for (const line of item.label.children) line.setAttribute("x", String(-item.w / 2 + 10));
+        item.label.setAttribute("text-anchor", "start");
+      }
     }
     updateEdges();
   }

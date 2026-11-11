@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from ..application.plan import GraphDiff, impacted_nodes
 from ..core.graph import RequirementGraph
@@ -115,9 +116,13 @@ def render_plan_markdown(
         "|---|---|---|---|---|",
     ]
     for node_id in diff.added:
-        lines.append(f"| 🟢 追加 | `{node_id}` | — | — | {_cell(after.nodes[node_id].text)} |")
+        lines.append(
+            f"| 🟢 追加 | `{node_id}` | — | — | {_cell(after.nodes[node_id].text)} |"
+        )
     for node_id in diff.removed:
-        lines.append(f"| 🔴 削除 | `{node_id}` | — | {_cell(before.nodes[node_id].text)} | — |")
+        lines.append(
+            f"| 🔴 削除 | `{node_id}` | — | {_cell(before.nodes[node_id].text)} | — |"
+        )
     for node_id, (old, new) in diff.retyped.items():
         lines.append(f"| 🔵 型変更 | `{node_id}` | type | {old} | {new} |")
     for node_id, changes in diff.changed.items():

@@ -7,13 +7,13 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from conftest import build, fr, goal, need, qr, source
+
 from reqmodel.application.explain import explain_text, impact_set
 from reqmodel.application.loader import load_paths
 from reqmodel.application.plan import diff_graphs, format_plan, load_revision
-from reqmodel.presentation.render import render_dot, render_mermaid
 from reqmodel.presentation.plan import render_plan_markdown
+from reqmodel.presentation.render import render_dot, render_mermaid
 
 HEADER = "from reqmodel import Goal, Need, FunctionalRequirement, Reference\n"
 
@@ -95,11 +95,13 @@ def test_markdown_plan_contains_table_mermaid_and_diff_colors():
 @pytest.mark.parametrize("remove_old_node", [False, True])
 def test_markdown_plan_colors_rewired_edges_and_keeps_old_target(remove_old_node):
     before = build(
-        need("Need-old"), need("Need-kept"),
+        need("Need-old"),
+        need("Need-kept"),
         fr("FR-1", satisfies=["Need-old", "Need-kept"]),
     )
     after_nodes = [
-        need("Need-new"), need("Need-kept"),
+        need("Need-new"),
+        need("Need-kept"),
         fr("FR-1", satisfies=["Need-new", "Need-kept"]),
     ]
     if not remove_old_node:
@@ -116,8 +118,11 @@ def test_markdown_plan_colors_rewired_edges_and_keeps_old_target(remove_old_node
     assert len(edges) == 3
     assert by_edge == {
         ("FR-1", "satisfies", "Need-new"): "stroke:#1a7f37,stroke-width:2px",
-        ("FR-1", "satisfies", "Need-old"):
-            "stroke:#cf222e,stroke-width:2px,stroke-dasharray:5 5",
+        (
+            "FR-1",
+            "satisfies",
+            "Need-old",
+        ): "stroke:#cf222e,stroke-width:2px,stroke-dasharray:5 5",
         ("FR-1", "satisfies", "Need-kept"): None,
     }
 

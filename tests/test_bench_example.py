@@ -16,9 +16,9 @@ from types import ModuleType
 
 import pytest
 
-from reqmodel.findings import FindingList
 from reqmodel.application.loader import load_paths
 from reqmodel.application.validate import validate_semantics_lexical, validate_structure
+from reqmodel.findings import FindingList
 
 ROOT = Path(__file__).resolve().parents[1]
 BENCH = ROOT / "examples" / "bench.py"
@@ -55,7 +55,11 @@ def test_bench_is_large_enough(bench):
 
 def test_bench_has_a_wide_rank(bench):
     """同じ段に並ぶ FR が多いこと (横長になる原因そのもの)。"""
-    frs = [node for node in bench.nodes.values() if type(node).__name__ == "FunctionalRequirement"]
+    frs = [
+        node
+        for node in bench.nodes.values()
+        if type(node).__name__ == "FunctionalRequirement"
+    ]
     assert len(frs) > len(bench) / 2
 
 
@@ -64,4 +68,6 @@ def test_bench_validates_without_findings(bench):
     findings = FindingList(validate_structure(bench).items)
     findings.extend(validate_semantics_lexical(bench).items)
 
-    assert list(findings.sorted()) == [], [str(finding) for finding in findings.sorted()]
+    assert list(findings.sorted()) == [], [
+        str(finding) for finding in findings.sorted()
+    ]

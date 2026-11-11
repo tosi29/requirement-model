@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
+from conftest import constraint, fr, goal, need, qr, source
 from pydantic import ValidationError
 
-from conftest import constraint, fr, goal, need, qr, source
 from reqmodel.core.metamodel import edge_specs_for
 from reqmodel.definition import (
     Constraint,

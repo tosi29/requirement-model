@@ -44,7 +44,9 @@ def test_spec_nests_goal_need_fr_qr():
     assert heading_of(text, "Need-1") == "####"
     assert heading_of(text, "FR-1") == "#####"
     assert heading_of(text, "QR-1") == "######"
-    assert text.index("### Goal-1") < text.index("#### Need-1") < text.index("##### FR-1")
+    assert (
+        text.index("### Goal-1") < text.index("#### Need-1") < text.index("##### FR-1")
+    )
 
 
 def test_spec_lists_attributes_criteria_and_references():
@@ -124,11 +126,17 @@ def test_spec_squashes_newlines_in_text():
     assert "### Goal-1 工数を 半減する" in render_spec(graph)
 
 
-NEED_FR = MatrixSpec("Need × FR", "satisfies", (Need,), (FunctionalRequirement,), reverse=True)
+NEED_FR = MatrixSpec(
+    "Need × FR", "satisfies", (Need,), (FunctionalRequirement,), reverse=True
+)
 
 
 def test_build_matrix_puts_upstream_on_rows():
-    graph = build(need("Need-1"), need("Need-2", text="早く承認したい"), fr("FR-1", satisfies=["Need-1"]))
+    graph = build(
+        need("Need-1"),
+        need("Need-2", text="早く承認したい"),
+        fr("FR-1", satisfies=["Need-1"]),
+    )
     matrix = build_matrix(graph, NEED_FR)
     assert [n.id for n in matrix.rows] == ["Need-1", "Need-2"]
     assert [n.id for n in matrix.cols] == ["FR-1"]
@@ -152,7 +160,11 @@ def test_matrix_is_empty_when_a_side_has_no_node():
 
 
 def test_markdown_matrix_marks_links_and_reports_gaps():
-    graph = build(need("Need-1"), fr("FR-1", satisfies=["Need-1"]), fr("FR-2", text="通知すること"))
+    graph = build(
+        need("Need-1"),
+        fr("FR-1", satisfies=["Need-1"]),
+        fr("FR-2", text="通知すること"),
+    )
     text = render_matrices_markdown(graph, specs=[NEED_FR])
     assert "| Need × FR | FR-1 | FR-2 |" in text
     assert "| Need-1 早く精算したい | ✓ |  |" in text
@@ -162,7 +174,9 @@ def test_markdown_matrix_marks_links_and_reports_gaps():
 
 
 def test_markdown_matrix_escapes_pipe_in_text():
-    graph = build(need("Need-1", text="A | B を見たい"), fr("FR-1", satisfies=["Need-1"]))
+    graph = build(
+        need("Need-1", text="A | B を見たい"), fr("FR-1", satisfies=["Need-1"])
+    )
     row = [
         line
         for line in render_matrices_markdown(graph, specs=[NEED_FR]).splitlines()
@@ -182,7 +196,11 @@ def test_default_matrices_cover_the_main_edges():
 
 
 def test_csv_is_one_row_per_link_and_keeps_uncovered_rows():
-    graph = build(need("Need-1"), need("Need-2", text="早く承認したい"), fr("FR-1", satisfies=["Need-1"]))
+    graph = build(
+        need("Need-1"),
+        need("Need-2", text="早く承認したい"),
+        fr("FR-1", satisfies=["Need-1"]),
+    )
     rows = list(csv.reader(io.StringIO(render_matrices_csv(graph, specs=[NEED_FR]))))
     assert rows[0] == list(CSV_HEADER)
     assert rows[1] == [
@@ -195,7 +213,16 @@ def test_csv_is_one_row_per_link_and_keeps_uncovered_rows():
         "FR-1",
         "領収書を読み取ること",
     ]
-    assert rows[2] == ["Need × FR", "satisfies", "Need", "Need-2", "早く承認したい", "", "", ""]
+    assert rows[2] == [
+        "Need × FR",
+        "satisfies",
+        "Need",
+        "Need-2",
+        "早く承認したい",
+        "",
+        "",
+        "",
+    ]
 
 
 @pytest.mark.parametrize("render", [render_spec, render_matrices_markdown])

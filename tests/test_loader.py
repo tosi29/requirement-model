@@ -31,11 +31,11 @@ def test_definition_file_is_never_executed(tmp_path: Path):
 def test_node_locations_are_recorded():
     result = load(
         's = Reference(title="経理部長", url="https://example.com/references/S-1")\n'
-        'n = Need(\n'
+        "n = Need(\n"
         '    id="Need-1",\n'
         '    text="早く精算したい",\n'
-        '    source=[s],\n'
-        ')\n'
+        "    source=[s],\n"
+        ")\n"
     )
     assert result.ok
     assert result.graph.location_of("Need-1") == "<test>:3"
@@ -45,7 +45,8 @@ def test_node_locations_are_recorded():
 def test_node_location_points_at_the_file(tmp_path: Path):
     definition = tmp_path / "requirements.py"
     definition.write_text(
-        HEADER + 's = Reference(title="経理部長", url="https://example.com/references/S-1")\n',
+        HEADER
+        + 's = Reference(title="経理部長", url="https://example.com/references/S-1")\n',
         encoding="utf-8",
     )
     result = load_paths([definition])

@@ -7,9 +7,10 @@ Python ファイルの diff ではなくグラフの diff を見るのが目的�
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from ..core.graph import RequirementGraph, node_to_json_obj
 from .loader import LoadResult, load_sources
@@ -63,7 +64,9 @@ def diff_graphs(before: RequirementGraph, after: RequirementGraph) -> GraphDiff:
     return diff
 
 
-def load_revision(paths: Sequence[Path], rev: str, repo: Path | None = None) -> LoadResult:
+def load_revision(
+    paths: Sequence[Path], rev: str, repo: Path | None = None
+) -> LoadResult:
     """git の指定リビジョンにある定義ファイルを読み込む (実行はしない)。"""
     root = repo or Path.cwd()
     sources: list[tuple[str, str]] = []

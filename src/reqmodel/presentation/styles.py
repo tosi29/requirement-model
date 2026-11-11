@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..definition import (Constraint, FunctionalRequirement, Goal, Need, Node, QualityRequirement)
 from ..core.metamodel import TYPE_ORDER
+from ..definition import (
+    Constraint,
+    FunctionalRequirement,
+    Goal,
+    Need,
+    Node,
+    QualityRequirement,
+)
 from ..definition.nodes import STATUS_RANK
 
 #: 型 → Mermaid のノード形状 (前置き, 後置き)
@@ -164,7 +171,11 @@ def render_meta() -> dict[str, Any]:
                 # 画面から Mermaid を書き出す (絞り込み後の図) ときの形状。
                 # 書式そのものは render_mermaid() と揃える。
                 "mermaid": dict(
-                    zip(("open", "close"), _mermaid_shape_of_type(node_type))
+                    zip(
+                        ("open", "close"),
+                        _mermaid_shape_of_type(node_type),
+                        strict=True,
+                    )
                 ),
             }
             for node_type in TYPE_ORDER
@@ -178,8 +189,7 @@ def render_meta() -> dict[str, Any]:
             for status in sorted(STATUS_RANK, key=lambda name: STATUS_RANK[name])
         },
         "bands": [
-            {"type": node_type.__name__, "label": label}
-            for node_type, label in _BANDS
+            {"type": node_type.__name__, "label": label} for node_type, label in _BANDS
         ],
         "dashed_edges": [
             name for name, arrow in _EDGE_STYLE_MERMAID.items() if arrow == "-.->"

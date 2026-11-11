@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from conftest import build, fr, goal, need, qr, source
+
 from reqmodel.core.graph import RequirementGraph
 
 
@@ -50,7 +51,9 @@ def test_related_ignores_edge_direction():
 
 
 def test_cycles_are_detected_per_edge_type():
-    graph = build(goal("Goal-1", refines=["Goal-2"]), goal("Goal-2", refines=["Goal-1"]))
+    graph = build(
+        goal("Goal-1", refines=["Goal-2"]), goal("Goal-2", refines=["Goal-1"])
+    )
     assert graph.cycles(("refines",))
     assert graph.cycles(("motivates",)) == []
 
@@ -75,7 +78,9 @@ def test_locations_survive_the_json_round_trip():
 
 
 def test_locations_of_unknown_nodes_are_dropped():
-    graph = RequirementGraph([need("Need-1")], {"Need-1": "reqs.py:7", "Need-9": "reqs.py:9"})
+    graph = RequirementGraph(
+        [need("Need-1")], {"Need-1": "reqs.py:7", "Need-9": "reqs.py:9"}
+    )
     assert graph.locations == {"Need-1": "reqs.py:7"}
 
 

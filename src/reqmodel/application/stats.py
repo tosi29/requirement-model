@@ -11,20 +11,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Sequence
+from typing import Any
 
 from ..core.graph import RequirementGraph
 from ..core.metamodel import EDGE_NAMES, TYPE_ORDER
-from ..definition.nodes import STATUS_RANK
 from ..definition import (
-    Constraint,
     FunctionalRequirement,
-    Goal,
     Need,
     Node,
     QualityRequirement,
 )
+from ..definition.nodes import STATUS_RANK
 from .validate import validate_semantics_lexical
 
 __all__ = [

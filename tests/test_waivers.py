@@ -9,11 +9,11 @@ import pytest
 from conftest import build, codes, fr, goal, need, source
 from pydantic import ValidationError
 
-from reqmodel.codes import CHECK_CODES, SUPPRESSIBLE_CODES
-from reqmodel.findings import Finding, FindingList
-from reqmodel.definition import Need
 from reqmodel.application.validate import validate_semantics_lexical, validate_structure
 from reqmodel.application.waivers import apply_waivers
+from reqmodel.codes import CHECK_CODES, SUPPRESSIBLE_CODES
+from reqmodel.definition import Need
+from reqmodel.findings import Finding, FindingList
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "reqmodel"
 
@@ -45,7 +45,9 @@ def test_suppresses_only_the_named_node_and_code():
 
 
 def test_other_codes_on_the_same_node_survive():
-    graph = build(need("Need-1", suppress=[("structure.orphan_need", "FR は次版で書く")]))
+    graph = build(
+        need("Need-1", suppress=[("structure.orphan_need", "FR は次版で書く")])
+    )
     result = apply_waivers(graph, validate_structure(graph))
     assert codes(result.findings) == set()
     assert result.count == 1

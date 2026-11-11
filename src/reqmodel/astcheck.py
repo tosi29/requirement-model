@@ -24,7 +24,13 @@ from .definition import Reference, RequirementGroup
 DECLARATION_TYPES = {**NODE_TYPES, "RequirementGroup": RequirementGroup}
 VALUE_TYPES = {"Reference": Reference}
 
-__all__ = ["RawNode", "ExtractResult", "extract_source", "extract_file", "ALLOWED_IMPORT_ROOTS"]
+__all__ = [
+    "RawNode",
+    "ExtractResult",
+    "extract_source",
+    "extract_file",
+    "ALLOWED_IMPORT_ROOTS",
+]
 
 #: import を許可するモジュールのルート。
 ALLOWED_IMPORT_ROOTS = frozenset({"reqmodel", "__future__"})
@@ -156,10 +162,15 @@ class _Extractor:
             return
 
         if isinstance(stmt, ast.Expr):
-            if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+            if isinstance(stmt.value, ast.Constant) and isinstance(
+                stmt.value.value, str
+            ):
                 return  # docstring
             if isinstance(stmt.value, ast.Call):
-                if isinstance(stmt.value.func, ast.Name) and stmt.value.func.id in VALUE_TYPES:
+                if (
+                    isinstance(stmt.value.func, ast.Name)
+                    and stmt.value.func.id in VALUE_TYPES
+                ):
                     self._eval(stmt.value)
                     return
                 self._visit_instantiation(stmt.value, var_name=None)
@@ -242,7 +253,9 @@ class _Extractor:
 
     # -- インスタンス化 -----------------------------------------------------
 
-    def _visit_instantiation(self, call: ast.Call, var_name: str | None) -> RawNode | None:
+    def _visit_instantiation(
+        self, call: ast.Call, var_name: str | None
+    ) -> RawNode | None:
         if not isinstance(call.func, ast.Name):
             self._violation("呼び出せるのはノード型のみ", call)
             return None

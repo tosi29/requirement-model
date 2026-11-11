@@ -13,8 +13,8 @@ from reqmodel import (
     Goal,
     Need,
     QualityRequirement,
-    RequirementGroup,
     Reference,
+    RequirementGroup,
 )
 
 # --- 源泉 -------------------------------------------------------------------
@@ -189,7 +189,6 @@ CONSTRAINT_REGION = Constraint(
     constrains=[FR_OCR, QR_OCR_LATENCY],
     source=[SRC_POLICY_DOMESTIC],
 )
-
 
 
 # --- 表示グループ -----------------------------------------------------------

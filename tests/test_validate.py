@@ -13,6 +13,7 @@ from conftest import (
     qr,
     source,
 )
+
 from reqmodel.application.loader import load_sources
 from reqmodel.application.validate import validate_semantics_lexical, validate_structure
 
@@ -92,9 +93,7 @@ def test_goal_decomposition_requires_every_child_to_reach_requirements():
     reaching = goal("Goal-2", refines=[g], motivates=[n], source=[s])
     dangling = goal("Goal-3", refines=[g], source=[s])
     findings = validate_structure(build(s, n, g, f, reaching, dangling))
-    messages = [
-        f.message for f in findings if f.code == "structure.goal_decomposition"
-    ]
+    messages = [f.message for f in findings if f.code == "structure.goal_decomposition"]
     assert messages and "Goal-3" in messages[0]
 
 
@@ -116,14 +115,18 @@ def test_evidence_silences_the_verified_claim():
             evidence=[source("EV-1", text="受入テストで確認した")],
         )
     )
-    assert "structure.unverified_claim" not in codes_for(validate_structure(graph), "FR-1")
+    assert "structure.unverified_claim" not in codes_for(
+        validate_structure(graph), "FR-1"
+    )
 
 
 def test_unverified_claim_does_not_fire_before_the_claim():
     """まだ確かめたと言っていない要求に根拠を求めない。"""
     for status in ("proposed", "approved", "implemented"):
         graph = build(fr("FR-1", status=status))
-        assert "structure.unverified_claim" not in codes_for(validate_structure(graph), "FR-1")
+        assert "structure.unverified_claim" not in codes_for(
+            validate_structure(graph), "FR-1"
+        )
 
 
 def test_acceptance_criteria_are_optional():
@@ -138,9 +141,7 @@ def test_approved_requirement_pointing_at_proposed_need_is_reported():
     g = goal("Goal-1", motivates=[n], source=[s])
     f = fr("FR-1", satisfies=[n], source=[s], status="approved")
     findings = validate_structure(build(s, n, g, f))
-    inconsistent = [
-        f for f in findings if f.code == "structure.status_inconsistent"
-    ]
+    inconsistent = [f for f in findings if f.code == "structure.status_inconsistent"]
     assert inconsistent and inconsistent[0].node_id == "FR-1"
 
 
@@ -195,7 +196,11 @@ def test_ambiguous_terms_are_detected_in_evidence():
 
 def test_ambiguous_term_lookup_avoids_false_positives():
     graph = build(
-        fr("FR-1", text="本番同等の環境で計測できること", acceptance_criteria=["不安定な回線でも動くこと"])
+        fr(
+            "FR-1",
+            text="本番同等の環境で計測できること",
+            acceptance_criteria=["不安定な回線でも動くこと"],
+        )
     )
     assert list(validate_semantics_lexical(graph)) == []
 

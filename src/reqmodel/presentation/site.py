@@ -10,18 +10,19 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from html import escape
 from importlib import resources
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
-from ..findings import FindingList
 from ..core.graph import RequirementGraph
 from ..core.metamodel import EDGE_NAMES, TYPE_ORDER, edge_specs_for
-from ..definition.nodes import STATUS_RANK
-from .render import render_dot, render_meta, render_mermaid
 from ..definition import RequirementGroup
+from ..definition.nodes import STATUS_RANK
+from ..findings import FindingList
+from .render import render_dot, render_mermaid, render_meta
 
 __all__ = [
     "build_site",
@@ -135,7 +136,7 @@ def site_data(
             "nodes": len(graph),
             "edges": len(graph.edges),
             "findings": {
-                severity: findings.count(severity)  # type: ignore[arg-type]
+                severity: findings.count(severity)
                 for severity in ("error", "severe", "warning", "info")
             },
             "suppressed": suppressed,
@@ -154,9 +155,16 @@ def _read(name: str) -> str:
 
 #: 開発時に直接 lint / test する ES modules。配布時は esbuild の生成物だけを読む。
 SITE_SCRIPTS: tuple[str, ...] = (
-    "site_text.ts", "site_graph.ts", "site_table.ts", "site_state.ts",
-    "site_context.ts", "site_layout.ts", "site_logic.ts", "site_types.ts",
-    "site_graph_view.ts", "site_app.ts",
+    "site_text.ts",
+    "site_graph.ts",
+    "site_table.ts",
+    "site_state.ts",
+    "site_context.ts",
+    "site_layout.ts",
+    "site_logic.ts",
+    "site_types.ts",
+    "site_graph_view.ts",
+    "site_app.ts",
 )
 SITE_BUNDLE = "site_bundle.js"
 

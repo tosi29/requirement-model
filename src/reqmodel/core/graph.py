@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import json
 from collections import deque
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator, Mapping, TypeVar
+from typing import Any, TypeVar
 
 from ..definition import Node
 from .metamodel import NODE_TYPES, TYPE_INDEX, edge_specs_for
@@ -251,7 +252,7 @@ class RequirementGraph:
         return json.dumps(self.to_json_obj(), ensure_ascii=False, indent=2) + "\n"
 
     @classmethod
-    def from_json_obj(cls, obj: dict[str, Any]) -> "RequirementGraph":
+    def from_json_obj(cls, obj: dict[str, Any]) -> RequirementGraph:
         nodes: list[Node] = []
         locations: dict[str, str] = {}
         for record in obj.get("nodes", []):
@@ -265,7 +266,7 @@ class RequirementGraph:
         return cls(nodes, locations)
 
     @classmethod
-    def from_json(cls, text: str) -> "RequirementGraph":
+    def from_json(cls, text: str) -> RequirementGraph:
         return cls.from_json_obj(json.loads(text))
 
 

@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.14"
 
-      - uses: astral-sh/setup-uv@v7.6.0
+      - uses: astral-sh/setup-uv@v10.3.3
 
       - name: uv のロック済み環境を作成する
         run: uv sync --locked

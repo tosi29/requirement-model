@@ -13,5 +13,5 @@
     "noUnusedParameters": true,
     "skipLibCheck": true
   },
-  "include": ["src/reqmodel/presentation/site_*.ts"]
+  "include": ["src/reqmodel/presentation/site_*.ts", "tests/js/*.ts", "tools/*.ts"]
 }

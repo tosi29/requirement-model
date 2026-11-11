@@ -447,7 +447,7 @@
   function createView(data, state2) {
     const byId = new Map(data.nodes.map((node) => [node.id, node]));
     const nodes = data.nodes.filter(
-      (node) => state2.types.has(node.type) && (!state2.statuses || state2.statuses.has(node.status))
+      (node) => state2.types.has(node.type) && state2.statuses.has(node.status)
     );
     const shown = new Set(nodes.map((node) => node.id));
     const edges = data.edges.filter(
@@ -1402,7 +1402,6 @@ ${text}`;
     for (const filter of SET_FILTERS) {
       const selected = state2[filter.key];
       const all = filter.all(data);
-      if (!selected) continue;
       const initial = initialOf(filter, data);
       if (selected.size === initial.length && initial.every((name) => selected.has(name))) {
         continue;

@@ -12,8 +12,7 @@ import type {
  * 絞り込みを適用した「いま見えているグラフ」。
  *
  * 1 回の再描画につき 1 つ作り、以降の計算はすべてこれを介して行う。
- * state は `{ types: Set<string>, edges: Set<string>, statuses?: Set<string> }`。
- * statuses は省略すると「絞り込み無し」。
+ * ノードは state の types / statuses の両方に入っているものだけが残る。
  *
  * エッジは「見えているノード同士」を繋ぐものだけが残る。ノード側の条件が
  * 何であれ (種別・status) 同じ扱いになるので、絞り込みはそのまま
@@ -22,7 +21,7 @@ import type {
 export function createView(data: SiteData, state: ViewState): GraphViewModel {
   const byId = new Map(data.nodes.map((node) => [node.id, node]));
   const nodes = data.nodes.filter(
-    (node) => state.types.has(node.type) && (!state.statuses || state.statuses.has(node.status)),
+    (node) => state.types.has(node.type) && state.statuses.has(node.status),
   );
   const shown = new Set(nodes.map((node) => node.id));
   const edges = data.edges.filter(

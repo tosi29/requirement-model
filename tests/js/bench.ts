@@ -4,7 +4,7 @@
  * 300 ノード級の合成グラフ (`largeFixture()`。examples/bench.py と同じ形) に対して、
  * ページ上で実際に回る経路を回数ぶん回して時間を測る。
  *
- *   node tests/js/bench.mjs [ノード数の倍率]
+ *   node --import tsx tests/js/bench.ts [ノード数の倍率]
  *
  * 隣接マップを入れる前の実装 (全エッジ走査) も同じ入力で測り、比を出す。
  * 実装を直したときに「速くなったつもり」で終わらせないための、唯一の物差し。
@@ -17,11 +17,12 @@ import {
   focusTrail,
   reach,
 } from "../../src/reqmodel/presentation/site_logic.ts";
-import { allOn, largeFixture } from "./fixture.mjs";
+import type { GraphViewModel } from "../../src/reqmodel/presentation/site_types.ts";
+import { allOn, largeFixture } from "./fixture.ts";
 
 /** 隣接マップを使わない、書き換え前の reach()。比較対象として残してある。 */
-function reachByScan(view, start, forward) {
-  const seen = new Set();
+function reachByScan(view: GraphViewModel, start: string, forward: boolean) {
+  const seen = new Set<string>();
   const queue = [start];
   while (queue.length) {
     const current = queue.shift();
@@ -47,7 +48,7 @@ const state = allOn(data);
 const view = createView(data, state);
 
 /** fn を全ノードぶん回す時間 (ms)。3 回測って最小を採る。 */
-function measure(fn) {
+function measure(fn: (id: string) => void) {
   let best = Infinity;
   for (let round = 0; round < 3; round++) {
     const started = performance.now();
@@ -57,7 +58,7 @@ function measure(fn) {
   return best;
 }
 
-const ms = (value) => `${value.toFixed(1)} ms`;
+const ms = (value: number) => `${value.toFixed(1)} ms`;
 
 console.log(`規模: ${data.nodes.length} ノード / ${data.edges.length} エッジ`);
 console.log(`createView() 1 回: ${ms(measure(() => createView(data, state)) / view.nodes.length)}`);

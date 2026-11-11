@@ -30,8 +30,8 @@ from reqmodel.presentation.site import SITE_SCRIPTS, site_data
 
 ROOT = Path(__file__).resolve().parents[1]
 JS_TESTS = ROOT / "tests" / "js"
-BRIDGE = JS_TESTS / "context_bridge.mjs"
-EXPORT_BRIDGE = JS_TESTS / "export_bridge.mjs"
+BRIDGE = JS_TESTS / "context_bridge.ts"
+EXPORT_BRIDGE = JS_TESTS / "export_bridge.ts"
 SAMPLE = ROOT / "examples" / "sample.py"
 
 NODE = shutil.which("node")
@@ -86,7 +86,7 @@ def test_ts_modules_typecheck_on_their_own():
 
 
 def test_js_unit_tests_pass():
-    result = run_node(["--test", str(JS_TESTS / "logic.test.mjs")])
+    result = run_node(["--test", str(JS_TESTS / "logic.test.ts")])
     assert result.returncode == 0, result.stdout + result.stderr
 
 

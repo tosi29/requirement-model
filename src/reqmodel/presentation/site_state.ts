@@ -90,8 +90,6 @@ export function encodeHash(state: ViewState, data: SiteData): string {
   for (const filter of SET_FILTERS) {
     const selected = state[filter.key];
     const all = filter.all(data);
-    // 持っていない軸は createView() と同じく「絞り込み無し」として扱う。
-    if (!selected) continue;
     // 既定と同じなら書かない。基準は「全選択」ではなく初期選択。
     const initial = initialOf(filter, data);
     if (selected.size === initial.length && initial.every((name) => selected.has(name))) {

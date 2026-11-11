@@ -36,6 +36,8 @@ typeCheckingMode = "standard"
 [tool.ruff]
 # target-version は requires-python から導出される。
 src = ["src"]
+# tools/gen_bench.py の生成物。生成器の出力と一致することをテストで検査している。
+extend-exclude = ["examples/bench.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]

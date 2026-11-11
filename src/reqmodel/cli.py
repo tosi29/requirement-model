@@ -114,11 +114,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="影響範囲の計算に使うエッジ種別をカンマ区切りで指定する",
     )
     plan_parser.add_argument(
-        "--format", choices=("text", "markdown"), default="text",
+        "--format",
+        choices=("text", "markdown"),
+        default="text",
         help="出力形式 (既定: text)",
     )
     plan_parser.add_argument(
-        "--fail-on-impact", choices=tuple(STATUS_RANK), metavar="STATUS",
+        "--fail-on-impact",
+        choices=tuple(STATUS_RANK),
+        metavar="STATUS",
         help="影響範囲に指定 status のノードがあれば終了コード 1 を返す",
     )
 

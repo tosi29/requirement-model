@@ -64,7 +64,9 @@ def diff_graphs(before: RequirementGraph, after: RequirementGraph) -> GraphDiff:
     return diff
 
 
-def load_revision(paths: Sequence[Path], rev: str, repo: Path | None = None) -> LoadResult:
+def load_revision(
+    paths: Sequence[Path], rev: str, repo: Path | None = None
+) -> LoadResult:
     """git の指定リビジョンにある定義ファイルを読み込む (実行はしない)。"""
     root = repo or Path.cwd()
     sources: list[tuple[str, str]] = []

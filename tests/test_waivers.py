@@ -45,7 +45,9 @@ def test_suppresses_only_the_named_node_and_code():
 
 
 def test_other_codes_on_the_same_node_survive():
-    graph = build(need("Need-1", suppress=[("structure.orphan_need", "FR は次版で書く")]))
+    graph = build(
+        need("Need-1", suppress=[("structure.orphan_need", "FR は次版で書く")])
+    )
     result = apply_waivers(graph, validate_structure(graph))
     assert codes(result.findings) == set()
     assert result.count == 1

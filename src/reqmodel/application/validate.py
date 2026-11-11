@@ -251,8 +251,7 @@ def _check_goal_decomposition(graph: RequirementGraph, findings: FindingList) ->
                     code="structure.goal_decomposition",
                     layer=2,
                     message=(
-                        "要求群に到達しない子 Goal がある: "
-                        + ", ".join(sorted(unmet))
+                        "要求群に到達しない子 Goal がある: " + ", ".join(sorted(unmet))
                     ),
                     node_id=goal.id,
                 )
@@ -262,7 +261,6 @@ def _check_goal_decomposition(graph: RequirementGraph, findings: FindingList) ->
 # ---------------------------------------------------------------------------
 # 源泉・受け入れ基準・状態整合
 # ---------------------------------------------------------------------------
-
 
 
 def _check_unverified_claims(graph: RequirementGraph, findings: FindingList) -> None:

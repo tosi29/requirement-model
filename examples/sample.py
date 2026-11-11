@@ -191,7 +191,6 @@ CONSTRAINT_REGION = Constraint(
 )
 
 
-
 # --- 表示グループ -----------------------------------------------------------
 
 GROUP_CAPTURE = RequirementGroup(

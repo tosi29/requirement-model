@@ -101,7 +101,5 @@ def edge_specs_for(node_type: type[Node]) -> dict[str, EdgeSpec]:
 
 #: エッジ名の一覧 (CLI のフィルタ指定などに使う)。
 EDGE_NAMES: tuple[str, ...] = tuple(
-    dict.fromkeys(
-        name for specs in _EDGE_SPECS.values() for name in specs
-    )
+    dict.fromkeys(name for specs in _EDGE_SPECS.values() for name in specs)
 )

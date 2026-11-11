@@ -95,11 +95,13 @@ def test_markdown_plan_contains_table_mermaid_and_diff_colors():
 @pytest.mark.parametrize("remove_old_node", [False, True])
 def test_markdown_plan_colors_rewired_edges_and_keeps_old_target(remove_old_node):
     before = build(
-        need("Need-old"), need("Need-kept"),
+        need("Need-old"),
+        need("Need-kept"),
         fr("FR-1", satisfies=["Need-old", "Need-kept"]),
     )
     after_nodes = [
-        need("Need-new"), need("Need-kept"),
+        need("Need-new"),
+        need("Need-kept"),
         fr("FR-1", satisfies=["Need-new", "Need-kept"]),
     ]
     if not remove_old_node:
@@ -116,8 +118,11 @@ def test_markdown_plan_colors_rewired_edges_and_keeps_old_target(remove_old_node
     assert len(edges) == 3
     assert by_edge == {
         ("FR-1", "satisfies", "Need-new"): "stroke:#1a7f37,stroke-width:2px",
-        ("FR-1", "satisfies", "Need-old"):
-            "stroke:#cf222e,stroke-width:2px,stroke-dasharray:5 5",
+        (
+            "FR-1",
+            "satisfies",
+            "Need-old",
+        ): "stroke:#cf222e,stroke-width:2px,stroke-dasharray:5 5",
         ("FR-1", "satisfies", "Need-kept"): None,
     }
 

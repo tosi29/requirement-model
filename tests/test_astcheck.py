@@ -37,7 +37,7 @@ need = Need(id="Need-1", text="早く精算したい", source=[src])
         ("class C:\n    pass\n", "クラス定義"),
         ("with open('x') as f:\n    pass\n", "with 文"),
         ("try:\n    pass\nexcept Exception:\n    pass\n", "try 文"),
-        ('x = [i for i in [1]]\n', "リスト内包表記"),
+        ("x = [i for i in [1]]\n", "リスト内包表記"),
         ("x = 1 + 1\n", "二項演算"),
         ("x = -1\n", "単項演算"),
         ("x = True and False\n", "論理演算"),

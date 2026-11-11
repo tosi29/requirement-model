@@ -84,7 +84,9 @@ class Reference(BaseModel):
     @classmethod
     def _check_url_text(cls, value: str | None) -> str | None:
         if value is not None and not value.strip():
-            raise ValueError("Reference.url は空文字にできない (URL が無ければ省略する)")
+            raise ValueError(
+                "Reference.url は空文字にできない (URL が無ければ省略する)"
+            )
         return value
 
     @field_validator("note")
@@ -168,10 +170,12 @@ class Node(BaseModel):
         for entry in value:
             if isinstance(entry, str):
                 raise ValueError(
-                    f"抑制 {entry!r} に理由が無い。(\"{entry}\", \"理由\") の組で書くこと"
+                    f'抑制 {entry!r} に理由が無い。("{entry}", "理由") の組で書くこと'
                 )
             if not isinstance(entry, (list, tuple)) or len(entry) != 2:
-                raise ValueError("suppress の要素は (コード, 理由) の 2 要素の組で書くこと")
+                raise ValueError(
+                    "suppress の要素は (コード, 理由) の 2 要素の組で書くこと"
+                )
             code, reason = entry
             if not isinstance(code, str) or not isinstance(reason, str):
                 raise ValueError("suppress のコードと理由はどちらも文字列で書くこと")
@@ -224,6 +228,7 @@ class Need(Node):
 
     #: Need は合意の状態だけを持つ。実現・検証される対象ではない。
     status: DecisionStatus = "proposed"  # pyright: ignore[reportIncompatibleVariableOverride]
+
     @field_validator("text")
     @classmethod
     def _check_suffix(cls, value: str) -> str:

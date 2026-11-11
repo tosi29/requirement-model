@@ -171,7 +171,11 @@ def render_meta() -> dict[str, Any]:
                 # 画面から Mermaid を書き出す (絞り込み後の図) ときの形状。
                 # 書式そのものは render_mermaid() と揃える。
                 "mermaid": dict(
-                    zip(("open", "close"), _mermaid_shape_of_type(node_type), strict=True)
+                    zip(
+                        ("open", "close"),
+                        _mermaid_shape_of_type(node_type),
+                        strict=True,
+                    )
                 ),
             }
             for node_type in TYPE_ORDER
@@ -185,8 +189,7 @@ def render_meta() -> dict[str, Any]:
             for status in sorted(STATUS_RANK, key=lambda name: STATUS_RANK[name])
         },
         "bands": [
-            {"type": node_type.__name__, "label": label}
-            for node_type, label in _BANDS
+            {"type": node_type.__name__, "label": label} for node_type, label in _BANDS
         ],
         "dashed_edges": [
             name for name, arrow in _EDGE_STYLE_MERMAID.items() if arrow == "-.->"

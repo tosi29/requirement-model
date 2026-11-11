@@ -281,8 +281,7 @@ def render_dot(
             continue
         edge_attrs = [f'label="{edge.name}"']
         lines.append(
-            f"    {ids[edge.source]} -> {ids[edge.target]} "
-            f"[{', '.join(edge_attrs)}];"
+            f"    {ids[edge.source]} -> {ids[edge.target]} [{', '.join(edge_attrs)}];"
         )
     lines.append("}")
     return "\n".join(lines) + "\n"

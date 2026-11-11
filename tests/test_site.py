@@ -95,9 +95,14 @@ def test_quality_requirement_uses_the_same_render_shape_as_functional_requiremen
     """要求である FR と QR は色で区別し、形状は同じにする。"""
     types = render_meta()["types"]
 
-    assert types["QualityRequirement"]["shape"] == types["FunctionalRequirement"]["shape"]
+    assert (
+        types["QualityRequirement"]["shape"] == types["FunctionalRequirement"]["shape"]
+    )
     assert types["QualityRequirement"]["fit"] == types["FunctionalRequirement"]["fit"]
-    assert types["QualityRequirement"]["mermaid"] == types["FunctionalRequirement"]["mermaid"]
+    assert (
+        types["QualityRequirement"]["mermaid"]
+        == types["FunctionalRequirement"]["mermaid"]
+    )
     assert types["QualityRequirement"]["fill"] != types["FunctionalRequirement"]["fill"]
 
 
@@ -194,9 +199,7 @@ def test_shape_fit_keeps_the_label_inside_every_shape():
         half_w, half_h = 1 / fit["wmul"], 1 / fit["hmul"]
 
         if shape in _SHAPE_POINTS:
-            corners = [
-                (sx * half_w, sy * half_h) for sx in (-1, 1) for sy in (-1, 1)
-            ]
+            corners = [(sx * half_w, sy * half_h) for sx in (-1, 1) for sy in (-1, 1)]
             for corner in corners:
                 assert _inside(_SHAPE_POINTS[shape], corner), (shape, corner)
         elif shape == "ellipse":
@@ -296,10 +299,10 @@ def test_page_uses_svg_dom_and_dagre_without_cytoscape(tmp_path: Path):
     """描画は SVG DOM、dagre はノード座標の計算だけに使う。"""
     html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
 
-    assert 'createElementNS(SVG_NS, name)' in html
-    assert 'new dagre.graphlib.Graph({ multigraph: true })' in html
-    assert 'const pos = g.node(id)' in html
-    assert 'g.edge({' not in html
+    assert "createElementNS(SVG_NS, name)" in html
+    assert "new dagre.graphlib.Graph({ multigraph: true })" in html
+    assert "const pos = g.node(id)" in html
+    assert "g.edge({" not in html
     assert 'svgEl("path", { class: "edge-line"' in html
     assert "cytoscape(" not in html
     assert "cytoscape.min.js" not in html
@@ -331,12 +334,12 @@ def test_svg_state_styles_do_not_erase_status_or_search_meaning(tmp_path: Path):
 def test_svg_type_palette_comes_from_render_meta(tmp_path: Path):
     html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
 
-    assert 'const typeMeta = types[item.data.type] || {}' in html
+    assert "const typeMeta = types[item.data.type] || {}" in html
     assert "const colors = primitives.typeColors(typeMeta, pal)" in html
     assert "fill: colors.fill" in html
     assert "stroke: colors.stroke" in html
     assert '"dark_fill": "#17233a"' in html
-    assert 'shapeEl(typeMeta.shape)' in html
+    assert "shapeEl(typeMeta.shape)" in html
 
 
 def test_svg_preserves_four_distinct_status_patterns(tmp_path: Path):
@@ -392,7 +395,10 @@ def test_svg_bands_are_behind_nodes_and_do_not_capture_input(tmp_path: Path):
 def test_band_labels_use_the_frame_header_instead_of_overlapping_nodes(tmp_path: Path):
     html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
 
-    assert 'renderLabel(item.label, item.label.textContent, 0, -item.h / 2 + 7, 11, "bold")' in html
+    assert (
+        'renderLabel(item.label, item.label.textContent, 0, -item.h / 2 + 7, 11, "bold")'
+        in html
+    )
     assert "#graph .band-label {" in html
     assert "paint-order: stroke;" in html
 
@@ -411,9 +417,9 @@ def test_filter_changes_only_visibility_and_keeps_node_positions(tmp_path: Path)
 def test_svg_export_serializes_the_visible_dom(tmp_path: Path):
     html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
 
-    assert 'const copy = svg.cloneNode(true)' in html
+    assert "const copy = svg.cloneNode(true)" in html
     assert 'copy.querySelectorAll(".hidden")' in html
-    assert 'new XMLSerializer().serializeToString(copy)' in html
+    assert "new XMLSerializer().serializeToString(copy)" in html
 
 
 def test_build_site_writes_page_and_raw_outputs(tmp_path: Path):
@@ -443,7 +449,11 @@ def test_app_js_is_the_prebuilt_bundle():
     assert not re.search(r"^\s*export\s", js, re.M)
     assert not re.search(r"^\s*import\s", js, re.M)
     assert js == (
-        Path(__file__).resolve().parents[1] / "src" / "reqmodel" / "presentation" / "site_bundle.js"
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "reqmodel"
+        / "presentation"
+        / "site_bundle.js"
     ).read_text(encoding="utf-8")
 
 
@@ -462,7 +472,13 @@ def test_page_has_both_the_graph_and_the_table_view(tmp_path: Path):
     index = build_site(chain(), FindingList(), tmp_path)
     html = index.read_text(encoding="utf-8")
 
-    for element_id in ("tab-graph", "tab-table", "graph-frame", "table-frame", "node-table"):
+    for element_id in (
+        "tab-graph",
+        "tab-table",
+        "graph-frame",
+        "table-frame",
+        "node-table",
+    ):
         assert f'id="{element_id}"' in html
 
 
@@ -501,7 +517,10 @@ def test_graph_only_controls_are_overlaid_inside_the_graph_frame(tmp_path: Path)
     assert ".graph-controls {" in html
     assert "top: auto;" in html
     assert "bottom: 12px;" in html
-    assert 'class="graph-control-group" role="group" aria-label="レイアウト"' in graph_frame
+    assert (
+        'class="graph-control-group" role="group" aria-label="レイアウト"'
+        in graph_frame
+    )
     assert 'class="export-menu"' in graph_frame
 
 
@@ -509,7 +528,14 @@ def test_graph_only_controls_are_icon_buttons_with_accessible_names(tmp_path: Pa
     """図上の操作は常設テキストを持たず、タイトルと読み上げ名を持つ。"""
     html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
 
-    for element_id in ("zoom-out", "zoom-in", "zoom-reset", "zoom-fit", "direction", "relayout"):
+    for element_id in (
+        "zoom-out",
+        "zoom-in",
+        "zoom-reset",
+        "zoom-fit",
+        "direction",
+        "relayout",
+    ):
         button = re.search(
             rf'<button id="{element_id}"[^>]*aria-label="[^"]+"[^>]*>\s*<svg', html
         )
@@ -526,7 +552,9 @@ def test_graph_only_controls_are_icon_buttons_with_accessible_names(tmp_path: Pa
     assert 'select id="direction"' not in html
     assert 'id="zoom-reset">等倍</button>' not in html
     assert 'id="zoom-fit">全体表示</button>' not in html
-    assert 'id="export-svg" title="いま図に描かれているものを SVG で保存する">' not in html
+    assert (
+        'id="export-svg" title="いま図に描かれているものを SVG で保存する">' not in html
+    )
 
 
 def test_graph_legend_separates_type_and_status_rows(tmp_path: Path):
@@ -601,7 +629,9 @@ def test_suppressed_findings_are_dropped_but_counted(tmp_path: Path):
     assert [finding["code"] for finding in data["findings"]] == []
     assert data["stats"]["suppressed"] == 1
     # 抑制した理由はノードに残るので、ページ側で読める。
-    assert data["nodes"][0]["suppress"] == [["structure.orphan_qr", "この版では張らない"]]
+    assert data["nodes"][0]["suppress"] == [
+        ["structure.orphan_qr", "この版では張らない"]
+    ]
 
 
 def test_site_command_applies_waivers(tmp_path: Path, capsys):
@@ -611,7 +641,7 @@ def test_site_command_applies_waivers(tmp_path: Path, capsys):
         'QualityRequirement(id="QR-1", text="5 秒以内とすること",\n'
         '                   acceptance_criteria=["5.0 秒以下"],\n'
         '                   suppress=[("structure.orphan_qr", "この版では張らない"),\n'
-        '                             ])\n',
+        "                             ])\n",
         encoding="utf-8",
     )
     output = tmp_path / "site"
@@ -653,7 +683,9 @@ def test_site_command(tmp_path: Path, capsys):
     assert data["findings"] == []
 
     model = json.loads((output / "model.json").read_text(encoding="utf-8"))
-    assert all(re.fullmatch(rf"{re.escape(SAMPLE)}:\d+", n["location"]) for n in model["nodes"])
+    assert all(
+        re.fullmatch(rf"{re.escape(SAMPLE)}:\d+", n["location"]) for n in model["nodes"]
+    )
     assert [n["location"] for n in data["nodes"]] == [
         n["location"] for n in model["nodes"]
     ]
@@ -671,7 +703,10 @@ def test_render_meta_carries_the_mermaid_shape_of_every_type():
     types = render_meta()["types"]
 
     assert types["Goal"]["mermaid"] == {"open": "{{", "close": "}}"}
-    assert all(entry["mermaid"]["open"] and entry["mermaid"]["close"] for entry in types.values())
+    assert all(
+        entry["mermaid"]["open"] and entry["mermaid"]["close"]
+        for entry in types.values()
+    )
 
 
 def test_site_data_has_no_repo_link_by_default():
@@ -714,7 +749,10 @@ def test_site_command_takes_a_repo_url(tmp_path: Path):
 
 def test_site_command_defaults_the_repo_ref(tmp_path: Path):
     output = tmp_path / "site"
-    assert main(["site", SAMPLE, "-o", str(output), "--repo-url", "https://example.com/r"]) == 0
+    assert (
+        main(["site", SAMPLE, "-o", str(output), "--repo-url", "https://example.com/r"])
+        == 0
+    )
 
     data = embedded_data((output / "index.html").read_text(encoding="utf-8"))
     assert data["repo"] == {"url": "https://example.com/r", "ref": DEFAULT_REF}

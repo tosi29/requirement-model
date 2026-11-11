@@ -708,9 +708,7 @@ FR_SITE = FunctionalRequirement(
 )
 FR_FIT_WHOLE = FunctionalRequirement(
     id="FR-13",
-    text=(
-        "図の初期表示でグラフ全体を 1 画面に収め、この表示は俯瞰の用途に限ること"
-    ),
+    text=("図の初期表示でグラフ全体を 1 画面に収め、この表示は俯瞰の用途に限ること"),
     refines=[FR_SITE],
     satisfies=[NEED_READABLE],
     source=[SRC_OWNER, ISSUE_SCALE],
@@ -903,10 +901,7 @@ FR_ID_COLLISION = FunctionalRequirement(
 )
 FR_SOURCE_AS_ATTRIBUTE = FunctionalRequirement(
     id="FR-25",
-    text=(
-        "源泉を図に描かず、参照元ノードの属性として引用文・位置・引用元まで"
-        "出すこと"
-    ),
+    text=("源泉を図に描かず、参照元ノードの属性として引用文・位置・引用元まで出すこと"),
     satisfies=[NEED_READABLE, NEED_LLM_CONTEXT],
     source=[SRC_OWNER, ISSUE_SOURCE_ATTRIBUTE, ISSUE_REFERENCE],
     status="implemented",
@@ -1028,7 +1023,6 @@ CONSTRAINT_NO_LLM_CALL = Constraint(
 )
 
 
-
 # --- 表示グループ -----------------------------------------------------------
 
 GROUP_VALIDATION = RequirementGroup(
@@ -1051,7 +1045,13 @@ GROUP_ANALYSIS = RequirementGroup(
     id="analysis",
     label="影響分析・LLM連携",
     order=20,
-    members=[FR_IMPACT, FR_EXPLAIN, FR_PLAN, CONSTRAINT_GIT_ONLY, CONSTRAINT_NO_LLM_CALL],
+    members=[
+        FR_IMPACT,
+        FR_EXPLAIN,
+        FR_PLAN,
+        CONSTRAINT_GIT_ONLY,
+        CONSTRAINT_NO_LLM_CALL,
+    ],
 )
 GROUP_PRESENTATION = RequirementGroup(
     id="presentation",

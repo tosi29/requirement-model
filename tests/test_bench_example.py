@@ -55,7 +55,11 @@ def test_bench_is_large_enough(bench):
 
 def test_bench_has_a_wide_rank(bench):
     """同じ段に並ぶ FR が多いこと (横長になる原因そのもの)。"""
-    frs = [node for node in bench.nodes.values() if type(node).__name__ == "FunctionalRequirement"]
+    frs = [
+        node
+        for node in bench.nodes.values()
+        if type(node).__name__ == "FunctionalRequirement"
+    ]
     assert len(frs) > len(bench) / 2
 
 
@@ -64,4 +68,6 @@ def test_bench_validates_without_findings(bench):
     findings = FindingList(validate_structure(bench).items)
     findings.extend(validate_semantics_lexical(bench).items)
 
-    assert list(findings.sorted()) == [], [str(finding) for finding in findings.sorted()]
+    assert list(findings.sorted()) == [], [
+        str(finding) for finding in findings.sorted()
+    ]

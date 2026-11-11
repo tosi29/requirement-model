@@ -120,7 +120,13 @@ def evidence_for(status: str, index: int) -> list[str]:
     """
     if status != "verified":
         return []
-    return [reference(f"EVIDENCE-{index % 9 + 1}", f"{area(index)}の受入テスト第 {index % 9 + 1} 回", "全項目が合格している")]
+    return [
+        reference(
+            f"EVIDENCE-{index % 9 + 1}",
+            f"{area(index)}の受入テスト第 {index % 9 + 1} 回",
+            "全項目が合格している",
+        )
+    ]
 
 
 def area(index: int) -> str:
@@ -159,7 +165,6 @@ from reqmodel import (
 '''
 
 
-
 class Raw:
     def __init__(self, text: str) -> None:
         self.text = text
@@ -168,9 +173,9 @@ class Raw:
 def reference(key: str, note: str | None = None, detail: str | None = None) -> Raw:
     title = note or key
     # 合成ベンチの出典・受入結果は実在の外部文書ではないため、URLを捏造しない。
-    args = [f'title={literal(title)}']
+    args = [f"title={literal(title)}"]
     if detail:
-        args.append(f'note={literal(detail)}')
+        args.append(f"note={literal(detail)}")
     return Raw(f"Reference({', '.join(args)})")
 
 
@@ -347,7 +352,9 @@ def render() -> str:
         end = group_index * (FRS // 4) if group_index < 4 else FRS
         members = [f"FR-{number}" for number in range(start, end + 1)]
         members += [f"QR-{number}" for number in range(group_index, QRS + 1, 4)]
-        members += [f"Constraint-{number}" for number in range(group_index, CONSTRAINTS + 1, 4)]
+        members += [
+            f"Constraint-{number}" for number in range(group_index, CONSTRAINTS + 1, 4)
+        ]
         parts.append(
             node(
                 "RequirementGroup",
@@ -363,7 +370,9 @@ def render() -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--stdout", action="store_true", help="ファイルに書かず標準出力に出す")
+    parser.add_argument(
+        "--stdout", action="store_true", help="ファイルに書かず標準出力に出す"
+    )
     args = parser.parse_args(argv)
 
     text = render()

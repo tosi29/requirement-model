@@ -155,9 +155,16 @@ def _read(name: str) -> str:
 
 #: 開発時に直接 lint / test する ES modules。配布時は esbuild の生成物だけを読む。
 SITE_SCRIPTS: tuple[str, ...] = (
-    "site_text.ts", "site_graph.ts", "site_table.ts", "site_state.ts",
-    "site_context.ts", "site_layout.ts", "site_logic.ts", "site_types.ts",
-    "site_graph_view.ts", "site_app.ts",
+    "site_text.ts",
+    "site_graph.ts",
+    "site_table.ts",
+    "site_state.ts",
+    "site_context.ts",
+    "site_layout.ts",
+    "site_logic.ts",
+    "site_types.ts",
+    "site_graph_view.ts",
+    "site_app.ts",
 )
 SITE_BUNDLE = "site_bundle.js"
 

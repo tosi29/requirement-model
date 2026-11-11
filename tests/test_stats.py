@@ -131,7 +131,10 @@ def test_render_text_summary():
     assert "| Goal | 1 | 0 | 0 | 0 | 1 |" in text
     assert "| 計 | 3 | 0 | 0 | 0 | 3 |" in text
     assert "- Need の充足率 (satisfies されている): 100.0% (1/1)" in text
-    assert "- 外部参照率 (source を持つノード): 0.0% (0/3) 未達: Goal-1, Need-1, FR-1" in text
+    assert (
+        "- 外部参照率 (source を持つノード): 0.0% (0/3) 未達: Goal-1, Need-1, FR-1"
+        in text
+    )
 
 
 def test_render_truncates_a_long_list_of_uncovered_nodes():
@@ -141,7 +144,9 @@ def test_render_truncates_a_long_list_of_uncovered_nodes():
 
 
 def test_json_shape():
-    payload = collect_stats(build(need("Need-1"), fr(satisfies=["Need-1"]))).to_json_obj()
+    payload = collect_stats(
+        build(need("Need-1"), fr(satisfies=["Need-1"]))
+    ).to_json_obj()
 
     assert payload["totals"] == {"nodes": 2, "edges": 1}
     assert payload["nodes"]["by_type"]["Need"] == 1

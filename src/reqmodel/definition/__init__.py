@@ -19,8 +19,19 @@ from .nodes import (
 )
 
 __all__ = [
-    "Reference", "Node", "Requirement", "Goal", "Need",
-    "FunctionalRequirement", "QualityRequirement", "Constraint",
-    "FR", "QR", "Ref", "DecisionStatus", "RequirementStatus", "Waiver",
+    "Reference",
+    "Node",
+    "Requirement",
+    "Goal",
+    "Need",
+    "FunctionalRequirement",
+    "QualityRequirement",
+    "Constraint",
+    "FR",
+    "QR",
+    "Ref",
+    "DecisionStatus",
+    "RequirementStatus",
+    "Waiver",
     "RequirementGroup",
 ]

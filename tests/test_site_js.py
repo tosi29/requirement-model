@@ -76,7 +76,11 @@ def test_js_modules_are_syntactically_valid_on_their_own():
     """切り出した TypeScript は、bundle しなくても型・構文検査できる。"""
     assert SITE_SCRIPTS
     result = subprocess.run(
-        ["npm", "run", "lint"], cwd=ROOT, capture_output=True, text=True, encoding="utf-8"
+        ["npm", "run", "lint"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -104,7 +108,9 @@ def test_node_context_matches_req_explain_with_edge_filter():
     graph = sample_graph()
     data = site_data(graph, FindingList(), "題名", [str(SAMPLE)])
     node_ids = [node["id"] for node in data["nodes"]]
-    selected = [name for name in EDGE_NAMES if name in ("refines", "satisfies", "motivates")]
+    selected = [
+        name for name in EDGE_NAMES if name in ("refines", "satisfies", "motivates")
+    ]
 
     actual = node_contexts(
         data, [{"id": node_id, "edges": selected} for node_id in node_ids]
@@ -138,10 +144,7 @@ def test_node_context_matches_req_explain_undirected(depth: int | None):
 
     actual = node_contexts(
         data,
-        [
-            {"id": node_id, "depth": depth, "undirected": True}
-            for node_id in node_ids
-        ],
+        [{"id": node_id, "depth": depth, "undirected": True} for node_id in node_ids],
     )
 
     for node_id, text in zip(node_ids, actual, strict=True):
@@ -171,5 +174,9 @@ def test_mermaid_export_drops_filtered_out_nodes():
     lines = text.splitlines()
 
     assert not [line for line in lines if "[Goal]" in line]
-    assert not [line for line in lines if line.startswith("    class n") and line.endswith(" Goal")]
+    assert not [
+        line
+        for line in lines
+        if line.startswith("    class n") and line.endswith(" Goal")
+    ]
     assert "motivates" not in text

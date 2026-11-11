@@ -133,7 +133,9 @@ def _reference_lines(node: Node, attr: str, label: str) -> list[str]:
         return []
     lines = [f"- {label}:"]
     for item in items:
-        lines.append(f"    - **{_inline(item.title)}**: {_inline(item.note or '')}".rstrip())
+        lines.append(
+            f"    - **{_inline(item.title)}**: {_inline(item.note or '')}".rstrip()
+        )
         if item.url:
             lines.append(f"      URL: {item.url}")
     return lines
@@ -336,7 +338,9 @@ class MatrixSpec:
 #: 出力するマトリクス。エッジ型ごとに 1 枚。
 MATRICES: tuple[MatrixSpec, ...] = (
     MatrixSpec("Goal × Need", "motivates", (Goal,), (Need,)),
-    MatrixSpec("Need × FR", "satisfies", (Need,), (FunctionalRequirement,), reverse=True),
+    MatrixSpec(
+        "Need × FR", "satisfies", (Need,), (FunctionalRequirement,), reverse=True
+    ),
     MatrixSpec(
         "FR × QR",
         "qualifies",
@@ -396,9 +400,11 @@ def build_matrix(graph: RequirementGraph, spec: MatrixSpec) -> Matrix:
 
 
 def _matrix_table(matrix: Matrix) -> list[str]:
-    header = f"| {_cell(matrix.spec.title)} | " + " | ".join(
-        node.id for node in matrix.cols
-    ) + " |"
+    header = (
+        f"| {_cell(matrix.spec.title)} | "
+        + " | ".join(node.id for node in matrix.cols)
+        + " |"
+    )
     ruler = "|---" * (len(matrix.cols) + 1) + "|"
     lines = [header, ruler]
     for row in matrix.rows:
@@ -440,9 +446,7 @@ def render_matrices_markdown(
         lines.append(_uncovered_line("トレースの無い列", matrix.uncovered_cols()))
         lines.append("")
         lines.append("列:")
-        lines.extend(
-            f"- {node.id} {_inline(node.text)}" for node in matrix.cols
-        )
+        lines.extend(f"- {node.id} {_inline(node.text)}" for node in matrix.cols)
     return "\n".join(lines) + "\n"
 
 

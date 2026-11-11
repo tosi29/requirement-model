@@ -7,10 +7,10 @@
   "scripts": {
     "build": "node tools/build-site.mjs",
     "check:bundle": "node tools/build-site.mjs --check",
-    "lint": "node --check tools/build-site.mjs && tsc --noEmit",
     "test": "npm run check:bundle && node --import tsx --test tests/js/*.test.mjs",
     "bench": "node --import tsx tests/js/bench.mjs",
-    "typecheck": "pyright"
+    "typecheck:py": "pyright",
+    "typecheck:ts": "tsc --noEmit"
   },
   "devDependencies": {
     "esbuild": "^0.25.9",

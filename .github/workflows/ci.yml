@@ -81,7 +81,7 @@ jobs:
 
       # pyright は npm で固定し、型の解決には上で作った .venv を使う。
       - name: 型検査
-        run: npm run typecheck
+        run: npm run typecheck:py
 
       # それぞれ別のグラフなので 1 回にまとめない (id が衝突する)。
       # requirements.py はこのリポジトリ自身の要求モデル (dogfooding)。
@@ -92,7 +92,7 @@ jobs:
           uv run --locked req validate --strict examples/bench.py
 
   site-js:
-    # 埋め込み前の JS を、単体で構文検査してユニットテストにかける。
+    # 埋め込み前の TypeScript を、単体で型検査してユニットテストにかける。
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
@@ -104,8 +104,8 @@ jobs:
       - name: Node 依存をインストール
         run: npm ci
 
-      - name: 構文検査
-        run: npm run lint
+      - name: 型検査
+        run: npm run typecheck:ts
 
       - name: ロジックのテスト
         run: npm test

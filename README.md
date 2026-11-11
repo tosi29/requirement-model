@@ -927,7 +927,7 @@ $ npm ci
 $ uv run --locked pytest
 $ uv run --locked ruff check
 $ uv run --locked ruff format --check
-$ npm run typecheck
+$ npm run typecheck:py
 ```
 
 lint と整形は ruff、型検査は pyright が担う。pyright の本体は Node 製なので npm 側
@@ -936,7 +936,7 @@ lint と整形は ruff、型検査は pyright が担う。pyright の本体は N
 静的サイトの TypeScript だけを回すなら Node (18 以上) で、`npm install` 後に次を叩く。
 
 ```console
-$ npm run lint
+$ npm run typecheck:ts
 $ npm test
 $ npm run bench   # 300 ノード級の合成グラフで探索の時間を測る
 ```

@@ -72,11 +72,11 @@ def sample_graph():
     return loaded.graph
 
 
-def test_js_modules_are_syntactically_valid_on_their_own():
-    """切り出した TypeScript は、bundle しなくても型・構文検査できる。"""
+def test_ts_modules_typecheck_on_their_own():
+    """切り出した TypeScript は、bundle しなくても型検査できる。"""
     assert SITE_SCRIPTS
     result = subprocess.run(
-        ["npm", "run", "lint"],
+        ["npm", "run", "typecheck:ts"],
         cwd=ROOT,
         capture_output=True,
         text=True,

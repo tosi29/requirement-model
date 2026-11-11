@@ -81,13 +81,13 @@ npm ci
 uv run --locked pytest -q
 uv run --locked ruff check
 uv run --locked ruff format --check
-npm run typecheck
+npm run typecheck:py
 
 uv run --locked req validate --strict requirements.py
 uv run --locked req validate --strict examples/sample.py
 uv run --locked req validate --strict examples/bench.py
 
-npm run lint
+npm run typecheck:ts
 npm test
 ```
 

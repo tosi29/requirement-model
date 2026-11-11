@@ -17,15 +17,6 @@ export function truncate(text: string, limit = 42): string {
   return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
 }
 
-export function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-/** 属性値に入れる文字列。引用符まで潰す。 */
-export function escapeAttr(text: unknown): string {
-  return escapeHtml(String(text)).replace(/"/g, "&quot;");
-}
-
 /**
  * リンクとして DOM に設定してよい URL だけを返す。
  *

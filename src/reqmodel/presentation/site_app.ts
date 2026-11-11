@@ -235,7 +235,6 @@ function initGraph(): SVGSVGElement | null {
 }
 
 function buildGraphDom(defs: SVGDefsElement, graphLayer: SVGGElement) {
-  const pal = palette();
   const arrow = svgEl("marker", {
     id: "req-arrow",
     viewBox: "0 0 10 10",
@@ -277,12 +276,6 @@ function buildGraphDom(defs: SVGDefsElement, graphLayer: SVGGElement) {
   }
 
   const types = DATA.meta.types || {};
-  const impact = impactColors();
-  graphEl.style.setProperty("--impact-selected", impact.selected || pal.fg);
-  graphEl.style.setProperty("--impact-upstream", impact.upstream || pal.fg);
-  graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
-  graphEl.style.setProperty("--impact-related", impact.related || pal.fg);
-  graphEl.style.setProperty("--search-hit", DATA.meta.search?.hit || pal.fg);
   const analysisFrames = Object.entries(ANALYSIS_BANDS).map(([key, label]) => ({
     data: { id: bandId(`analysis:${key}`), bandKey: `analysis:${key}`, label },
   }));
@@ -399,11 +392,6 @@ function syncFocusLayout() {
   runLayout();
 }
 
-/**
- * Goal / Need の帯を図の上 (LR なら左) に並べ直し、枠を掛け直す。
- * dagre の副軸方向の並びは保つので、「整列」のたびに図の形が大きく変わる
- * ことは無い。
- */
 function shownNodeItems() {
   return [...nodeItems.values()].filter((item) => !item.group.classList.contains("hidden"));
 }
@@ -491,7 +479,11 @@ function updateEdges() {
   }
 }
 
-/** Goal / Need の帯を図の上 (LR なら左) に並べ直し、枠を掛け直す。 */
+/**
+ * Goal / Need の帯を図の上 (LR なら左) に並べ直し、枠を掛け直す。
+ * dagre の副軸方向の並びは保つので、「整列」のたびに図の形が大きく変わる
+ * ことは無い。
+ */
 function applyBanding() {
   if (!svg) return;
   const bands = bandDefs(DATA);
@@ -785,7 +777,6 @@ function renderDetail() {
   );
   const details = htmlEl("dl");
   appendTerm(details, fieldLabel("status"), node.status);
-  if (node.kind) appendTerm(details, "kind", node.kind);
   if (node.location) appendTerm(details, "出所", locationElement(node.location), "loc");
   //: 件数は影響範囲の設定 (深さ・向き) に従う。図の色分けと同じ範囲を数える。
   if (impact.undirected) appendTerm(details, "関連", `${impact.downstream.size} 件`);

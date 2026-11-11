@@ -1609,7 +1609,6 @@ ${text}`;
     return root;
   }
   function buildGraphDom(defs2, graphLayer) {
-    const pal = palette();
     const arrow = svgEl("marker", {
       id: "req-arrow",
       viewBox: "0 0 10 10",
@@ -1647,12 +1646,6 @@ ${text}`;
       });
     }
     const types = DATA.meta.types || {};
-    const impact = impactColors();
-    graphEl.style.setProperty("--impact-selected", impact.selected || pal.fg);
-    graphEl.style.setProperty("--impact-upstream", impact.upstream || pal.fg);
-    graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
-    graphEl.style.setProperty("--impact-related", impact.related || pal.fg);
-    graphEl.style.setProperty("--search-hit", DATA.meta.search?.hit || pal.fg);
     const analysisFrames = Object.entries(ANALYSIS_BANDS).map(([key, label]) => ({
       data: { id: bandId(`analysis:${key}`), bandKey: `analysis:${key}`, label }
     }));
@@ -2063,7 +2056,6 @@ ${text}`;
     );
     const details = htmlEl("dl");
     appendTerm(details, fieldLabel("status"), node.status);
-    if (node.kind) appendTerm(details, "kind", node.kind);
     if (node.location) appendTerm(details, "\u51FA\u6240", locationElement(node.location), "loc");
     if (impact.undirected) appendTerm(details, "\u95A2\u9023", `${impact.downstream.size} \u4EF6`);
     else {

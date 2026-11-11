@@ -1,9 +1,6 @@
 import { compare, fieldLabel, impactSets } from "./site_graph.ts";
 import {
-  escapeAttr,
-  escapeHtml,
   estimateTextWidth,
-  LABEL_FONT,
   LABEL_MAX_LENGTH,
   LABEL_WRAP_WIDTH,
   nodeSize,
@@ -13,7 +10,6 @@ import {
 import type {
   Box,
   Direction,
-  Extent,
   GraphBandDefinition,
   GraphEdgeDefinition,
   GraphElementDefinition,
@@ -25,8 +21,6 @@ import type {
   NormalizedNode,
   Point,
   RenderMetadata,
-  RenderStatusMetadata,
-  RenderTypeMetadata,
   SiteData,
 } from "./site_types.ts";
 
@@ -252,32 +246,6 @@ export function legendGroups(meta: RenderMetadata, colorScheme = "light"): Legen
   }
 
   return groups;
-}
-
-/**
- * ノードが表示範囲に収まっているか。extent も box も SVG のモデル座標
- * `{x1, y1, x2, y2}`。
- *
- * margin は端に貼り付いた状態を「見えている」と扱わないための余白。
- * ノードが視野より大きくて収めようが無いときは、中心が見えていれば十分とする
- * (そうしないと選ぶたびに毎回パンすることになる)。
- */
-export function isNodeVisible(extent: Extent, box: Extent, margin = 0): boolean {
-  const inner = {
-    x1: extent.x1 + margin,
-    y1: extent.y1 + margin,
-    x2: extent.x2 - margin,
-    y2: extent.y2 - margin,
-  };
-  const fits = box.x2 - box.x1 <= inner.x2 - inner.x1 && box.y2 - box.y1 <= inner.y2 - inner.y1;
-  if (fits) {
-    return box.x1 >= inner.x1 && box.x2 <= inner.x2 && box.y1 >= inner.y1 && box.y2 <= inner.y2;
-  }
-  const centerX = (box.x1 + box.x2) / 2;
-  const centerY = (box.y1 + box.y2) / 2;
-  return (
-    centerX >= extent.x1 && centerX <= extent.x2 && centerY >= extent.y1 && centerY <= extent.y2
-  );
 }
 
 /** 最終ノード座標から、短い二次 Bézier の制御点を作る。 */
@@ -637,7 +605,7 @@ export function bandedLayout(
   return { positions, frames };
 }
 
-// --- 書き出し (Mermaid / SVG) ------------------------------------------------
+// --- 書き出し (Mermaid) -------------------------------------------------------
 //
 // 出力先に置かれる `graph.mmd` / `graph.dot` は**全体**のグラフである。画面で
 // 絞り込んだ図をそのまま PR や資料に持っていけるよう、いま見えているぶんだけを
@@ -716,307 +684,6 @@ export function mermaidText(view: GraphViewModel, maxLabel = EXPORT_LABEL_LIMIT)
   for (const node of view.nodes) lines.push(`    class ${ids.get(node.id)} ${node.type}`);
 
   return `${lines.join("\n")}\n`;
-}
-
-// --- SVG --------------------------------------------------------------------
-//
-// 図の見た目 (位置・大きさ・折り返し済みのラベル) は表示層が持っているので、
-// 表示層が実測値を集めて scene として渡し、ここは**組み立てだけ**を行う。
-//
-// 形状は画面表示と同じ近似である。書き出しの用途 (資料に
-// 貼る) では、位置関係とラベルと配色が保たれていれば足りる。近似の範囲は
-// 各定数のコメントに書く。
-
-//: 図の周りに空ける余白 (px)。
-export const SVG_PADDING = 24;
-
-//: 多角形を、外形の矩形に内接する頂点 (-1..1 の座標) で写したもの。
-const SVG_POLYGONS: ReadonlyMap<string, readonly number[]> = new Map([
-  ["hexagon", [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1]],
-  ["rhomboid", [-1, -1, 0.333, -1, 1, 1, -0.333, 1]],
-  ["diamond", [0, -1, 1, 0, 0, 1, -1, 0]],
-  ["tag", [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1]],
-]);
-
-//: 角を落とす比率 (cut-rectangle)。画面表示と同じく、書き出しでは
-//: 大きさに対する比で近似する。
-const SVG_CUT_RATIO = 0.16;
-//: 角の丸め (round-rectangle) と、樽の膨らみ (barrel) の代わりの丸め。
-const SVG_CORNER = 8;
-const SVG_BARREL_RATIO = 0.3;
-
-//: status の線種 → SVG の stroke-dasharray。二重線 (verified) は SVG に無いので
-//: 実線で近似する (太さは meta の border_width が残るので区別は付く)。
-//: 破線。帯枠と、破線にするエッジ種別 (meta.dashed_edges) にも使う。
-const SVG_DASHED = "6 4";
-const SVG_DASH: ReadonlyMap<string, string> = new Map([
-  ["dotted", "1 3"],
-  ["dashed", SVG_DASHED],
-  ["solid", ""],
-  ["double", ""],
-]);
-
-/** SVG の属性値。null / undefined / 空文字の属性は書かない。 */
-type SvgAttrs = Readonly<Record<string, string | number | null | undefined>>;
-
-const attrs = (values: SvgAttrs) =>
-  Object.entries(values)
-    .filter(([, value]) => value !== null && value !== undefined && value !== "")
-    .map(([name, value]) => `${name}="${escapeAttr(value)}"`)
-    .join(" ");
-
-const element = (name: string, values: SvgAttrs, children?: string) => {
-  const head = [name, attrs(values)].filter(Boolean).join(" ");
-  return children === undefined ? `<${head}/>` : `<${head}>${children}</${name}>`;
-};
-
-const round = (value: number) => Math.round(value * 100) / 100;
-
-/** 図形 1 つぶんの要素。box は中心と外形 `{ x, y, w, h }`。 */
-function shapeElement(shape: string | undefined, box: Box, style: SvgAttrs) {
-  const { x, y, w, h } = box;
-  const polygon = (points: readonly number[]) =>
-    element("polygon", {
-      points: points
-        .map((value, index) => round(index % 2 ? y + (value * h) / 2 : x + (value * w) / 2))
-        .join(" "),
-      ...style,
-    });
-
-  if (shape === "ellipse") {
-    return element("ellipse", {
-      cx: round(x),
-      cy: round(y),
-      rx: round(w / 2),
-      ry: round(h / 2),
-      ...style,
-    });
-  }
-  const points = shape === undefined ? undefined : SVG_POLYGONS.get(shape);
-  if (points) return polygon(points);
-  if (shape === "cut-rectangle") {
-    const cut = Math.min(w, h) * SVG_CUT_RATIO;
-    const cx = cut / (w / 2);
-    const cy = cut / (h / 2);
-    return polygon([
-      -1 + cx,
-      -1,
-      1 - cx,
-      -1,
-      1,
-      -1 + cy,
-      1,
-      1 - cy,
-      1 - cx,
-      1,
-      -1 + cx,
-      1,
-      -1,
-      1 - cy,
-      -1,
-      -1 + cy,
-    ]);
-  }
-  const radius = shape === "barrel" ? Math.min(w, h) * SVG_BARREL_RATIO : SVG_CORNER;
-  return element("rect", {
-    x: round(x - w / 2),
-    y: round(y - h / 2),
-    width: round(w),
-    height: round(h),
-    rx: round(Math.min(radius, Math.min(w, h) / 2)),
-    ...style,
-  });
-}
-
-/** 改行入りのラベル。中心 (x, y) に上下中央で置く。 */
-function labelElement(
-  label: string,
-  x: number,
-  y: number,
-  {
-    size = LABEL_FONT.size,
-    fill = undefined,
-    weight = undefined,
-  }: { size?: number; fill?: string; weight?: string } = {},
-) {
-  const lines = String(label).split("\n");
-  const step = size * LABEL_FONT.lineHeight;
-  const top = y - ((lines.length - 1) * step) / 2 + size * 0.35;
-  const spans = lines
-    .map((line, index) =>
-      element("tspan", { x: round(x), y: round(top + index * step) }, escapeHtml(line)),
-    )
-    .join("");
-  return element(
-    "text",
-    {
-      "text-anchor": "middle",
-      "font-family": LABEL_FONT.family,
-      "font-size": size,
-      "font-weight": weight,
-      fill,
-    },
-    spans,
-  );
-}
-
-/** `graphSvg()` に渡す、図に描かれているものの実測値。 */
-export interface SvgScene {
-  nodes?: readonly (Box & { type: string; status: string; label: string })[];
-  edges?: readonly (Extent & { name: string; dashed: boolean })[];
-  bands?: readonly (Box & { type: string; label: string })[];
-  meta?: Partial<RenderMetadata>;
-  palette?: Partial<Record<"fg" | "bg" | "border" | "muted", string>>;
-  title?: string;
-}
-
-/**
- * いま図に描かれているものを SVG 1 枚にする。
- *
- * scene は表示層 (`site_app.ts`) が SVG 描画状態から集めた実測値:
- *
- * - `nodes`: `{ id, type, status, label, x, y, w, h }`
- * - `edges`: `{ name, dashed, x1, y1, x2, y2 }` (端点はノードの縁の座標)
- * - `bands`: `{ type, label, x, y, w, h }` (Goal / Need の帯枠)
- * - `meta`: `render_meta()` の内容、`palette`: テーマ依存の色
- *
- * ノードが 1 つも無ければ空の図 (背景だけ) を返す。
- */
-export function graphSvg(scene: SvgScene): string {
-  const nodes = scene.nodes || [];
-  const edges = scene.edges || [];
-  const bands = scene.bands || [];
-  const meta = scene.meta || {};
-  const palette = scene.palette || {};
-  const types = meta.types || {};
-  const statuses = meta.statuses || {};
-
-  const xs: number[] = [];
-  const ys: number[] = [];
-  for (const box of [...nodes, ...bands]) {
-    xs.push(box.x - box.w / 2, box.x + box.w / 2);
-    ys.push(box.y - box.h / 2, box.y + box.h / 2);
-  }
-  for (const edge of edges) {
-    xs.push(edge.x1, edge.x2);
-    ys.push(edge.y1, edge.y2);
-  }
-  const minX = (xs.length ? Math.min(...xs) : 0) - SVG_PADDING;
-  const minY = (ys.length ? Math.min(...ys) : 0) - SVG_PADDING;
-  const width = (xs.length ? Math.max(...xs) : 0) + SVG_PADDING - minX;
-  const height = (ys.length ? Math.max(...ys) : 0) + SVG_PADDING - minY;
-
-  const body: string[] = [];
-
-  body.push(
-    element("rect", {
-      x: round(minX),
-      y: round(minY),
-      width: round(width),
-      height: round(height),
-      fill: palette.bg || "#ffffff",
-    }),
-  );
-
-  //: 帯枠はノード・エッジの下に敷く (画面と同じ重なり順)。
-  for (const band of bands) {
-    const typeMeta: RenderTypeMetadata = types[band.type] || {};
-    body.push(
-      shapeElement("round-rectangle", band, {
-        fill: typeMeta.fill || "none",
-        "fill-opacity": 0.3,
-        stroke: typeMeta.stroke || palette.border,
-        "stroke-width": 1,
-        "stroke-dasharray": SVG_DASHED,
-      }),
-    );
-    body.push(
-      labelElement(band.label, band.x, band.y - band.h / 2 - 6, {
-        size: 11,
-        weight: "bold",
-        fill: typeMeta.stroke || palette.muted,
-      }),
-    );
-  }
-
-  for (const edge of edges) {
-    body.push(
-      element("line", {
-        x1: round(edge.x1),
-        y1: round(edge.y1),
-        x2: round(edge.x2),
-        y2: round(edge.y2),
-        stroke: palette.border,
-        "stroke-width": 1.2,
-        "stroke-dasharray": edge.dashed ? SVG_DASHED : "",
-        "marker-end": "url(#req-arrow)",
-      }),
-    );
-    //: エッジ名は線の上に置く。背景を敷けないので、縁取り (paint-order) で抜く。
-    body.push(
-      element(
-        "text",
-        {
-          x: round((edge.x1 + edge.x2) / 2),
-          y: round((edge.y1 + edge.y2) / 2),
-          "text-anchor": "middle",
-          "font-family": LABEL_FONT.family,
-          "font-size": 9,
-          fill: palette.muted,
-          stroke: palette.bg,
-          "stroke-width": 3,
-          "paint-order": "stroke",
-        },
-        escapeHtml(edge.name),
-      ),
-    );
-  }
-
-  for (const node of nodes) {
-    const typeMeta: RenderTypeMetadata = types[node.type] || {};
-    const statusMeta: Partial<RenderStatusMetadata> = statuses[node.status] || {};
-    body.push(
-      shapeElement(typeMeta.shape, node, {
-        fill: typeMeta.fill || "#ffffff",
-        stroke: typeMeta.stroke || palette.fg,
-        "stroke-width": statusMeta.border_width || 1.5,
-        "stroke-dasharray":
-          (statusMeta.border_style && SVG_DASH.get(statusMeta.border_style)) || "",
-      }),
-    );
-    //: ラベルの色は図の塗り (明るい固定色) に対して読める色。テーマには従わない。
-    body.push(labelElement(node.label, node.x, node.y, { fill: "#1f2328" }));
-  }
-
-  const defs = element(
-    "defs",
-    {},
-    element(
-      "marker",
-      {
-        id: "req-arrow",
-        viewBox: "0 0 10 10",
-        refX: 9,
-        refY: 5,
-        markerWidth: 6,
-        markerHeight: 6,
-        orient: "auto-start-reverse",
-      },
-      element("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "context-stroke" }),
-    ),
-  );
-
-  const svg = element(
-    "svg",
-    {
-      xmlns: "http://www.w3.org/2000/svg",
-      viewBox: `${round(minX)} ${round(minY)} ${round(width)} ${round(height)}`,
-      width: round(width),
-      height: round(height),
-    },
-    `\n${element("title", {}, escapeHtml(scene.title || "要求グラフ"))}\n${defs}\n${body.join("\n")}\n`,
-  );
-  return `${svg}\n`;
 }
 
 /** 分析では要求グループでなく、起点からの到達方向で枠を作る。 */

@@ -937,7 +937,7 @@ TypeScript / JavaScript 側は lint と整形を Biome (`biome.jsonc`)、型検�
 一括整形のコミットは `.git-blame-ignore-revs` に登録してあり、手元の `git blame` では
 `git config blame.ignoreRevsFile .git-blame-ignore-revs` で除外できる。
 
-静的サイトの TypeScript だけを回すなら Node (18 以上) で、`npm install` 後に次を叩く。
+静的サイトの TypeScript だけを回すなら Node (20 以上) で、`npm ci` 後に次を叩く。
 
 ```console
 $ npm run check:js      # Biome の lint と整形の検査 (fix:js で自動修正)
@@ -986,5 +986,5 @@ RDB / 外部ストレージを持たないこと、LLM API を直接呼ばず文
 - i* のアクター依存モデル、KAOS の Obstacle
 - 複数体系の統合メタモデル
 
-未着手の機能 (MCP サーバ、SARIF 出力、設定ファイル等) は非スコープではなく
+未着手の機能 (MCP サーバ、設定ファイル等) は非スコープではなく
 `proposed` の要求として `requirements.py` に載っている。

@@ -17,7 +17,6 @@ export interface NormalizedNode {
   type: string;
   text: string;
   status: string;
-  kind?: string | null;
   location?: SourceLocation | null;
   source?: readonly ExternalReference[];
   realized_by?: readonly ExternalReference[];

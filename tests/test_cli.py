@@ -411,4 +411,20 @@ def test_graph_uses_requirement_groups_from_definition(tmp_path: Path, capsys):
     )
 
     assert main(["graph", str(definition)]) == 0
-    assert "subgraph group_input[入力]" in capsys.readouterr().out
+    assert "subgraph group_g1[入力]" in capsys.readouterr().out
+
+
+def test_graph_group_identifiers_do_not_depend_on_group_id(tmp_path: Path, capsys):
+    """グループ id に記号があっても、DOT / Mermaid の識別子は壊れない。"""
+    definition = tmp_path / "requirements.py"
+    definition.write_text(
+        "from reqmodel import FunctionalRequirement, RequirementGroup\n"
+        'FR = FunctionalRequirement(id="FR-1", text="金額を表示すること")\n'
+        'GROUP = RequirementGroup(id="core-model", label="入力", members=[FR])\n',
+        encoding="utf-8",
+    )
+
+    assert main(["graph", str(definition), "--format", "dot"]) == 0
+    out = capsys.readouterr().out
+    assert "subgraph cluster_group_g1 {" in out
+    assert "core-model" not in out

@@ -1,6 +1,6 @@
 import { IMPACT_DEPTHS, initialSelection, parseFocus, statusNames } from "./site_graph.ts";
 import { TABLE_COLUMNS } from "./site_table.ts";
-import type { SiteData, ViewState } from "./site_types.ts";
+import type { SiteData, SortState, Theme, ViewState } from "./site_types.ts";
 
 // --- URL ハッシュ ----------------------------------------------------------
 //
@@ -12,7 +12,7 @@ import type { SiteData, ViewState } from "./site_types.ts";
 // パーセントエンコードしない `,` と `:` を使う。
 
 //: テーブルの既定の並び順。
-const DEFAULT_SORT = { key: "id", asc: true };
+const DEFAULT_SORT: SortState = { key: "id", asc: true };
 
 /**
  * 集合で持つ絞り込みの軸。ハッシュのキー・state のキー・取りうる値の全体を
@@ -23,7 +23,14 @@ const DEFAULT_SORT = { key: "id", asc: true };
  * `site_data()` の `hidden_by_default` で定義する。
  * 「既定と違うところだけ URL に載せる」という規則はこの `initial` が基準になる。
  */
-const SET_FILTERS = [
+interface SetFilter {
+  param: string;
+  key: "types" | "edges" | "statuses";
+  all: (data: SiteData) => readonly string[];
+  initial?: (data: SiteData) => readonly string[];
+}
+
+const SET_FILTERS: readonly SetFilter[] = [
   {
     param: "types",
     key: "types",
@@ -40,7 +47,8 @@ const SET_FILTERS = [
 ];
 
 /** 軸の初期選択。`initial` を持たない軸は全選択。 */
-const initialOf = (filter, data) => (filter.initial ? filter.initial(data) : filter.all(data));
+const initialOf = (filter: SetFilter, data: SiteData) =>
+  filter.initial ? filter.initial(data) : filter.all(data);
 
 /** ハッシュが無いときの状態。ページの初期 state でもある。 */
 export function defaultState(data: SiteData): ViewState {
@@ -66,11 +74,11 @@ export function defaultState(data: SiteData): ViewState {
 }
 
 /** 状態を `#...` にする。既定のままなら空文字 (ハッシュ無し)。 */
-export function encodeHash(state, data) {
+export function encodeHash(state: ViewState, data: SiteData): string {
   const params: string[] = [];
-  const put = (key, value) => params.push(`${key}=${value}`);
+  const put = (key: string, value: string) => params.push(`${key}=${value}`);
   //: 選択の順ではなく定義順で並べる。同じ絞り込みなら常に同じ URL になる。
-  const list = (selected, all) =>
+  const list = (selected: ReadonlySet<string>, all: readonly string[]) =>
     all
       .filter((name) => selected.has(name))
       .map(encodeURIComponent)
@@ -121,7 +129,7 @@ export function encodeHash(state, data) {
 export function decodeHash(hash: string | null, data: SiteData): ViewState {
   const state = defaultState(data);
   const params = parseHash(hash);
-  const subset = (raw, all) =>
+  const subset = (raw: string, all: readonly string[]) =>
     new Set(
       raw
         .split(",")
@@ -132,15 +140,17 @@ export function decodeHash(hash: string | null, data: SiteData): ViewState {
   const node = params.get("node");
   if (node && data.nodes.some((item) => item.id === node)) state.selected = node;
   for (const filter of SET_FILTERS) {
-    if (!params.has(filter.param)) continue;
-    state[filter.key] = subset(params.get(filter.param), filter.all(data));
+    const raw = params.get(filter.param);
+    if (raw === undefined) continue;
+    state[filter.key] = subset(raw, filter.all(data));
   }
   if (params.get("dir") === "LR") state.direction = "LR";
-  if (params.get("view") === "table" || params.get("view") === "analysis")
-    state.mode = params.get("view");
+  const mode = params.get("view");
+  if (mode === "table" || mode === "analysis") state.mode = mode;
   state.focus = parseFocus(params.get("focus") || "0");
   const detail = params.get("detail");
   if (
+    detail !== undefined &&
     state.mode === "analysis" &&
     state.selected &&
     detail !== state.selected &&
@@ -151,15 +161,16 @@ export function decodeHash(hash: string | null, data: SiteData): ViewState {
   const depth = Number(params.get("depth"));
   if (IMPACT_DEPTHS.includes(depth)) state.depth = depth;
   if (params.get("undir") === "1") state.undirected = true;
-  if (params.has("q")) state.query = params.get("q");
+  const query = params.get("q");
+  if (query !== undefined) state.query = query;
   const sort = parseSort(params.get("sort"));
   if (sort) state.sort = sort;
   return state;
 }
 
 /** `#a=1&b=2` を Map にする。壊れている組はその組だけ捨てる。 */
-function parseHash(hash) {
-  const params = new Map();
+function parseHash(hash: string | null): Map<string, string> {
+  const params = new Map<string, string>();
   for (const part of (hash || "").replace(/^#/, "").split("&")) {
     if (!part) continue;
     const at = part.indexOf("=");
@@ -176,7 +187,7 @@ function parseHash(hash) {
 }
 
 /** `findings:desc` を並び順にする。知らない列や向きは null (既定のまま)。 */
-function parseSort(raw) {
+function parseSort(raw: string | undefined): SortState | null {
   if (!raw) return null;
   const [key, order] = raw.split(":");
   if (!TABLE_COLUMNS.some((column) => column.key === key)) return null;
@@ -199,7 +210,7 @@ export const VIEW_STORAGE_KEY = "reqmodel:site:view";
 export const THEME_STORAGE_KEY = "reqmodel:site:theme";
 
 /** 次回に持ち越す状態を `#...` にしたもの。既定のままなら空文字。 */
-export function storableHash(state, data) {
+export function storableHash(state: ViewState, data: SiteData): string {
   return encodeHash(
     {
       ...state,
@@ -213,7 +224,7 @@ export function storableHash(state, data) {
 }
 
 /** 開いたときに適用するハッシュ。URL に何か載っていればそれ、無ければ保存。 */
-export function initialHash(hash, stored) {
+export function initialHash(hash: string, stored: string | null): string {
   return (hash || "").replace(/^#/, "") ? hash : stored || "";
 }
 
@@ -223,16 +234,21 @@ export function initialHash(hash, stored) {
 // 手で固定できるようにする。固定した選択は localStorage に残す。
 
 /** 選べるテーマ。押すたびにこの順で回る。 */
-const THEMES = ["auto", "light", "dark"];
+const THEMES: readonly Theme[] = ["auto", "light", "dark"];
 
 /** ボタンの表示。いま何が効いているかがそのまま読めるようにする。 */
-export const THEME_LABELS = { auto: "テーマ: 自動", light: "テーマ: 明", dark: "テーマ: 暗" };
+export const THEME_LABELS: Readonly<Record<Theme, string>> = {
+  auto: "テーマ: 自動",
+  light: "テーマ: 明",
+  dark: "テーマ: 暗",
+};
 
 /** 保存値や属性値をテーマに直す。知らない値は auto。 */
-export const normalizeTheme = (value) => (THEMES.includes(value) ? value : "auto");
+export const normalizeTheme = (value: string | null): Theme =>
+  THEMES.find((theme) => theme === value) ?? "auto";
 
 /** 次のテーマ。 */
-export function nextTheme(theme) {
+export function nextTheme(theme: string | null): Theme {
   return THEMES[(THEMES.indexOf(normalizeTheme(theme)) + 1) % THEMES.length];
 }
 

@@ -7,12 +7,20 @@
 
 import type { PanZoomController } from "./site_graph_view.ts";
 import { applyGraphTheme, createGraphViewPrimitives, createPanZoom } from "./site_graph_view.ts";
+import type { TableRow } from "./site_table.ts";
 import type {
+  Direction,
+  ExternalReference,
+  Finding,
   GraphBandElement,
   GraphEdgeElement,
   GraphElementDefinition,
   GraphNodeElement,
+  NodeId,
+  Point,
+  Severity,
   SiteData,
+  ViewMode,
   ViewState,
 } from "./site_types.ts";
 
@@ -124,7 +132,7 @@ const impactColors = () =>
 // 使えない環境 (file:// で開いた・プライベートモード・容量超過) では黙って
 // 諦める。保存はどれも「次に開いたときの利便」でしかなく、無くても表示は成立する。
 
-function readStore(key) {
+function readStore(key: string): string | null {
   try {
     return localStorage.getItem(key);
   } catch {
@@ -132,7 +140,7 @@ function readStore(key) {
   }
 }
 
-function writeStore(key, value) {
+function writeStore(key: string, value: string | null) {
   try {
     if (value) localStorage.setItem(key, value);
     else localStorage.removeItem(key);
@@ -408,13 +416,13 @@ function shownBandItems() {
   return [...bandItems.values()].filter((item) => !item.group.classList.contains("hidden"));
 }
 
-function moveItem(item, x, y) {
+function moveItem(item: { x: number; y: number; group: SVGGElement }, x: number, y: number) {
   item.x = x;
   item.y = y;
   item.group.setAttribute("transform", `translate(${x} ${y})`);
 }
 
-function rectangleEndpoint(from, to) {
+function rectangleEndpoint(from: GraphNodeElement, to: Point): Point {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   if (!dx && !dy) return { x: from.x, y: from.y };
@@ -422,7 +430,7 @@ function rectangleEndpoint(from, to) {
   return { x: from.x + dx * scale, y: from.y + dy * scale };
 }
 
-function ellipseEndpoint(from, to) {
+function ellipseEndpoint(from: GraphNodeElement, to: Point): Point {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   if (!dx && !dy) return { x: from.x, y: from.y };
@@ -432,11 +440,11 @@ function ellipseEndpoint(from, to) {
   return { x: from.x + dx * scale, y: from.y + dy * scale };
 }
 
-function polygonEndpoint(from, to) {
+function polygonEndpoint(from: GraphNodeElement, shape: string, to: Point): Point {
   const ray = { x: to.x - from.x, y: to.y - from.y };
   if (!ray.x && !ray.y) return { x: from.x, y: from.y };
-  const vertices = polygonCoords(from.shapeName, from.w, from.h);
-  const cross = (a, b) => a.x * b.y - a.y * b.x;
+  const vertices = polygonCoords(shape, from.w, from.h);
+  const cross = (a: Point, b: Point) => a.x * b.y - a.y * b.x;
   let closest = Infinity;
   for (let index = 0; index < vertices.length; index += 1) {
     const a = vertices[index];
@@ -453,10 +461,11 @@ function polygonEndpoint(from, to) {
 }
 
 /** Rendered node boundary on the ray from the node centre toward `to`. */
-function edgeEndpoint(from, to) {
-  if (from.shapeName === "ellipse") return ellipseEndpoint(from, to);
-  if (["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(from.shapeName)) {
-    return polygonEndpoint(from, to);
+function edgeEndpoint(from: GraphNodeElement, to: Point): Point {
+  const shape = from.shapeName;
+  if (shape === "ellipse") return ellipseEndpoint(from, to);
+  if (shape && ["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape)) {
+    return polygonEndpoint(from, shape, to);
   }
   return rectangleEndpoint(from, to);
 }
@@ -541,7 +550,7 @@ function runLayout() {
   g.setDefaultEdgeLabel(() => ({}));
   const nodes = new Set(shownNodeItems().map((item) => item.id));
   for (const item of shownNodeItems()) g.setNode(item.id, { width: item.w, height: item.h });
-  const parallel = new Map();
+  const parallel = new Map<string, GraphEdgeElement[]>();
   for (const item of shownEdgeItems()) {
     const edge = DATA.edges[item.index];
     if (!nodes.has(edge.source) || !nodes.has(edge.target)) continue;
@@ -670,7 +679,7 @@ function applySearchHits() {
   }
 }
 
-function moveCursor(delta) {
+function moveCursor(delta: number) {
   const next = stepHit(hits(), cursor, delta);
   if (next === null) return;
   cursor = next;
@@ -704,21 +713,25 @@ function fitInitial() {
   panZoom?.fit(graphBox(), true);
 }
 
-function revealNode(id) {
-  if (!svg || state.mode === "table") return;
+function revealNode(id: NodeId | null) {
+  if (id === null || !svg || state.mode === "table") return;
   const item = nodeItems.get(id);
   if (!item || item.group.classList.contains("hidden")) return;
   panZoom?.reveal(item);
 }
 const revealSelected = () => revealNode(state.selected);
 
-function zoomBy(factor) {
+function zoomBy(factor: number) {
   panZoom?.zoomBy(factor);
 }
 
 // --- 詳細パネル ------------------------------------------------------------
 
-function appendReferenceSection(panel, title, references) {
+function appendReferenceSection(
+  panel: HTMLElement,
+  title: string,
+  references: readonly ExternalReference[] | undefined,
+) {
   if (!Array.isArray(references) || references.length === 0) return;
   panel.append(htmlEl("h2", {}, title));
   const list = htmlEl("ul", { class: "sources" });
@@ -740,7 +753,12 @@ function appendReferenceSection(panel, title, references) {
   panel.append(list);
 }
 
-function appendTerm(list, term, value, className: string | null = null) {
+function appendTerm(
+  list: HTMLElement,
+  term: string,
+  value: Node | string,
+  className: string | null = null,
+) {
   list.append(htmlEl("dt", {}, term), htmlEl("dd", className ? { class: className } : {}, value));
 }
 
@@ -800,7 +818,7 @@ function renderDetail() {
     );
   }
 
-  const appendEdges = (title, items) => {
+  const appendEdges = (title: string, items: ReturnType<typeof edgeItems>["out"]) => {
     if (!items.length) return;
     const list = htmlEl("ul", { class: "plain" });
     for (const item of items) {
@@ -856,7 +874,7 @@ function renderDetail() {
 }
 
 /** 出所を、安全な場合だけリポジトリ上の定義へのリンクにする。 */
-function locationElement(location) {
+function locationElement(location: string) {
   const href = safeHref(sourceUrl(DATA, location));
   return href
     ? htmlEl(
@@ -868,7 +886,7 @@ function locationElement(location) {
 }
 
 /** 指摘 1 件。動的値はすべて textContent 相当で追加する。 */
-function findingElement(finding, interactive = true) {
+function findingElement(finding: Finding, interactive = true) {
   const where = finding.node_id ? ` (${finding.node_id})` : "";
   const content = [
     htmlEl(
@@ -924,7 +942,7 @@ function renderNodeList() {
     }),
   );
   list.querySelectorAll<HTMLElement>("button[data-id]").forEach((button: HTMLElement) => {
-    button.addEventListener("click", () => selectRoot(button.dataset.id));
+    button.addEventListener("click", () => selectRoot(dataValue(button, "id")));
   });
 }
 
@@ -932,7 +950,12 @@ function renderNodeList() {
  * チェックボックス 1 群。`items` は `{ key, label, count }` の配列。
  * チェックの有無は state の集合から取る (ハッシュ付きの URL で開いたとき用)。
  */
-function renderToggles(containerId, attribute, items, set) {
+function renderToggles(
+  containerId: string,
+  attribute: string,
+  items: readonly { key: string; label: string; count: number }[],
+  set: ReadonlySet<string>,
+) {
   getElement(containerId).replaceChildren(
     ...items.map((item) =>
       htmlEl(
@@ -954,9 +977,9 @@ function renderToggles(containerId, attribute, items, set) {
  * チェックの付け外しを state の集合に写す。集合は押されたときに引き直す
  * (`applyHash()` が state ごと差し替えるので、ここで掴んでおくと古い集合が残る)。
  */
-function bindToggles(attribute, key) {
+function bindToggles(attribute: string, key: FilterKey) {
   queryElements(`input[data-${attribute}]`).forEach((input) => {
-    const value = input.dataset[attribute];
+    const value = dataValue(input, attribute);
     input.addEventListener("change", () => {
       input.checked ? state[key].add(value) : state[key].delete(value);
       refresh();
@@ -967,29 +990,33 @@ function bindToggles(attribute, key) {
 
 //: 絞り込み 1 群の [チェックボックスの属性名, state のキー]。置き場所は
 //: `<属性名>-filters`。描画・イベント・URL からの復元がこの並びを共有する。
-const FILTER_SETS = [
+type FilterKey = "types" | "statuses" | "edges";
+const FILTER_SETS: readonly (readonly [string, FilterKey])[] = [
   ["type", "types"],
   ["status", "statuses"],
   ["edge", "edges"],
 ];
 
 function renderFilters() {
-  const countBy = (keyOf) => {
-    const counts = {};
-    for (const node of DATA.nodes) counts[keyOf(node)] = (counts[keyOf(node)] || 0) + 1;
+  const countBy = (keys: Iterable<string>) => {
+    const counts = new Map<string, number>();
+    for (const key of keys) counts.set(key, (counts.get(key) || 0) + 1);
     return counts;
   };
 
-  const typeCounts = countBy((node) => node.type);
-  const edgeCounts = {};
-  for (const edge of DATA.edges) edgeCounts[edge.name] = (edgeCounts[edge.name] || 0) + 1;
-  const items = {
-    types: DATA.types.map((type) => ({ key: type, label: type, count: typeCounts[type] || 0 })),
+  const typeCounts = countBy(DATA.nodes.map((node) => node.type));
+  const edgeCounts = countBy(DATA.edges.map((edge) => edge.name));
+  const items: Record<FilterKey, { key: string; label: string; count: number }[]> = {
+    types: DATA.types.map((type) => ({
+      key: type,
+      label: type,
+      count: typeCounts.get(type) || 0,
+    })),
     statuses: statusFilters(DATA),
     edges: DATA.edge_names.map((name) => ({
       key: name,
       label: name,
-      count: edgeCounts[name] || 0,
+      count: edgeCounts.get(name) || 0,
     })),
   };
 
@@ -1007,7 +1034,7 @@ function renderFocusOptions() {
   );
 }
 
-const directionName = (direction) => (direction === "LR" ? "横 (LR)" : "縦 (TD)");
+const directionName = (direction: Direction) => (direction === "LR" ? "横 (LR)" : "縦 (TD)");
 const focusName = () => (state.focus ? `近傍 ${state.focus} ホップ` : "フォーカス: 切");
 
 /** アイコンだけの向き・フォーカス操作にも現在値を伝える。 */
@@ -1058,7 +1085,7 @@ function syncControls() {
   getElement("depth-value").textContent = depthLabel();
   for (const [attribute, key] of FILTER_SETS) {
     queryElements(`input[data-${attribute}]`).forEach((input) => {
-      input.checked = state[key].has(input.dataset[attribute]);
+      input.checked = state[key].has(dataValue(input, attribute));
     });
   }
 }
@@ -1069,7 +1096,8 @@ function renderStats() {
     htmlEl("span", { class: "chip" }, `${DATA.stats.nodes} ノード`),
     htmlEl("span", { class: "chip" }, `${DATA.stats.edges} エッジ`),
   ];
-  for (const severity of ["error", "severe", "warning", "info"]) {
+  const severities: readonly Severity[] = ["error", "severe", "warning", "info"];
+  for (const severity of severities) {
     if (counts[severity])
       chips.push(htmlEl("span", { class: `chip ${severity}` }, `${severity} ${counts[severity]}`));
   }
@@ -1114,8 +1142,8 @@ function renderLegend() {
 let findingSeverity = ALL_SEVERITIES;
 
 /** 重大度タブを選ぶ。押しても ←→ で移っても同じ。 */
-function showSeverity(tab) {
-  findingSeverity = tab.dataset.severity;
+function showSeverity(tab: HTMLElement) {
+  findingSeverity = dataValue(tab, "severity");
   renderFindings();
 }
 
@@ -1168,7 +1196,7 @@ function renderFindings() {
     panel.replaceChildren(...children);
   }
   panel.querySelectorAll<HTMLElement>("button.finding[data-id]").forEach((button: HTMLElement) => {
-    button.addEventListener("click", () => selectRoot(button.dataset.id));
+    button.addEventListener("click", () => selectRoot(dataValue(button, "id")));
   });
 }
 
@@ -1199,7 +1227,7 @@ function renderTable() {
     );
   }
 
-  const cell = (row, key) => {
+  const cell = (row: TableRow, key: string) => {
     if (key === "text") return htmlEl("td", { class: "text" }, row.text);
     if (key === "findings") {
       return row.findings
@@ -1223,7 +1251,10 @@ function renderTable() {
         ? htmlEl("td", { class: "num" }, String(row.evidence))
         : htmlEl("td", { class: "num dash" }, "—");
     }
-    return htmlEl("td", { class: key }, String(row[key] ?? ""));
+    if (key === "id" || key === "type" || key === "status") {
+      return htmlEl("td", { class: key }, row[key]);
+    }
+    return htmlEl("td", { class: key }, "");
   };
 
   const body = htmlEl("tbody");
@@ -1272,23 +1303,23 @@ function renderTable() {
     });
   });
   table.querySelectorAll<HTMLElement>("tbody tr[data-id]").forEach((tr: HTMLElement) => {
-    tr.addEventListener("click", () => selectNode(tr.dataset.id));
+    tr.addEventListener("click", () => selectNode(dataValue(tr, "id")));
     tr.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      selectNode(tr.dataset.id);
+      selectNode(dataValue(tr, "id"));
     });
   });
   table.querySelectorAll<HTMLElement>("button[data-findings]").forEach((button: HTMLElement) => {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      showFindings(button.dataset.findings);
+      showFindings(dataValue(button, "findings"));
     });
   });
 }
 
 /** 指摘数から検証結果へ辿る。そのノードを選び、右ペインの指摘まで送る。 */
-function showFindings(id) {
+function showFindings(id: NodeId) {
   if ((state.detail || state.selected) !== id) chooseNode(id);
   const heading = getElement("node-findings");
   if (heading) heading.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -1323,14 +1354,14 @@ function bindTabKeys(container: HTMLElement, activate: (tab: HTMLElement) => voi
 }
 
 //: 中央ペインのタブ [ボタンの id, 表示]。
-const VIEW_TABS = [
+const VIEW_TABS: readonly (readonly [string, ViewMode])[] = [
   ["tab-graph", "graph"],
   ["tab-analysis", "analysis"],
   ["tab-table", "table"],
 ];
 
 /** 中央ペインの表示切り替え。グラフは消さず、隠すだけ。 */
-function setMode(mode) {
+function setMode(mode: ViewMode) {
   if (mode !== state.mode) state.detail = null;
   state.mode = mode;
   getElement("graph-frame").hidden = mode === "table";
@@ -1403,7 +1434,7 @@ function applyHash() {
 // --- 操作 ------------------------------------------------------------------
 
 /** 一覧・検索・指摘からの選択は通常画面と同様に起点を切り替える。 */
-function selectRoot(id, toggle = true) {
+function selectRoot(id: NodeId, toggle = true) {
   state.selected = toggle && state.selected === id ? null : id;
   state.detail = null;
   refresh();
@@ -1411,9 +1442,9 @@ function selectRoot(id, toggle = true) {
   writeHash();
 }
 
-function selectNode(id) {
+function selectNode(id: NodeId | null) {
   const inspecting = state.mode === "analysis" && Boolean(state.selected);
-  if (inspecting && !analysisIds()?.has(id)) return;
+  if (inspecting && (id === null || !analysisIds()?.has(id))) return;
   state = selectNodeState(state, id);
   if (inspecting) {
     view.state = state;
@@ -1427,7 +1458,7 @@ function selectNode(id) {
 }
 
 /** 選択を決める (トグルしない)。キーボードの Enter から呼ぶ。 */
-function chooseNode(id) {
+function chooseNode(id: NodeId) {
   if ((state.detail || state.selected) === id) {
     if (state.mode !== "analysis") revealNode(id);
     return;
@@ -1455,7 +1486,7 @@ function refresh() {
 }
 
 /** 検索語を差し替える。入力欄からも、キーボードの Esc からも通る。 */
-function applyQuery(value) {
+function applyQuery(value: string) {
   state.query = value;
   getElement("search").value = value;
   //: 語が変われば候補も変わる。位置は先頭から数え直す。
@@ -1597,7 +1628,7 @@ document.addEventListener("scroll", positionExportMenu, true);
 
 /** 文字列をファイルとして保存させる。 */
 let lastDownloadUrl: string | null = null;
-function download(name, text, type) {
+function download(name: string, text: string, type: string) {
   document.querySelector("a[data-generated-download]")?.remove();
   if (lastDownloadUrl) URL.revokeObjectURL(lastDownloadUrl);
   const url = URL.createObjectURL(new Blob([text], { type }));

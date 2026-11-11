@@ -481,7 +481,7 @@
     evidence: "\u8A3C\u8DE1",
     status: "\u30B9\u30C6\u30FC\u30BF\u30B9"
   });
-  var fieldLabel = (name) => FIELD_LABELS[name] || name;
+  var fieldLabel = (name) => Object.hasOwn(FIELD_LABELS, name) ? FIELD_LABELS[name] : name;
   var statusNames = (data) => Object.keys(data.meta?.statuses || {});
   function statusFilters(data) {
     const counts = countBy(data.nodes, (node) => node.status);
@@ -600,12 +600,13 @@
     return result;
   }
   var MISSING_RANK = 10 ** 6;
-  var rankOf = (view2, id) => view2.order.has(id) ? view2.order.get(id) : MISSING_RANK;
+  var rankOf = (view2, id) => view2.order.get(id) ?? MISSING_RANK;
   var compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 
   // src/reqmodel/presentation/site_context.ts
   function describe(view2, id) {
     const node = view2.byId.get(id);
+    if (!node) throw new Error(`\u8A18\u8FF0\u3059\u308B\u30CE\u30FC\u30C9\u304C\u7121\u3044: ${id}`);
     const attrs = [`status=${node.status}`];
     const lines = [`- [${node.type}] ${node.id}: ${node.text}`, `    (${attrs.join(", ")})`];
     const pushReference = (label, item) => {
@@ -735,7 +736,7 @@
     const types = new Set(shownNodes.map((node) => node.type));
     const keys = /* @__PURE__ */ new Set();
     for (const band of bandDefs(data)) {
-      const visible = band.members ? band.members.some((id) => ids.has(id)) : types.has(band.type);
+      const visible = band.members ? band.members.some((id) => ids.has(id)) : band.type !== void 0 && types.has(band.type);
       if (visible) keys.add(band.type || band.key);
     }
     return keys;
@@ -878,12 +879,14 @@ ${text}`;
     const parents = /* @__PURE__ */ new Map();
     for (const edge of edges) {
       if (edge.name !== "refines" || !ids.has(edge.source) || !ids.has(edge.target)) continue;
-      if (!parents.has(edge.source)) parents.set(edge.source, []);
-      parents.get(edge.source).push(edge.target);
+      const known = parents.get(edge.source);
+      if (known) known.push(edge.target);
+      else parents.set(edge.source, [edge.target]);
     }
     const depth = /* @__PURE__ */ new Map();
     const depthOf = (id, trail) => {
-      if (depth.has(id)) return depth.get(id);
+      const known = depth.get(id);
+      if (known !== void 0) return known;
       if (trail.has(id)) return 0;
       trail.add(id);
       const above = (parents.get(id) || []).map((parent) => depthOf(parent, trail));
@@ -913,8 +916,13 @@ ${text}`;
     const priSize = (node) => vertical ? node.h : node.w;
     const secSize = (node) => vertical ? node.w : node.h;
     const at = (secValue, priValue) => vertical ? { x: secValue, y: priValue } : { x: priValue, y: secValue };
-    const positionSec = (id) => {
+    const positionOf = (id) => {
       const position = positions.get(id);
+      if (!position) throw new Error(`\u5E2F\u30EC\u30A4\u30A2\u30A6\u30C8\u3067\u4F4D\u7F6E\u304C\u6C7A\u307E\u3063\u3066\u3044\u306A\u3044\u30CE\u30FC\u30C9: ${id}`);
+      return position;
+    };
+    const positionSec = (id) => {
+      const position = positionOf(id);
       return vertical ? position.x : position.y;
     };
     const topOf = (nodes) => Math.min(...nodes.map((node) => pri(node) - priSize(node) / 2));
@@ -957,14 +965,15 @@ ${text}`;
       };
     };
     const banded = /* @__PURE__ */ new Set();
-    const spans = /* @__PURE__ */ new Map();
+    const typeSpans = /* @__PURE__ */ new Map();
+    const groupSpans = /* @__PURE__ */ new Map();
     let cursor2 = topOf(placed);
     let index = 0;
     while (index < bands.length) {
       if (bands[index].members) {
         const sectionFrom = cursor2;
         const sectionStart = Math.min(...placed.map((node) => sec(node) - secSize(node) / 2));
-        const sectionBandIndexes = [];
+        const sectionSpans = [];
         let groupLeft = sectionStart;
         let sectionTo = sectionFrom;
         while (index < bands.length && bands[index].members) {
@@ -977,23 +986,25 @@ ${text}`;
           const group = layoutGroup(members2, groupMaxWidth);
           for (const node of members2) {
             const local = group.positions.get(node.id);
+            if (!local) throw new Error(`\u30B0\u30EB\u30FC\u30D7\u5185\u306E\u4F4D\u7F6E\u304C\u6C7A\u307E\u3063\u3066\u3044\u306A\u3044\u30CE\u30FC\u30C9: ${node.id}`);
             positions.set(
               node.id,
               at(groupLeft + BAND_FRAME_PAD + local.sec, sectionFrom + BAND_FRAME_PAD + local.pri)
             );
           }
-          spans.set(index, {
+          const span = {
             from: sectionFrom,
             to: sectionFrom + group.height,
             secMin: groupLeft,
             secMax: groupLeft + group.width
-          });
-          sectionBandIndexes.push(index);
+          };
+          groupSpans.set(index, span);
+          sectionSpans.push(span);
           sectionTo = Math.max(sectionTo, sectionFrom + group.height);
           groupLeft += group.width + REQUIREMENT_GROUP_GAP;
           index += 1;
         }
-        for (const bandIndex of sectionBandIndexes) spans.get(bandIndex).to = sectionTo;
+        for (const span of sectionSpans) span.to = sectionTo;
         cursor2 = sectionTo + BAND_GAP;
         continue;
       }
@@ -1016,7 +1027,7 @@ ${text}`;
         }
         cursor2 += height + BAND_ROW_GAP;
       }
-      spans.set(index, { from, to: cursor2 - BAND_ROW_GAP });
+      typeSpans.set(index, { from, to: cursor2 - BAND_ROW_GAP });
       cursor2 += BAND_GAP - BAND_ROW_GAP;
       index += 1;
     }
@@ -1036,9 +1047,7 @@ ${text}`;
     }
     let requirementSecMin = Infinity;
     let requirementSecMax = -Infinity;
-    for (let bandIndex = 0; bandIndex < bands.length; bandIndex++) {
-      if (!bands[bandIndex].members || !spans.has(bandIndex)) continue;
-      const span = spans.get(bandIndex);
+    for (const span of groupSpans.values()) {
       requirementSecMin = Math.min(requirementSecMin, span.secMin);
       requirementSecMax = Math.max(requirementSecMax, span.secMax);
       secMin = Math.min(secMin, span.secMin);
@@ -1061,16 +1070,18 @@ ${text}`;
     for (let bandIndex = 0; bandIndex < bands.length; bandIndex++) {
       const members = membersOf[bandIndex];
       if (!members.length) continue;
-      const span = spans.get(bandIndex);
-      if (!span) continue;
       if (bands[bandIndex].members) {
+        const span2 = groupSpans.get(bandIndex);
+        if (!span2) continue;
         frames.set(bands[bandIndex].key, {
-          ...at((span.secMin + span.secMax) / 2, (span.from + span.to) / 2),
-          w: vertical ? span.secMax - span.secMin : span.to - span.from,
-          h: vertical ? span.to - span.from : span.secMax - span.secMin
+          ...at((span2.secMin + span2.secMax) / 2, (span2.from + span2.to) / 2),
+          w: vertical ? span2.secMax - span2.secMin : span2.to - span2.from,
+          h: vertical ? span2.to - span2.from : span2.secMax - span2.secMin
         });
         continue;
       }
+      const span = typeSpans.get(bandIndex);
+      if (!span) continue;
       let min = Infinity;
       let max = -Infinity;
       for (const node of members) {
@@ -1079,7 +1090,7 @@ ${text}`;
       }
       const shift = bandMiddle - (min + max) / 2;
       for (const node of members) {
-        const position = positions.get(node.id);
+        const position = positionOf(node.id);
         positions.set(
           node.id,
           vertical ? { x: position.x + shift, y: position.y } : { x: position.x, y: position.y + shift }
@@ -1224,19 +1235,30 @@ ${text}`;
         worst.set(finding.node_id, rank);
       }
     }
-    return view2.nodes.filter((node) => matchesQuery(node, query)).map((node) => ({
-      id: node.id,
-      type: node.type,
-      text: node.text,
-      status: node.status,
-      evidence: (node.evidence || []).length,
-      findings: counts.get(node.id) || 0,
-      severity: worst.has(node.id) ? SEVERITY_ORDER[worst.get(node.id)] : null
-    }));
+    return view2.nodes.filter((node) => matchesQuery(node, query)).map((node) => {
+      const rank = worst.get(node.id);
+      return {
+        id: node.id,
+        type: node.type,
+        text: node.text,
+        status: node.status,
+        evidence: (node.evidence || []).length,
+        findings: counts.get(node.id) || 0,
+        severity: rank === void 0 ? null : SEVERITY_ORDER[rank]
+      };
+    });
   }
   var MISSING_VALUE = Number.POSITIVE_INFINITY;
   function sortValue(view2, row, key) {
     switch (key) {
+      case "id":
+        return row.id;
+      case "text":
+        return row.text;
+      case "evidence":
+        return row.evidence;
+      case "findings":
+        return row.findings;
       case "type":
         return view2.data.types.indexOf(row.type);
       case "status": {
@@ -1244,7 +1266,7 @@ ${text}`;
         return rank === void 0 ? MISSING_VALUE : rank;
       }
       default:
-        return row[key];
+        return MISSING_VALUE;
     }
   }
   function sortRows(view2, rows, sort) {
@@ -1308,7 +1330,7 @@ ${text}`;
       ...SEVERITY_ORDER.filter((severity) => counts.get(severity)).map((severity) => ({
         key: severity,
         label: severity,
-        count: counts.get(severity)
+        count: counts.get(severity) ?? 0
       }))
     ];
   }
@@ -1316,8 +1338,9 @@ ${text}`;
     const groups = /* @__PURE__ */ new Map();
     for (const finding of findings) {
       if (severity !== ALL_SEVERITIES && finding.severity !== severity) continue;
-      if (!groups.has(finding.code)) groups.set(finding.code, []);
-      groups.get(finding.code).push(finding);
+      const items = groups.get(finding.code);
+      if (items) items.push(finding);
+      else groups.set(finding.code, [finding]);
     }
     const severityRank = (finding) => {
       const at = SEVERITY_ORDER.indexOf(finding.severity);
@@ -1409,21 +1432,23 @@ ${text}`;
     const node = params.get("node");
     if (node && data.nodes.some((item) => item.id === node)) state2.selected = node;
     for (const filter of SET_FILTERS) {
-      if (!params.has(filter.param)) continue;
-      state2[filter.key] = subset(params.get(filter.param), filter.all(data));
+      const raw = params.get(filter.param);
+      if (raw === void 0) continue;
+      state2[filter.key] = subset(raw, filter.all(data));
     }
     if (params.get("dir") === "LR") state2.direction = "LR";
-    if (params.get("view") === "table" || params.get("view") === "analysis")
-      state2.mode = params.get("view");
+    const mode = params.get("view");
+    if (mode === "table" || mode === "analysis") state2.mode = mode;
     state2.focus = parseFocus(params.get("focus") || "0");
     const detail = params.get("detail");
-    if (state2.mode === "analysis" && state2.selected && detail !== state2.selected && data.nodes.some((node2) => node2.id === detail)) {
+    if (detail !== void 0 && state2.mode === "analysis" && state2.selected && detail !== state2.selected && data.nodes.some((node2) => node2.id === detail)) {
       state2.detail = detail;
     }
     const depth = Number(params.get("depth"));
     if (IMPACT_DEPTHS.includes(depth)) state2.depth = depth;
     if (params.get("undir") === "1") state2.undirected = true;
-    if (params.has("q")) state2.query = params.get("q");
+    const query = params.get("q");
+    if (query !== void 0) state2.query = query;
     const sort = parseSort(params.get("sort"));
     if (sort) state2.sort = sort;
     return state2;
@@ -1468,8 +1493,12 @@ ${text}`;
     return (hash || "").replace(/^#/, "") ? hash : stored || "";
   }
   var THEMES = ["auto", "light", "dark"];
-  var THEME_LABELS = { auto: "\u30C6\u30FC\u30DE: \u81EA\u52D5", light: "\u30C6\u30FC\u30DE: \u660E", dark: "\u30C6\u30FC\u30DE: \u6697" };
-  var normalizeTheme = (value) => THEMES.includes(value) ? value : "auto";
+  var THEME_LABELS = {
+    auto: "\u30C6\u30FC\u30DE: \u81EA\u52D5",
+    light: "\u30C6\u30FC\u30DE: \u660E",
+    dark: "\u30C6\u30FC\u30DE: \u6697"
+  };
+  var normalizeTheme = (value) => THEMES.find((theme2) => theme2 === value) ?? "auto";
   function nextTheme(theme2) {
     return THEMES[(THEMES.indexOf(normalizeTheme(theme2)) + 1) % THEMES.length];
   }
@@ -1737,10 +1766,10 @@ ${text}`;
     const scale = 1 / Math.sqrt(dx * dx / (rx * rx) + dy * dy / (ry * ry));
     return { x: from.x + dx * scale, y: from.y + dy * scale };
   }
-  function polygonEndpoint(from, to) {
+  function polygonEndpoint(from, shape, to) {
     const ray = { x: to.x - from.x, y: to.y - from.y };
     if (!ray.x && !ray.y) return { x: from.x, y: from.y };
-    const vertices = polygonCoords(from.shapeName, from.w, from.h);
+    const vertices = polygonCoords(shape, from.w, from.h);
     const cross = (a, b) => a.x * b.y - a.y * b.x;
     let closest = Infinity;
     for (let index = 0; index < vertices.length; index += 1) {
@@ -1757,9 +1786,10 @@ ${text}`;
     return { x: from.x + ray.x * closest, y: from.y + ray.y * closest };
   }
   function edgeEndpoint(from, to) {
-    if (from.shapeName === "ellipse") return ellipseEndpoint(from, to);
-    if (["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(from.shapeName)) {
-      return polygonEndpoint(from, to);
+    const shape = from.shapeName;
+    if (shape === "ellipse") return ellipseEndpoint(from, to);
+    if (shape && ["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape)) {
+      return polygonEndpoint(from, shape, to);
     }
     return rectangleEndpoint(from, to);
   }
@@ -1980,7 +2010,7 @@ ${text}`;
     panZoom?.fit(graphBox(), true);
   }
   function revealNode(id) {
-    if (!svg || state.mode === "table") return;
+    if (id === null || !svg || state.mode === "table") return;
     const item = nodeItems.get(id);
     if (!item || item.group.classList.contains("hidden")) return;
     panZoom?.reveal(item);
@@ -2173,7 +2203,7 @@ ${text}`;
       })
     );
     list.querySelectorAll("button[data-id]").forEach((button) => {
-      button.addEventListener("click", () => selectRoot(button.dataset.id));
+      button.addEventListener("click", () => selectRoot(dataValue(button, "id")));
     });
   }
   function renderToggles(containerId, attribute, items, set) {
@@ -2195,7 +2225,7 @@ ${text}`;
   }
   function bindToggles(attribute, key) {
     queryElements(`input[data-${attribute}]`).forEach((input) => {
-      const value = input.dataset[attribute];
+      const value = dataValue(input, attribute);
       input.addEventListener("change", () => {
         input.checked ? state[key].add(value) : state[key].delete(value);
         refresh();
@@ -2209,21 +2239,24 @@ ${text}`;
     ["edge", "edges"]
   ];
   function renderFilters() {
-    const countBy2 = (keyOf) => {
-      const counts = {};
-      for (const node of DATA.nodes) counts[keyOf(node)] = (counts[keyOf(node)] || 0) + 1;
+    const countBy2 = (keys) => {
+      const counts = /* @__PURE__ */ new Map();
+      for (const key of keys) counts.set(key, (counts.get(key) || 0) + 1);
       return counts;
     };
-    const typeCounts = countBy2((node) => node.type);
-    const edgeCounts = {};
-    for (const edge of DATA.edges) edgeCounts[edge.name] = (edgeCounts[edge.name] || 0) + 1;
+    const typeCounts = countBy2(DATA.nodes.map((node) => node.type));
+    const edgeCounts = countBy2(DATA.edges.map((edge) => edge.name));
     const items = {
-      types: DATA.types.map((type) => ({ key: type, label: type, count: typeCounts[type] || 0 })),
+      types: DATA.types.map((type) => ({
+        key: type,
+        label: type,
+        count: typeCounts.get(type) || 0
+      })),
       statuses: statusFilters(DATA),
       edges: DATA.edge_names.map((name) => ({
         key: name,
         label: name,
-        count: edgeCounts[name] || 0
+        count: edgeCounts.get(name) || 0
       }))
     };
     for (const [attribute, key] of FILTER_SETS) {
@@ -2273,7 +2306,7 @@ ${text}`;
     getElement("depth-value").textContent = depthLabel();
     for (const [attribute, key] of FILTER_SETS) {
       queryElements(`input[data-${attribute}]`).forEach((input) => {
-        input.checked = state[key].has(input.dataset[attribute]);
+        input.checked = state[key].has(dataValue(input, attribute));
       });
     }
   }
@@ -2283,7 +2316,8 @@ ${text}`;
       htmlEl("span", { class: "chip" }, `${DATA.stats.nodes} \u30CE\u30FC\u30C9`),
       htmlEl("span", { class: "chip" }, `${DATA.stats.edges} \u30A8\u30C3\u30B8`)
     ];
-    for (const severity of ["error", "severe", "warning", "info"]) {
+    const severities = ["error", "severe", "warning", "info"];
+    for (const severity of severities) {
       if (counts[severity])
         chips.push(htmlEl("span", { class: `chip ${severity}` }, `${severity} ${counts[severity]}`));
     }
@@ -2315,7 +2349,7 @@ ${text}`;
   }
   var findingSeverity = ALL_SEVERITIES;
   function showSeverity(tab) {
-    findingSeverity = tab.dataset.severity;
+    findingSeverity = dataValue(tab, "severity");
     renderFindings();
   }
   function renderFindings() {
@@ -2365,7 +2399,7 @@ ${text}`;
       panel.replaceChildren(...children);
     }
     panel.querySelectorAll("button.finding[data-id]").forEach((button) => {
-      button.addEventListener("click", () => selectRoot(button.dataset.id));
+      button.addEventListener("click", () => selectRoot(dataValue(button, "id")));
     });
   }
   function renderTable() {
@@ -2409,7 +2443,10 @@ ${text}`;
       if (key === "evidence") {
         return row.evidence ? htmlEl("td", { class: "num" }, String(row.evidence)) : htmlEl("td", { class: "num dash" }, "\u2014");
       }
-      return htmlEl("td", { class: key }, String(row[key] ?? ""));
+      if (key === "id" || key === "type" || key === "status") {
+        return htmlEl("td", { class: key }, row[key]);
+      }
+      return htmlEl("td", { class: key }, "");
     };
     const body = htmlEl("tbody");
     if (rows.length) {
@@ -2453,17 +2490,17 @@ ${text}`;
       });
     });
     table.querySelectorAll("tbody tr[data-id]").forEach((tr) => {
-      tr.addEventListener("click", () => selectNode(tr.dataset.id));
+      tr.addEventListener("click", () => selectNode(dataValue(tr, "id")));
       tr.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
-        selectNode(tr.dataset.id);
+        selectNode(dataValue(tr, "id"));
       });
     });
     table.querySelectorAll("button[data-findings]").forEach((button) => {
       button.addEventListener("click", (event) => {
         event.stopPropagation();
-        showFindings(button.dataset.findings);
+        showFindings(dataValue(button, "findings"));
       });
     });
   }
@@ -2550,7 +2587,7 @@ ${text}`;
   }
   function selectNode(id) {
     const inspecting = state.mode === "analysis" && Boolean(state.selected);
-    if (inspecting && !analysisIds()?.has(id)) return;
+    if (inspecting && (id === null || !analysisIds()?.has(id))) return;
     state = selectNodeState(state, id);
     if (inspecting) {
       view.state = state;

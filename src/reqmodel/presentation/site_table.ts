@@ -1,5 +1,13 @@
 import { compare, fieldLabel, rankOf } from "./site_graph.ts";
-import type { Finding, GraphViewModel, NormalizedNode, SiteData, SortState } from "./site_types.ts";
+import type {
+  Finding,
+  GraphViewModel,
+  NormalizedEdge,
+  NormalizedNode,
+  Severity,
+  SiteData,
+  SortState,
+} from "./site_types.ts";
 // --- テーブル --------------------------------------------------------------
 //
 // 棚卸し (全件を順に確認する作業) 用の一覧。グラフと同じ view から作るので、
@@ -16,7 +24,7 @@ export const TABLE_COLUMNS = [
 ];
 
 /** 重い順。行の指摘数に色を付けるときの「最も重い指摘」を決めるのに使う。 */
-const SEVERITY_ORDER = ["error", "severe", "warning", "info"];
+const SEVERITY_ORDER: readonly Severity[] = ["error", "severe", "warning", "info"];
 
 /** 検索欄の絞り込み。id と本文の部分一致 (大文字小文字は区別しない)。 */
 export function matchesQuery(node: NormalizedNode, query: string): boolean {
@@ -55,8 +63,8 @@ export function stepHit(
  * 指摘は「そのノードに紐づくもの」だけを数え、色付け用に最も重い severity を添える。
  */
 export function tableRows(view: GraphViewModel, query = "") {
-  const counts = new Map();
-  const worst = new Map();
+  const counts = new Map<string, number>();
+  const worst = new Map<string, number>();
   for (const finding of view.data.findings || []) {
     if (!finding.node_id) continue;
     counts.set(finding.node_id, (counts.get(finding.node_id) || 0) + 1);
@@ -68,16 +76,22 @@ export function tableRows(view: GraphViewModel, query = "") {
   }
   return view.nodes
     .filter((node) => matchesQuery(node, query))
-    .map((node) => ({
-      id: node.id,
-      type: node.type,
-      text: node.text,
-      status: node.status,
-      evidence: (node.evidence || []).length,
-      findings: counts.get(node.id) || 0,
-      severity: worst.has(node.id) ? SEVERITY_ORDER[worst.get(node.id)] : null,
-    }));
+    .map((node) => {
+      const rank = worst.get(node.id);
+      return {
+        id: node.id,
+        type: node.type,
+        text: node.text,
+        status: node.status,
+        evidence: (node.evidence || []).length,
+        findings: counts.get(node.id) || 0,
+        severity: rank === undefined ? null : SEVERITY_ORDER[rank],
+      };
+    });
 }
+
+/** 表の 1 行。 */
+export type TableRow = ReturnType<typeof tableRows>[number];
 
 //: 値を持たない行 (status が meta に無い等) の並び。向きに関わらず末尾に置く。
 const MISSING_VALUE = Number.POSITIVE_INFINITY;
@@ -86,8 +100,16 @@ const MISSING_VALUE = Number.POSITIVE_INFINITY;
  * 並び替えに使う値。type は種別の定義順、status は成熟度 (`STATUS_RANK`) で、
  * どちらも Python 側から渡ってきた並びを唯一の出典とする。
  */
-function sortValue(view, row, key) {
+function sortValue(view: GraphViewModel, row: TableRow, key: string): string | number {
   switch (key) {
+    case "id":
+      return row.id;
+    case "text":
+      return row.text;
+    case "evidence":
+      return row.evidence;
+    case "findings":
+      return row.findings;
     case "type":
       return view.data.types.indexOf(row.type);
     case "status": {
@@ -95,7 +117,8 @@ function sortValue(view, row, key) {
       return rank === undefined ? MISSING_VALUE : rank;
     }
     default:
-      return row[key];
+      //: 列に無い key は TABLE_COLUMNS 由来でない並び順。どの行も値を持たない扱いにする。
+      return MISSING_VALUE;
   }
 }
 
@@ -103,11 +126,7 @@ function sortValue(view, row, key) {
  * 行の並び替え。同値のときは正規化 JSON の並び (型順 → id 順) で決めるので、
  * 何度押しても結果が揺れない。
  */
-export function sortRows(
-  view: GraphViewModel,
-  rows: ReturnType<typeof tableRows>,
-  sort: SortState,
-) {
+export function sortRows(view: GraphViewModel, rows: readonly TableRow[], sort: SortState) {
   const sign = sort.asc ? 1 : -1;
   return [...rows].sort((a, b) => {
     const left = sortValue(view, a, sort.key);
@@ -141,7 +160,7 @@ export function nextSort(sort: SortState, key: string): SortState {
  * view に無いので、相手ノードは必ず引ける。
  */
 export function edgeItems(view: GraphViewModel, id: string) {
-  const item = (edge, direction) => {
+  const item = (edge: NormalizedEdge, direction: "out" | "in") => {
     const other = direction === "out" ? edge.target : edge.source;
     const node = view.byId.get(other);
     return {
@@ -197,7 +216,7 @@ export const ALL_SEVERITIES = "all";
  * 「すべて」は指摘が 1 件も無くても出す。
  */
 export function severityTabs(findings: readonly Finding[]) {
-  const counts = new Map();
+  const counts = new Map<string, number>();
   for (const finding of findings) {
     counts.set(finding.severity, (counts.get(finding.severity) || 0) + 1);
   }
@@ -206,7 +225,7 @@ export function severityTabs(findings: readonly Finding[]) {
     ...SEVERITY_ORDER.filter((severity) => counts.get(severity)).map((severity) => ({
       key: severity,
       label: severity,
-      count: counts.get(severity),
+      count: counts.get(severity) ?? 0,
     })),
   ];
 }
@@ -218,14 +237,15 @@ export function severityTabs(findings: readonly Finding[]) {
  * (Python 側が重い順に並べたもの) のまま。
  */
 export function groupFindings(findings: readonly Finding[], severity = ALL_SEVERITIES) {
-  const groups = new Map();
+  const groups = new Map<string, Finding[]>();
   for (const finding of findings) {
     if (severity !== ALL_SEVERITIES && finding.severity !== severity) continue;
-    if (!groups.has(finding.code)) groups.set(finding.code, []);
-    groups.get(finding.code).push(finding);
+    const items = groups.get(finding.code);
+    if (items) items.push(finding);
+    else groups.set(finding.code, [finding]);
   }
   //: 知らない重大度は最も軽いものとして扱う (並びが未定義にならないように)。
-  const severityRank = (finding) => {
+  const severityRank = (finding: Finding) => {
     const at = SEVERITY_ORDER.indexOf(finding.severity);
     return at < 0 ? SEVERITY_ORDER.length : at;
   };

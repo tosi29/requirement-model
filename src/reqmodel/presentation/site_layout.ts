@@ -11,7 +11,11 @@ import {
   wrapLabel,
 } from "./site_text.ts";
 import type {
+  Box,
+  GraphBandDefinition,
+  GraphEdgeDefinition,
   GraphElementDefinition,
+  GraphNodeDefinition,
   GraphViewModel,
   RenderMetadata,
   SiteData,
@@ -24,8 +28,25 @@ import type {
 /** Requirements 段に入る型。 */
 const REQUIREMENT_TYPES = new Set(["FunctionalRequirement", "QualityRequirement", "Constraint"]);
 
+/**
+ * 帯 (枠) 1 つ。型の帯は `type` を、RequirementGroup の帯は `groupId` と `members` を持つ。
+ */
+export interface BandDef {
+  key: string;
+  label: string;
+  type?: string;
+  groupId?: string;
+  members?: string[];
+}
+
+/** 帯に並べるノード。中心 `(x, y)` と外形 `(w, h)` は dagre の配置結果。 */
+interface PlacedNode extends Box {
+  id: string;
+  type: string;
+}
+
 /** 帯 (枠) の定義。Goal / Need は型ごと、Requirements は表示用グループごとに作る。 */
-export function bandDefs(data: SiteData) {
+export function bandDefs(data: SiteData): BandDef[] {
   const top = (data.meta?.bands || [])
     .filter((band) => data.nodes.some((node) => node.type === band.type))
     .map((band) => ({ ...band, key: band.type }));
@@ -39,9 +60,9 @@ export function bandDefs(data: SiteData) {
   const requirementIds = new Set(
     data.nodes.filter((node) => REQUIREMENT_TYPES.has(node.type)).map((node) => node.id),
   );
-  const requirementBands = [];
+  const requirementBands: BandDef[] = [];
   for (const group of groups) {
-    const members = [];
+    const members: string[] = [];
     for (const id of group.members || []) {
       if (!requirementIds.has(id) || assigned.has(id)) continue;
       assigned.add(id);
@@ -103,7 +124,7 @@ export function graphElements(
   const bands = bandDefs(data);
   const types = data.meta?.types || {};
   return [
-    ...data.nodes.map((node) => {
+    ...data.nodes.map((node): GraphNodeDefinition => {
       const text = wrapLabel(truncate(node.text, LABEL_MAX_LENGTH), LABEL_WRAP_WIDTH, measure);
       const label = `${node.id}\n${text}`;
       const size = nodeSize(label, types[node.type]?.fit, measure);
@@ -118,37 +139,63 @@ export function graphElements(
         },
       };
     }),
-    ...data.edges.map((edge, index) => ({
-      data: {
-        id: `e${index}`,
-        index,
-        source: edge.source,
-        target: edge.target,
-        name: edge.name,
-      },
-    })),
-    ...bands.map((band) => ({
-      //: w / h は applyBanding が実測で入れ直すまでの仮の値。
-      data: {
-        id: bandId(band.key),
-        band: true,
-        bandType: band.type || "RequirementGroup",
-        bandKey: band.type || band.key,
-        label: band.label,
-        w: 10,
-        h: 10,
-      },
-      classes: "band",
-      selectable: false,
-      grabbable: false,
-    })),
+    ...data.edges.map(
+      (edge, index): GraphEdgeDefinition => ({
+        data: {
+          id: `e${index}`,
+          index,
+          source: edge.source,
+          target: edge.target,
+          name: edge.name,
+        },
+      }),
+    ),
+    ...bands.map(
+      (band): GraphBandDefinition => ({
+        //: w / h は applyBanding が実測で入れ直すまでの仮の値。
+        data: {
+          id: bandId(band.key),
+          band: true,
+          bandType: band.type || "RequirementGroup",
+          bandKey: band.type || band.key,
+          label: band.label,
+          w: 10,
+          h: 10,
+        },
+        classes: "band",
+        selectable: false,
+        grabbable: false,
+      }),
+    ),
   ];
 }
+
+export const isEdgeElement = (element: GraphElementDefinition): element is GraphEdgeDefinition =>
+  "source" in element.data;
+export const isBandElement = (element: GraphElementDefinition): element is GraphBandDefinition =>
+  "classes" in element && element.classes === "band";
+export const isNodeElement = (element: GraphElementDefinition): element is GraphNodeDefinition =>
+  !isEdgeElement(element) && !isBandElement(element);
 
 // --- 凡例 ------------------------------------------------------------------
 
 //: 凡例の見本は小さいので、太い枠 (verified の double 等) はここで頭打ちにする。
 const LEGEND_MAX_BORDER = 3;
+
+/** 凡例の 1 見出しぶん。 */
+export interface LegendGroup {
+  title: string;
+  items: {
+    label: string;
+    swatch: {
+      //: 配色を持たない型 (meta に fill / stroke が無い) では undefined になる。
+      background: string | undefined;
+      borderColor: string | null | undefined;
+      borderStyle: string;
+      borderWidth: number;
+    };
+  }[];
+}
 
 /**
  * 凡例に出す項目。図に効いているスタイルと同じ meta から作るので、
@@ -157,9 +204,9 @@ const LEGEND_MAX_BORDER = 3;
  * 各 swatch は CSS の border 指定にそのまま写せる形にしてある
  * (`borderColor` が null ならテーマの文字色を使う、の意味)。
  */
-export function legendGroups(meta: RenderMetadata, colorScheme = "light") {
+export function legendGroups(meta: RenderMetadata, colorScheme = "light"): LegendGroup[] {
   const dark = colorScheme === "dark";
-  const groups = [
+  const groups: LegendGroup[] = [
     {
       title: "種別",
       items: Object.entries(meta.types).map(([type, typeMeta]) => ({
@@ -291,7 +338,7 @@ const REQUIREMENT_GROUP_GAP = 48;
  * 親子が無い型 (Need) は 1 行になる。閉路は validate が指摘するので、
  * ここでは無限ループしないことだけを保証する。
  */
-function bandRows(members, edges) {
+function bandRows(members: readonly PlacedNode[], edges): PlacedNode[][] {
   const ids = new Set(members.map((node) => node.id));
   const parents = new Map();
   for (const edge of edges) {
@@ -309,7 +356,7 @@ function bandRows(members, edges) {
     depth.set(id, value);
     return value;
   };
-  const rows = [];
+  const rows: PlacedNode[][] = [];
   for (const node of members) {
     const row = depthOf(node.id, new Set());
     rows[row] ||= [];
@@ -370,7 +417,7 @@ export function bandedLayout(
     let contentWidth = 0;
     for (const depthRow of bandRows(members, edges)) {
       depthRow.sort((a, b) => sec(a) - sec(b));
-      let line = [];
+      let line: PlacedNode[] = [];
       let lineWidth = 0;
       const finishLine = () => {
         if (!line.length) return;
@@ -410,7 +457,7 @@ export function bandedLayout(
     if (bands[index].members) {
       const sectionFrom = cursor;
       const sectionStart = Math.min(...placed.map((node) => sec(node) - secSize(node) / 2));
-      const sectionBandIndexes = [];
+      const sectionBandIndexes: number[] = [];
       let groupLeft = sectionStart;
       let sectionTo = sectionFrom;
       while (index < bands.length && bands[index].members) {
@@ -675,7 +722,7 @@ const attrs = (values) =>
     .map(([name, value]) => `${name}="${escapeAttr(value)}"`)
     .join(" ");
 
-const element = (name, values, children = undefined) => {
+const element = (name: string, values, children?: string) => {
   const head = [name, attrs(values)].filter(Boolean).join(" ");
   return children === undefined ? `<${head}/>` : `<${head}>${children}</${name}>`;
 };
@@ -790,8 +837,8 @@ export function graphSvg(scene) {
   const types = meta.types || {};
   const statuses = meta.statuses || {};
 
-  const xs = [];
-  const ys = [];
+  const xs: number[] = [];
+  const ys: number[] = [];
   for (const box of [...nodes, ...bands]) {
     xs.push(box.x - box.w / 2, box.x + box.w / 2);
     ys.push(box.y - box.h / 2, box.y + box.h / 2);
@@ -805,7 +852,7 @@ export function graphSvg(scene) {
   const width = (xs.length ? Math.max(...xs) : 0) + SVG_PADDING - minX;
   const height = (ys.length ? Math.max(...ys) : 0) + SVG_PADDING - minY;
 
-  const body = [];
+  const body: string[] = [];
 
   body.push(
     element("rect", {

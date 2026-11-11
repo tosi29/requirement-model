@@ -26,6 +26,24 @@ interface PageElement extends HTMLElement {
   select(): void;
 }
 const getElement = (id: string): PageElement => document.getElementById(id) as PageElement;
+/**
+ * テンプレートに必ずある要素を引く。無ければテンプレートと JS の食い違いなので、
+ * 後段で黙って壊れないよう、その場で例外にする。
+ */
+function requireElement<T extends Element>(selector: string, root: ParentNode = document): T {
+  const found = root.querySelector<T>(selector);
+  if (!found) throw new Error(`テンプレートに要素が無い: ${selector}`);
+  return found;
+}
+/**
+ * セレクタで存在を確かめた `data-*` 属性を読む。name は dataset の鍵 (camelCase)。
+ * 無ければセレクタと読み出しの食い違いなので例外にする。
+ */
+function dataValue(element: HTMLElement, name: string): string {
+  const value = element.dataset[name];
+  if (value === undefined) throw new Error(`data 属性が無い: ${name}`);
+  return value;
+}
 const queryElements = (selector: string): NodeListOf<PageElement> =>
   document.querySelectorAll<HTMLElement>(selector) as NodeListOf<PageElement>;
 
@@ -52,6 +70,9 @@ import {
   IMPACT_DEPTHS,
   impactSets,
   initialHash,
+  isBandElement,
+  isEdgeElement,
+  isNodeElement,
   LABEL_FONT,
   layoutOptions,
   legendGroups,
@@ -150,8 +171,6 @@ const {
 } = graphPrimitives;
 const graphEl = getElement("graph");
 let svg: SVGSVGElement | null = null;
-let viewport: SVGRectElement | null = null;
-let graphLayer: SVGGElement | null = null;
 let defs: SVGDefsElement | null = null;
 let graph: GraphElementDefinition[] = [];
 let panZoom: PanZoomController | null = null;
@@ -159,7 +178,8 @@ const nodeItems = new Map<string, GraphNodeElement>();
 const edgeItemsByKey = new Map<string, GraphEdgeElement>();
 const bandItems = new Map<string, GraphBandElement>();
 
-function initGraph() {
+/** 図を組む。組めたら SVG を返す。描画ライブラリが無ければ案内を出して null を返す。 */
+function initGraph(): SVGSVGElement | null {
   if (!dagre) {
     graphEl.replaceChildren(
       htmlEl(
@@ -172,31 +192,41 @@ function initGraph() {
         " にある。",
       ),
     );
-    return;
+    return null;
   }
   graph = graphElements(DATA, labelMeasurer());
   graphEl.replaceChildren();
-  svg = svgEl("svg", { class: "req-graph", tabindex: 0, role: "img", "aria-label": DATA.title });
-  defs = svgEl("defs");
-  viewport = svgEl("rect", {
+  const root = svgEl("svg", {
+    class: "req-graph",
+    tabindex: 0,
+    role: "img",
+    "aria-label": DATA.title,
+  });
+  const defsEl = svgEl("defs");
+  const viewport = svgEl("rect", {
     class: "graph-bg",
     x: -100000,
     y: -100000,
     width: 200000,
     height: 200000,
   });
-  graphLayer = svgEl("g", { class: "graph-layer" });
-  panZoom = createPanZoom(graphEl, graphLayer);
-  svg.append(defs, viewport, graphLayer);
-  graphEl.append(svg);
-  buildGraphDom();
-  panZoom.bind(svg, viewport, () => {
+  const graphLayer = svgEl("g", { class: "graph-layer" });
+  const controller = createPanZoom(graphEl, graphLayer);
+  root.append(defsEl, viewport, graphLayer);
+  graphEl.append(root);
+  //: 以降の描画関数は「図があるか」をこれらで見分けるので、DOM を組む前に確定させる。
+  svg = root;
+  defs = defsEl;
+  panZoom = controller;
+  buildGraphDom(defsEl, graphLayer);
+  controller.bind(root, viewport, () => {
     if (state.mode !== "analysis") selectNode(state.selected);
   });
   runLayout();
+  return root;
 }
 
-function buildGraphDom() {
+function buildGraphDom(defs: SVGDefsElement, graphLayer: SVGGElement) {
   const pal = palette();
   const arrow = svgEl("marker", {
     id: "req-arrow",
@@ -217,7 +247,7 @@ function buildGraphDom() {
   graphLayer.replaceChildren(bandLayer, edgeLayer, nodeLayer);
 
   const dashedEdges = new Set(DATA.meta.dashed_edges || []);
-  for (const item of graph.filter((element) => element.data.source)) {
+  for (const item of graph.filter(isEdgeElement)) {
     const path = svgEl("path", { class: "edge-line", "marker-end": "url(#req-arrow)" });
     const label = svgEl("text", { class: "edge-label", "text-anchor": "middle" });
     label.textContent = item.data.name;
@@ -248,10 +278,7 @@ function buildGraphDom() {
   const analysisFrames = Object.entries(ANALYSIS_BANDS).map(([key, label]) => ({
     data: { id: bandId(`analysis:${key}`), bandKey: `analysis:${key}`, label },
   }));
-  for (const item of [
-    ...graph.filter((element) => element.classes === "band"),
-    ...analysisFrames,
-  ]) {
+  for (const item of [...graph.filter(isBandElement), ...analysisFrames]) {
     const group = svgEl("g", {
       class: "node band",
       "data-id": item.data.id,
@@ -264,7 +291,7 @@ function buildGraphDom() {
     bandLayer.append(group);
     bandItems.set(item.data.id, { ...item.data, x: 0, y: 0, w: 10, h: 10, group, shape, label });
   }
-  for (const item of graph.filter((element) => !element.classes && !element.data.source)) {
+  for (const item of graph.filter(isNodeElement)) {
     const typeMeta = types[item.data.type] || {};
     const group = svgEl("g", {
       class: `node status-${item.data.status || "unknown"}`,
@@ -273,9 +300,11 @@ function buildGraphDom() {
       role: "button",
       "aria-label": String(item.data.label).replaceAll("\n", " "),
     });
-    const shape = shapeEl(typeMeta.shape);
+    //: 形状を持たない型は矩形で描く (`applyGraphTheme()` の既定と同じ)。
+    const shapeName = typeMeta.shape || "round-rectangle";
+    const shape = shapeEl(shapeName);
     shape.classList.add("node-shape");
-    const statusRing = shapeEl(typeMeta.shape);
+    const statusRing = shapeEl(shapeName);
     statusRing.classList.add("node-status-ring");
     const label = svgEl("text", { class: "node-label" });
     renderLabel(label, item.data.label, 0, 0);
@@ -289,7 +318,7 @@ function buildGraphDom() {
     nodeLayer.append(group);
     nodeItems.set(item.data.id, {
       ...item.data,
-      shapeName: typeMeta.shape,
+      shapeName,
       x: 0,
       y: 0,
       group,
@@ -499,7 +528,7 @@ function applyBanding() {
 
 /** dagre → 帯の並べ直し → 倍率合わせ。初期表示・「整列」・向きの変更が通る。 */
 function runLayout() {
-  if (!svg) return;
+  if (!svg || !dagre) return;
   const startedAt = Date.now();
   const g = new dagre.graphlib.Graph({ multigraph: true });
   const opts = layoutOptions(state.direction);
@@ -541,13 +570,14 @@ function runLayout() {
   }
   applyBanding();
   fitInitial();
+  const ms = Date.now() - startedAt;
   METRICS.layouts.push({
-    ms: Date.now() - startedAt,
+    ms,
     nodes: shownNodeItems().length,
     edges: shownEdgeItems().length,
     direction: state.direction,
   });
-  svg.dataset.layoutMs = String(METRICS.layouts.at(-1).ms);
+  svg.dataset.layoutMs = String(ms);
 }
 
 /** 絞り込みの反映。再レイアウトはせず、表示・非表示だけを切り替える。 */
@@ -575,8 +605,9 @@ function applyVisibility() {
     classed(item.group, "hidden", !visibleBands.has(item.bandKey));
   for (const item of edgeItemsByKey.values())
     classed(item.group, "hidden", !edges.has(DATA.edges[item.index]));
-  METRICS.filters.push({ ms: Date.now() - startedAt, nodes: nodes.size, edges: edges.size });
-  svg.dataset.filterMs = String(METRICS.filters.at(-1).ms);
+  const ms = Date.now() - startedAt;
+  METRICS.filters.push({ ms, nodes: nodes.size, edges: edges.size });
+  svg.dataset.filterMs = String(ms);
 }
 
 function applyHighlight() {
@@ -627,7 +658,7 @@ function applyHighlight() {
 }
 
 // --- 検索のグラフ連動 -------------------------------------------------------
-let cursor = null;
+let cursor: string | null = null;
 const hits = () => searchHits(view, state.query);
 
 function applySearchHits() {
@@ -709,7 +740,7 @@ function appendReferenceSection(panel, title, references) {
   panel.append(list);
 }
 
-function appendTerm(list, term, value, className = null) {
+function appendTerm(list, term, value, className: string | null = null) {
   list.append(htmlEl("dt", {}, term), htmlEl("dd", className ? { class: className } : {}, value));
 }
 
@@ -717,7 +748,8 @@ function renderDetail() {
   const panel = getElement("detail");
   panel.replaceChildren();
   const detailId = state.mode === "analysis" && state.detail ? state.detail : state.selected;
-  if (!detailId || !view.byId.has(detailId)) {
+  const node = detailId ? view.byId.get(detailId) : undefined;
+  if (!node) {
     panel.append(
       htmlEl(
         "p",
@@ -727,7 +759,6 @@ function renderDetail() {
     );
     return;
   }
-  const node = view.byId.get(detailId);
   const impact = impactSets(view, node.id);
 
   panel.append(
@@ -750,19 +781,19 @@ function renderDetail() {
   appendReferenceSection(panel, fieldLabel("source"), node.source);
   appendReferenceSection(panel, fieldLabel("realized_by"), node.realized_by);
   appendReferenceSection(panel, fieldLabel("evidence"), node.evidence);
-  if ((node.acceptance_criteria || []).length) {
+  const criteria = node.acceptance_criteria || [];
+  if (criteria.length) {
     panel.append(htmlEl("h2", {}, "受け入れ基準"));
-    panel.append(
-      htmlEl("ul", {}, ...node.acceptance_criteria.map((criterion) => htmlEl("li", {}, criterion))),
-    );
+    panel.append(htmlEl("ul", {}, ...criteria.map((criterion) => htmlEl("li", {}, criterion))));
   }
-  if ((node.suppress || []).length) {
+  const suppressed = node.suppress || [];
+  if (suppressed.length) {
     panel.append(htmlEl("h2", {}, "抑制中の指摘"));
     panel.append(
       htmlEl(
         "ul",
         {},
-        ...node.suppress.map(([code, reason]) =>
+        ...suppressed.map(([code, reason]) =>
           htmlEl("li", {}, htmlEl("code", {}, code), `: ${reason}`),
         ),
       ),
@@ -811,7 +842,7 @@ function renderDetail() {
   );
 
   panel.querySelectorAll<HTMLElement>("button[data-goto]").forEach((button: HTMLElement) => {
-    button.addEventListener("click", () => selectNode(button.dataset.goto));
+    button.addEventListener("click", () => selectNode(dataValue(button, "goto")));
   });
   copyButton.addEventListener("click", async () => {
     try {
@@ -1060,7 +1091,8 @@ function renderLegend() {
     const container = htmlEl("div", { class: "legend-group" }, htmlEl("b", {}, group.title));
     for (const { label, swatch } of group.items) {
       const mark = htmlEl("i", { class: "swatch" });
-      mark.style.background = swatch.background;
+      //: 配色を持たない型は塗らない (CSS の既定のまま)。
+      mark.style.background = swatch.background ?? "";
       mark.style.borderColor = swatch.borderColor || "currentColor";
       mark.style.borderStyle = swatch.borderStyle;
       mark.style.borderWidth = `${swatch.borderWidth}px`;
@@ -1121,7 +1153,7 @@ function renderFindings() {
   const panel = getElement("findings");
   if (!groups.length) panel.replaceChildren(htmlEl("p", { class: "empty" }, "指摘は無い。"));
   else {
-    const children = [];
+    const children: HTMLElement[] = [];
     for (const group of groups) {
       children.push(
         htmlEl(
@@ -1234,7 +1266,7 @@ function renderTable() {
 
   table.querySelectorAll<HTMLElement>("thead button[data-key]").forEach((button: HTMLElement) => {
     button.addEventListener("click", () => {
-      state.sort = nextSort(state.sort, button.dataset.key);
+      state.sort = nextSort(state.sort, dataValue(button, "key"));
       renderTable();
       writeHash();
     });
@@ -1272,14 +1304,14 @@ function showFindings(id) {
  * キーボードでの移動距離が伸びない。
  */
 function bindTabKeys(container: HTMLElement, activate: (tab: HTMLElement) => void) {
-  const keys = { ArrowLeft: -1, ArrowRight: 1 };
+  const keys: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1 };
   container.onkeydown = (event) => {
     const buttons = [...container.querySelectorAll<HTMLElement>('[role="tab"]')].filter(
       (button) => !button.hasAttribute("disabled"),
     );
     const at = buttons.indexOf(event.target as HTMLElement);
     if (at < 0) return;
-    let next = null;
+    let next: HTMLElement | undefined;
     if (event.key in keys) next = buttons[(at + keys[event.key] + buttons.length) % buttons.length];
     else if (event.key === "Home") next = buttons[0];
     else if (event.key === "End") next = buttons[buttons.length - 1];
@@ -1440,8 +1472,11 @@ for (const [id, name] of VIEW_TABS) {
     writeHash();
   });
 }
-bindTabKeys(document.querySelector(".tabs"), (tab) => {
-  setMode(VIEW_TABS.find(([id]) => id === tab.id)[1]);
+bindTabKeys(requireElement<HTMLElement>(".tabs"), (tab) => {
+  const entry = VIEW_TABS.find(([id]) => id === tab.id);
+  //: 中央ペインのタブ以外は切り替え先を持たないので、何もしない。
+  if (!entry) return;
+  setMode(entry[1]);
   writeHash();
 });
 getElement("search").addEventListener("input", (event) => {
@@ -1535,13 +1570,14 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", res
 // 出力先の graph.mmd / graph.dot は全体のグラフなので、絞り込んだ図はここで組む。
 // SVG は「いま図に描かれているもの」(フォーカス中なら近傍だけ) を写す。
 
-const exportMenu = document.querySelector<HTMLDetailsElement>(".export-menu");
-const exportOptions = exportMenu.querySelector<HTMLElement>(".export-options");
+const exportMenu = requireElement<HTMLDetailsElement>(".export-menu");
+const exportSummary = requireElement<HTMLElement>("summary", exportMenu);
+const exportOptions = requireElement<HTMLElement>(".export-options", exportMenu);
 
 /** 開いたメニューを画面内に収める。下に入らなければアイコンの上に開く。 */
 function positionExportMenu() {
   if (!exportMenu.open) return;
-  const anchor = exportMenu.querySelector("summary").getBoundingClientRect();
+  const anchor = exportSummary.getBoundingClientRect();
   const menu = exportOptions.getBoundingClientRect();
   const margin = 8;
   const gap = 4;
@@ -1560,7 +1596,7 @@ window.addEventListener("resize", positionExportMenu);
 document.addEventListener("scroll", positionExportMenu, true);
 
 /** 文字列をファイルとして保存させる。 */
-let lastDownloadUrl = null;
+let lastDownloadUrl: string | null = null;
 function download(name, text, type) {
   document.querySelector("a[data-generated-download]")?.remove();
   if (lastDownloadUrl) URL.revokeObjectURL(lastDownloadUrl);
@@ -1643,12 +1679,12 @@ exportSvg.addEventListener("click", () => {
   const text = currentSvg();
   if (!text) return;
   download("graph.svg", text, "image/svg+xml;charset=utf-8");
-  exportSvg.closest("details").open = false;
+  exportMenu.open = false;
 });
 const exportMmd = getElement("export-mmd");
 exportMmd.addEventListener("click", () => {
   download("graph.mmd", mermaidText(displayedView()), "text/plain;charset=utf-8");
-  exportMmd.closest("details").open = false;
+  exportMenu.open = false;
 });
 
 // --- キーボード --------------------------------------------------------------
@@ -1699,9 +1735,9 @@ window.addEventListener("hashchange", applyHash);
 
 //: 図を組む前にテーマを確定させる (初期スタイルが CSS 変数を読むため)。
 applyTheme();
-initGraph();
+const drawn = initGraph();
 //: 描画ライブラリを読めなかったときは、写す図が無い。
-exportSvg.disabled = !svg;
+exportSvg.disabled = !drawn;
 renderFilters();
 renderFocusOptions();
 renderImpactControls();
@@ -1711,4 +1747,4 @@ setMode(state.mode);
 // 解釈できない項目を落とした後の正しい URL に直す (履歴は増やさない)。
 writeHash(false);
 METRICS.initialRenderMs = Date.now() - METRICS.startedAt;
-if (svg) svg.dataset.initialRenderMs = String(METRICS.initialRenderMs);
+if (drawn) drawn.dataset.initialRenderMs = String(METRICS.initialRenderMs);

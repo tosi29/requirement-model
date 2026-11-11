@@ -67,7 +67,7 @@ export function defaultState(data: SiteData): ViewState {
 
 /** 状態を `#...` にする。既定のままなら空文字 (ハッシュ無し)。 */
 export function encodeHash(state, data) {
-  const params = [];
+  const params: string[] = [];
   const put = (key, value) => params.push(`${key}=${value}`);
   //: 選択の順ではなく定義順で並べる。同じ絞り込みなら常に同じ URL になる。
   const list = (selected, all) =>

@@ -101,9 +101,15 @@ const charClass = (char) => {
   return "other";
 };
 
+/** 文字種でまとめた 1 区切り。 */
+interface Token {
+  cls: string;
+  text: string;
+}
+
 /** 文字種の続く限りをひとまとまりにする。約物は 1 文字ずつ。 */
-function tokenize(text) {
-  const tokens = [];
+function tokenize(text: string): Token[] {
+  const tokens: Token[] = [];
   let rest = text;
   while (rest) {
     const word = rest.match(WORD_RUN);
@@ -123,7 +129,7 @@ function tokenize(text) {
 }
 
 /** 前のまとまりに続けて置く (= ここでは折らない) か。 */
-function joins(last, token) {
+function joins(last: Token | null, token: Token) {
   if (!last) return true;
   if (NO_LINE_START.includes([...token.text][0])) return true;
   if (NO_LINE_END.includes(last.text.slice(-1))) return true;
@@ -142,9 +148,9 @@ function joins(last, token) {
  */
 export function labelChunks(text: string): string[] {
   const tokens = tokenize(text);
-  const chunks = [];
+  const chunks: string[] = [];
   let current = "";
-  let last = null;
+  let last: Token | null = null;
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
     if (token.cls === "space") {
@@ -183,8 +189,8 @@ function hardSplit(text, maxWidth, measure) {
 }
 
 /** 数字と記号だけの行を無くす。単独で落ちた数値は隣の行に戻す。 */
-function mergeLonelyNumbers(lines) {
-  const merged = [];
+function mergeLonelyNumbers(lines: readonly string[]): string[] {
+  const merged: string[] = [];
   for (const line of lines) {
     if (merged.length && !HAS_CONTENT.test(line)) merged[merged.length - 1] += line;
     else merged.push(line);
@@ -206,7 +212,7 @@ export function wrapLabel(
   maxWidth = LABEL_WRAP_WIDTH,
   measure: (text: string) => number = estimateTextWidth,
 ): string {
-  const lines = [];
+  const lines: string[] = [];
   let line = "";
   for (const chunk of labelChunks(text)) {
     if (line && measure((line + chunk).trimEnd()) > maxWidth) {

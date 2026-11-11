@@ -187,26 +187,31 @@ export interface GraphEdgeElement {
   y2?: number;
 }
 
-export interface GraphElementDefinition {
+export interface GraphNodeDefinition {
+  data: { id: NodeId; type: string; status: string; label: string; w: number; h: number };
+}
+export interface GraphEdgeDefinition {
+  data: { id: string; index: number; source: NodeId; target: NodeId; name: string };
+}
+export interface GraphBandDefinition {
   data: {
     id: string;
-    type?: string;
-    status?: string;
-    label?: string;
-    w?: number;
-    h?: number;
-    index?: number;
-    source?: string;
-    target?: string;
-    name?: string;
-    band?: boolean;
-    bandType?: string;
-    bandKey?: string;
+    band: true;
+    bandType: string;
+    bandKey: string;
+    label: string;
+    w: number;
+    h: number;
   };
-  classes?: string;
-  selectable?: boolean;
-  grabbable?: boolean;
+  classes: "band";
+  selectable: false;
+  grabbable: false;
 }
+/** 描画要素。種類ごとに持つ項目が決まっているので、種類を確かめてから読む。 */
+export type GraphElementDefinition =
+  | GraphNodeDefinition
+  | GraphEdgeDefinition
+  | GraphBandDefinition;
 
 export interface DagreGraph {
   setGraph(options: Record<string, unknown>): void;

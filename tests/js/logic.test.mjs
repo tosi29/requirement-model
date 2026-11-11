@@ -29,6 +29,9 @@ import {
   impactScope,
   impactSets,
   initialHash,
+  isBandElement,
+  isEdgeElement,
+  isNodeElement,
   isNodeVisible,
   LABEL_FONT,
   LABEL_MAX_LENGTH,
@@ -931,6 +934,14 @@ test("graphElements はノードとエッジをそのまま要素にする", () 
     target: "Need-1",
     name: "motivates",
   });
+});
+
+test("描画要素はノード・エッジ・帯枠のどれか 1 つに判別される", () => {
+  const elements = graphElements(fixture());
+
+  assert.equal(elements.filter(isNodeElement).length, 4);
+  assert.equal(elements.filter(isEdgeElement).length, 3);
+  assert.equal(elements.filter(isBandElement).length, 2);
 });
 
 test("graphElements はラベルを測って外形をデータに載せる", () => {

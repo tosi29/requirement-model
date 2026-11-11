@@ -85,7 +85,8 @@ import {
 const dagre = window.dagre;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-const DATA: SiteData = JSON.parse(getElement("model-data").textContent!);
+// 要素の textContent は null にならない (null は Document などの Node だけ)。
+const DATA: SiteData = JSON.parse(getElement("model-data").textContent ?? "");
 const METRICS: {
   startedAt: number;
   initialRenderMs: number | null;
@@ -147,7 +148,7 @@ const {
   updateShape,
   palette,
 } = graphPrimitives;
-const graphEl = getElement("graph")!;
+const graphEl = getElement("graph");
 let svg: SVGSVGElement | null = null;
 let viewport: SVGRectElement | null = null;
 let graphLayer: SVGGElement | null = null;
@@ -238,13 +239,12 @@ function buildGraphDom() {
   }
 
   const types = DATA.meta.types || {};
-  const statuses = DATA.meta.statuses || {};
   const impact = impactColors();
   graphEl.style.setProperty("--impact-selected", impact.selected || pal.fg);
   graphEl.style.setProperty("--impact-upstream", impact.upstream || pal.fg);
   graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
   graphEl.style.setProperty("--impact-related", impact.related || pal.fg);
-  graphEl.style.setProperty("--search-hit", (DATA.meta.search || {}).hit || pal.fg);
+  graphEl.style.setProperty("--search-hit", DATA.meta.search?.hit || pal.fg);
   const analysisFrames = Object.entries(ANALYSIS_BANDS).map(([key, label]) => ({
     data: { id: bandId(`analysis:${key}`), bandKey: `analysis:${key}`, label },
   }));
@@ -1581,7 +1581,7 @@ function download(name, text, type) {
 function currentSvg() {
   if (!svg) return null;
   const copy = svg.cloneNode(true) as SVGSVGElement;
-  copy.querySelectorAll(".hidden").forEach((element) => element.remove());
+  for (const element of copy.querySelectorAll(".hidden")) element.remove();
   copy.querySelectorAll("[tabindex], [role], [aria-label]").forEach((element) => {
     element.removeAttribute("tabindex");
     element.removeAttribute("role");
@@ -1624,7 +1624,7 @@ function currentSvg() {
     .node.down .node-shape { stroke: ${impact.downstream || pal.fg}; stroke-width: 3; }
     .node.rel .node-shape { stroke: ${impact.related || pal.fg}; stroke-width: 3; }
     .edge.on-path .edge-line { stroke: ${pal.fg}; stroke-width: 2; }
-    .hit .node-shape { filter: drop-shadow(0 0 8px ${(DATA.meta.search || {}).hit || pal.fg}); }
+    .hit .node-shape { filter: drop-shadow(0 0 8px ${DATA.meta.search?.hit || pal.fg}); }
     .dim.hit { opacity: .65; }
     .trail-muted { opacity: .35; }
     .node.detail-path:not(.sel) .node-shape { stroke: ${impact.related || pal.fg}; stroke-width: 4; }

@@ -1,10 +1,4 @@
-import {
-  IMPACT_DEPTHS,
-  initialSelection,
-  parseFocus,
-  statusFilters,
-  statusNames,
-} from "./site_graph.ts";
+import { IMPACT_DEPTHS, initialSelection, parseFocus, statusNames } from "./site_graph.ts";
 import { TABLE_COLUMNS } from "./site_table.ts";
 import type { SiteData, ViewState } from "./site_types.ts";
 

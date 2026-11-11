@@ -2,7 +2,7 @@
 (() => {
   // src/reqmodel/presentation/site_text.ts
   function truncate(text, limit = 42) {
-    return text.length > limit ? text.slice(0, limit - 1) + "\u2026" : text;
+    return text.length > limit ? `${text.slice(0, limit - 1)}\u2026` : text;
   }
   function safeHref(value) {
     if (!value) return null;
@@ -477,7 +477,7 @@
     status: "\u30B9\u30C6\u30FC\u30BF\u30B9"
   });
   var fieldLabel = (name) => FIELD_LABELS[name] || name;
-  var statusNames = (data) => Object.keys((data.meta || {}).statuses || {});
+  var statusNames = (data) => Object.keys(data.meta?.statuses || {});
   function statusFilters(data) {
     const counts = countBy(data.nodes, (node) => node.status);
     return statusNames(data).map((status) => ({
@@ -487,7 +487,7 @@
     }));
   }
   function hiddenByDefault(data, key) {
-    return ((data || {}).hidden_by_default || {})[key] || [];
+    return data?.hidden_by_default?.[key] || [];
   }
   function initialSelection(data, all, key) {
     const hidden = new Set(hiddenByDefault(data, key));
@@ -530,10 +530,10 @@
   }
   var IMPACT_DEPTHS = [1, 2, 3, 4, 5];
   function impactScope(state2) {
-    const depth = (state2 || {}).depth;
+    const depth = state2?.depth;
     return {
       depth: IMPACT_DEPTHS.includes(depth) ? depth : null,
-      undirected: state2?.mode !== "analysis" && Boolean((state2 || {}).undirected)
+      undirected: state2?.mode !== "analysis" && Boolean(state2?.undirected)
     };
   }
   function impactSets(view2, id, scope = null) {
@@ -680,14 +680,15 @@
     if (unused.length) {
       lines.push("", `(\u90E8\u5206\u30B0\u30E9\u30D5\u306B\u73FE\u308C\u306A\u304B\u3063\u305F\u30A8\u30C3\u30B8\u7A2E\u5225: ${unused.join(", ")})`);
     }
-    return lines.join("\n") + "\n";
+    return `${lines.join("\n")}
+`;
   }
 
   // src/reqmodel/presentation/site_layout.ts
   var REQUIREMENT_TYPES = /* @__PURE__ */ new Set(["FunctionalRequirement", "QualityRequirement", "Constraint"]);
   function bandDefs(data) {
-    const top = ((data.meta || {}).bands || []).filter((band) => data.nodes.some((node) => node.type === band.type)).map((band) => ({ ...band, key: band.type }));
-    if (!Object.prototype.hasOwnProperty.call(data, "requirement_groups")) return top;
+    const top = (data.meta?.bands || []).filter((band) => data.nodes.some((node) => node.type === band.type)).map((band) => ({ ...band, key: band.type }));
+    if (!Object.hasOwn(data, "requirement_groups")) return top;
     const groups = [...data.requirement_groups || []].sort(
       (a, b) => (a.order || 0) - (b.order || 0) || compare(a.id, b.id)
     );
@@ -736,13 +737,13 @@
   var bandId = (key) => `band:${key}`;
   function graphElements(data, measure = estimateTextWidth) {
     const bands = bandDefs(data);
-    const types = (data.meta || {}).types || {};
+    const types = data.meta?.types || {};
     return [
       ...data.nodes.map((node) => {
         const text = wrapLabel(truncate(node.text, LABEL_MAX_LENGTH), LABEL_WRAP_WIDTH, measure);
         const label = `${node.id}
 ${text}`;
-        const size = nodeSize(label, (types[node.type] || {}).fit, measure);
+        const size = nodeSize(label, types[node.type]?.fit, measure);
         return {
           data: {
             id: node.id,
@@ -880,7 +881,8 @@ ${text}`;
     const rows = [];
     for (const node of members) {
       const row = depthOf(node.id, /* @__PURE__ */ new Set());
-      (rows[row] ||= []).push(node);
+      rows[row] ||= [];
+      rows[row].push(node);
     }
     return rows.filter(Boolean);
   }
@@ -1083,7 +1085,7 @@ ${text}`;
   function collapse(text, limit) {
     const collapsed = String(text).split(/\s+/).filter(Boolean).join(" ");
     const chars = [...collapsed];
-    if (limit > 0 && chars.length > limit) return chars.slice(0, limit - 1).join("") + "\u2026";
+    if (limit > 0 && chars.length > limit) return `${chars.slice(0, limit - 1).join("")}\u2026`;
     return collapsed;
   }
   function exportIds(nodes) {
@@ -1099,7 +1101,7 @@ ${text}`;
     const ids = exportIds(view2.nodes);
     const lines = ["flowchart TD"];
     for (const node of view2.nodes) {
-      const shape = (types[node.type] || {}).mermaid || { open: "[", close: "]" };
+      const shape = types[node.type]?.mermaid || { open: "[", close: "]" };
       const label = [
         `<b>${node.id}</b> [${node.type}]`,
         mermaidEscape(collapse(node.text, maxLabel))
@@ -1117,7 +1119,8 @@ ${text}`;
       lines.push(`    classDef ${type} fill:${typeMeta.fill},stroke:${typeMeta.stroke}`);
     }
     for (const node of view2.nodes) lines.push(`    class ${ids.get(node.id)} ${node.type}`);
-    return lines.join("\n") + "\n";
+    return `${lines.join("\n")}
+`;
   }
   var ANALYSIS_BANDS = {
     upstream: "\u4E0A\u6D41",
@@ -1224,7 +1227,7 @@ ${text}`;
       case "type":
         return view2.data.types.indexOf(row.type);
       case "status": {
-        const rank = (view2.data.status_rank || {})[row.status];
+        const rank = view2.data.status_rank?.[row.status];
         return rank === void 0 ? MISSING_VALUE : rank;
       }
       default:
@@ -1268,8 +1271,8 @@ ${text}`;
     };
   }
   function sourceUrl(data, location2) {
-    const repo = (data || {}).repo;
-    if (!repo || !repo.url || !location2) return null;
+    const repo = data?.repo;
+    if (!repo?.url || !location2) return null;
     const match = /^(.+?)(?::(\d+))?$/.exec(String(location2).trim());
     if (!match) return null;
     const path = match[1].replace(/\\/g, "/").replace(/^\.\//, "");
@@ -1469,7 +1472,7 @@ ${text}`;
   var queryElements = (selector) => document.querySelectorAll(selector);
   var dagre = window.dagre;
   var SVG_NS2 = "http://www.w3.org/2000/svg";
-  var DATA = JSON.parse(getElement("model-data").textContent);
+  var DATA = JSON.parse(getElement("model-data").textContent ?? "");
   var METRICS = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
   var impactColors = () => (palette().dark ? DATA.meta.dark_impact_colors : null) ?? DATA.meta.impact_colors ?? { selected: "", upstream: "", downstream: "", related: "" };
   function readStore(key) {
@@ -1586,13 +1589,12 @@ ${text}`;
       });
     }
     const types = DATA.meta.types || {};
-    const statuses = DATA.meta.statuses || {};
     const impact = impactColors();
     graphEl.style.setProperty("--impact-selected", impact.selected || pal.fg);
     graphEl.style.setProperty("--impact-upstream", impact.upstream || pal.fg);
     graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
     graphEl.style.setProperty("--impact-related", impact.related || pal.fg);
-    graphEl.style.setProperty("--search-hit", (DATA.meta.search || {}).hit || pal.fg);
+    graphEl.style.setProperty("--search-hit", DATA.meta.search?.hit || pal.fg);
     const analysisFrames = Object.entries(ANALYSIS_BANDS).map(([key, label]) => ({
       data: { id: bandId(`analysis:${key}`), bandKey: `analysis:${key}`, label }
     }));
@@ -2674,7 +2676,7 @@ ${text}`;
   function currentSvg() {
     if (!svg) return null;
     const copy = svg.cloneNode(true);
-    copy.querySelectorAll(".hidden").forEach((element) => element.remove());
+    for (const element of copy.querySelectorAll(".hidden")) element.remove();
     copy.querySelectorAll("[tabindex], [role], [aria-label]").forEach((element) => {
       element.removeAttribute("tabindex");
       element.removeAttribute("role");
@@ -2717,7 +2719,7 @@ ${text}`;
     .node.down .node-shape { stroke: ${impact.downstream || pal.fg}; stroke-width: 3; }
     .node.rel .node-shape { stroke: ${impact.related || pal.fg}; stroke-width: 3; }
     .edge.on-path .edge-line { stroke: ${pal.fg}; stroke-width: 2; }
-    .hit .node-shape { filter: drop-shadow(0 0 8px ${(DATA.meta.search || {}).hit || pal.fg}); }
+    .hit .node-shape { filter: drop-shadow(0 0 8px ${DATA.meta.search?.hit || pal.fg}); }
     .dim.hit { opacity: .65; }
     .trail-muted { opacity: .35; }
     .node.detail-path:not(.sel) .node-shape { stroke: ${impact.related || pal.fg}; stroke-width: 4; }

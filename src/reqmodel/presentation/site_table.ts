@@ -1,5 +1,4 @@
-import { compare, fieldLabel, rankOf, reach } from "./site_graph.ts";
-import { truncate } from "./site_text.ts";
+import { compare, fieldLabel, rankOf } from "./site_graph.ts";
 import type { Finding, GraphViewModel, NormalizedNode, SiteData, SortState } from "./site_types.ts";
 // --- テーブル --------------------------------------------------------------
 //
@@ -92,7 +91,7 @@ function sortValue(view, row, key) {
     case "type":
       return view.data.types.indexOf(row.type);
     case "status": {
-      const rank = (view.data.status_rank || {})[row.status];
+      const rank = view.data.status_rank?.[row.status];
       return rank === undefined ? MISSING_VALUE : rank;
     }
     default:
@@ -170,8 +169,8 @@ export function edgeItems(view: GraphViewModel, id: string) {
  * リポジトリ内の位置が決まらない。黙って null にする (誤ったリンクは出さない)。
  */
 export function sourceUrl(data: SiteData, location: string): string | null {
-  const repo = (data || {}).repo;
-  if (!repo || !repo.url || !location) return null;
+  const repo = data?.repo;
+  if (!repo?.url || !location) return null;
   const match = /^(.+?)(?::(\d+))?$/.exec(String(location).trim());
   if (!match) return null;
   const path = match[1].replace(/\\/g, "/").replace(/^\.\//, "");

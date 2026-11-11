@@ -11,7 +11,7 @@
     "bench": "node --import tsx tests/js/bench.mjs",
     "typecheck:py": "pyright",
     "typecheck:ts": "tsc --noEmit",
-    "check:js": "biome ci",
+    "check:js": "biome ci --error-on-warnings",
     "fix:js": "biome check --write"
   },
   "devDependencies": {

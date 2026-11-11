@@ -1,12 +1,10 @@
 import {
-  activeEdgeNames,
   compare,
   edgeSelection,
   hiddenByDefault,
   impactScope,
   impactSets,
   rankOf,
-  reach,
 } from "./site_graph.ts";
 import type { GraphViewModel, SiteData } from "./site_types.ts";
 
@@ -135,5 +133,5 @@ export function nodeContext(
     lines.push("", `(部分グラフに現れなかったエッジ種別: ${unused.join(", ")})`);
   }
 
-  return lines.join("\n") + "\n";
+  return `${lines.join("\n")}\n`;
 }

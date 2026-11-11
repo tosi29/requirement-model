@@ -6,7 +6,6 @@ import {
   LABEL_FONT,
   LABEL_MAX_LENGTH,
   LABEL_WRAP_WIDTH,
-  labelChunks,
   nodeSize,
   truncate,
   wrapLabel,
@@ -27,11 +26,11 @@ const REQUIREMENT_TYPES = new Set(["FunctionalRequirement", "QualityRequirement"
 
 /** 帯 (枠) の定義。Goal / Need は型ごと、Requirements は表示用グループごとに作る。 */
 export function bandDefs(data: SiteData) {
-  const top = ((data.meta || {}).bands || [])
+  const top = (data.meta?.bands || [])
     .filter((band) => data.nodes.some((node) => node.type === band.type))
     .map((band) => ({ ...band, key: band.type }));
 
-  if (!Object.prototype.hasOwnProperty.call(data, "requirement_groups")) return top;
+  if (!Object.hasOwn(data, "requirement_groups")) return top;
 
   const groups = [...(data.requirement_groups || [])].sort(
     (a, b) => (a.order || 0) - (b.order || 0) || compare(a.id, b.id),
@@ -102,12 +101,12 @@ export function graphElements(
   measure = estimateTextWidth,
 ): GraphElementDefinition[] {
   const bands = bandDefs(data);
-  const types = (data.meta || {}).types || {};
+  const types = data.meta?.types || {};
   return [
     ...data.nodes.map((node) => {
       const text = wrapLabel(truncate(node.text, LABEL_MAX_LENGTH), LABEL_WRAP_WIDTH, measure);
       const label = `${node.id}\n${text}`;
-      const size = nodeSize(label, (types[node.type] || {}).fit, measure);
+      const size = nodeSize(label, types[node.type]?.fit, measure);
       return {
         data: {
           id: node.id,
@@ -313,7 +312,8 @@ function bandRows(members, edges) {
   const rows = [];
   for (const node of members) {
     const row = depthOf(node.id, new Set());
-    (rows[row] ||= []).push(node);
+    rows[row] ||= [];
+    rows[row].push(node);
   }
   return rows.filter(Boolean);
 }
@@ -574,7 +574,7 @@ const EXPORT_LABEL_LIMIT = 40;
 function collapse(text, limit) {
   const collapsed = String(text).split(/\s+/).filter(Boolean).join(" ");
   const chars = [...collapsed];
-  if (limit > 0 && chars.length > limit) return chars.slice(0, limit - 1).join("") + "…";
+  if (limit > 0 && chars.length > limit) return `${chars.slice(0, limit - 1).join("")}…`;
   return collapsed;
 }
 
@@ -614,7 +614,7 @@ export function mermaidText(view: GraphViewModel, maxLabel = EXPORT_LABEL_LIMIT)
   const lines = ["flowchart TD"];
 
   for (const node of view.nodes) {
-    const shape = (types[node.type] || {}).mermaid || { open: "[", close: "]" };
+    const shape = types[node.type]?.mermaid || { open: "[", close: "]" };
     const label = [
       `<b>${node.id}</b> [${node.type}]`,
       mermaidEscape(collapse(node.text, maxLabel)),
@@ -635,7 +635,7 @@ export function mermaidText(view: GraphViewModel, maxLabel = EXPORT_LABEL_LIMIT)
   }
   for (const node of view.nodes) lines.push(`    class ${ids.get(node.id)} ${node.type}`);
 
-  return lines.join("\n") + "\n";
+  return `${lines.join("\n")}\n`;
 }
 
 // --- SVG --------------------------------------------------------------------
@@ -904,18 +904,17 @@ export function graphSvg(scene) {
     ),
   );
 
-  return (
-    element(
-      "svg",
-      {
-        xmlns: "http://www.w3.org/2000/svg",
-        viewBox: `${round(minX)} ${round(minY)} ${round(width)} ${round(height)}`,
-        width: round(width),
-        height: round(height),
-      },
-      `\n${element("title", {}, escapeHtml(scene.title || "要求グラフ"))}\n${defs}\n${body.join("\n")}\n`,
-    ) + "\n"
+  const svg = element(
+    "svg",
+    {
+      xmlns: "http://www.w3.org/2000/svg",
+      viewBox: `${round(minX)} ${round(minY)} ${round(width)} ${round(height)}`,
+      width: round(width),
+      height: round(height),
+    },
+    `\n${element("title", {}, escapeHtml(scene.title || "要求グラフ"))}\n${defs}\n${body.join("\n")}\n`,
   );
+  return `${svg}\n`;
 }
 
 /** 分析では要求グループでなく、起点からの到達方向で枠を作る。 */

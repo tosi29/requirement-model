@@ -1,4 +1,3 @@
-import { estimateTextWidth, labelChunks, nodeSize } from "./site_text.ts";
 import type {
   GraphViewModel,
   NormalizedEdge,
@@ -75,7 +74,7 @@ export const FIELD_LABELS = Object.freeze({
 export const fieldLabel = (name) => FIELD_LABELS[name] || name;
 
 /** status の一覧。並びは成熟度 (`meta.statuses` の順 = `STATUS_RANK`)。 */
-export const statusNames = (data) => Object.keys((data.meta || {}).statuses || {});
+export const statusNames = (data) => Object.keys(data.meta?.statuses || {});
 
 /** status の選択肢。 */
 export function statusFilters(data: SiteData) {
@@ -89,7 +88,7 @@ export function statusFilters(data: SiteData) {
 
 /** 図に既定で描かないもの (`site_data()` の `hidden_by_default`)。 */
 export function hiddenByDefault(data: SiteData, key: "types" | "edges"): readonly string[] {
-  return ((data || {}).hidden_by_default || {})[key] || [];
+  return data?.hidden_by_default?.[key] || [];
 }
 
 /** ある軸の既定の選択。全体から「既定で隠すもの」を引いたもの。 */
@@ -201,10 +200,10 @@ export const IMPACT_DEPTHS = [1, 2, 3, 4, 5];
  * state.depth の 0 (既定) は「無制限」なので null に写す。
  */
 export function impactScope(state: ViewState) {
-  const depth = (state || {}).depth;
+  const depth = state?.depth;
   return {
     depth: IMPACT_DEPTHS.includes(depth) ? depth : null,
-    undirected: state?.mode !== "analysis" && Boolean((state || {}).undirected),
+    undirected: state?.mode !== "analysis" && Boolean(state?.undirected),
   };
 }
 

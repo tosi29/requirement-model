@@ -839,7 +839,7 @@ test("nodeContext は対象・上流・下流・エッジを並べる", () => {
   assert.match(text, /^# 影響部分グラフ: FR-1\n/);
   assert.match(text, /対象 1 件 \/ 上流 1 件 \/ 下流 1 件 \/ 合計 3 件/);
   assert.match(text, /## 対象ノード \(1 件\)\n- \[FunctionalRequirement\] FR-1: /);
-  assert.match(text, /    受け入れ基準: 正解率が 95% 以上である/);
+  assert.match(text, / {4}受け入れ基準: 正解率が 95% 以上である/);
   assert.match(text, /## 上流 \(この変更の理由・根拠になるノード\) \(1 件\)/);
   assert.match(text, /## 下流 \(この変更の影響を受けるノード\) \(1 件\)/);
   assert.match(text, /- FR-1 --satisfies--> Need-1/);

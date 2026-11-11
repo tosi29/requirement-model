@@ -83,9 +83,13 @@ def _mermaid_escape(text: str) -> str:
 def _requirement_group_members(
     nodes: Iterable[Node], requirement_groups: Iterable[RequirementGroup]
 ) -> tuple[list[tuple[str, str, list[str]]], list[str]]:
-    """表示用グループごとの主所属と未分類要求。
+    """表示用グループごとの (識別子, ラベル, 主所属) と未分類要求。
 
     同じ要求が複数グループに書かれても、描くのは最初のグループだけにする。
+
+    識別子は ``_ids()`` と同じ理由で連番にする。グループ id は空白以外の任意の
+    文字を含められるので、そのまま埋め込むと ``core-model`` のような id で DOT の
+    構文が壊れる。表示上の名前はラベルが担う。
     """
     requirement_ids = {
         node.id
@@ -103,7 +107,7 @@ def _requirement_group_members(
             assigned.add(node_id)
             members.append(node_id)
         if members:
-            groups.append((group.id, group.label, members))
+            groups.append((f"g{len(groups) + 1}", group.label, members))
     return groups, sorted(requirement_ids - assigned)
 
 
@@ -157,8 +161,10 @@ def render_mermaid(
     if use_group_layout:
         lines.append("    subgraph band_Requirements[Requirements]")
         lines.append("        direction LR")
-        for group_id, label, members in groups:
-            lines.append(f"        subgraph group_{group_id}[{_mermaid_escape(label)}]")
+        for group_key, label, members in groups:
+            lines.append(
+                f"        subgraph group_{group_key}[{_mermaid_escape(label)}]"
+            )
             lines.append("            direction TB")
             for node_id in members:
                 lines.append(f"            {node_lines[node_id]}")
@@ -255,8 +261,8 @@ def render_dot(
     if use_group_layout:
         lines.append("    subgraph cluster_Requirements {")
         lines.append('        label="Requirements";')
-        for group_id, label, members in groups:
-            lines.append(f"        subgraph cluster_group_{group_id} {{")
+        for group_key, label, members in groups:
+            lines.append(f"        subgraph cluster_group_{group_key} {{")
             lines.append(f'            label="{_dot_escape(label)}";')
             lines.append("            rank=same;")
             for node_id in members:

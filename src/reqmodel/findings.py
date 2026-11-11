@@ -26,7 +26,7 @@ class Finding:
     """検証で見つかった 1 件の指摘。"""
 
     severity: Severity
-    #: 機械可読なコード。例: "structure.edge_type", "syntax.suffix"
+    #: 機械可読なコード。例: "structure.edge_type", "syntax.invalid_field"
     code: str
     message: str
     #: 検証の層 (0: 宣言性 / 1: 構文 / 2: 構造)

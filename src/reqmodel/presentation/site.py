@@ -3,7 +3,7 @@
 正規化グラフと検証結果を 1 枚の HTML に埋め込み、ブラウザ上で
 グラフ表示・絞り込み・影響範囲の可視化ができるようにする。
 
-描画の定義 (形状・配色) は render.py から `render_meta()` で受け取り、
+描画の定義 (形状・配色) は styles.py の `render_meta()` から受け取り、
 ブラウザ側に複製しない。
 """
 
@@ -17,7 +17,7 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from ..core.graph import RequirementGraph
+from ..core.graph import SCHEMA_VERSION, RequirementGraph
 from ..core.metamodel import EDGE_NAMES, TYPE_ORDER, edge_specs_for
 from ..definition import RequirementGroup
 from ..definition.nodes import STATUS_RANK
@@ -108,7 +108,7 @@ def site_data(
         "generated_from": list(sources),
         # 出所 (file:line) から定義ファイルへ飛ぶためのリポジトリ情報。無ければ null。
         "repo": repo.to_dict() if repo else None,
-        "schema_version": graph.to_json_obj()["schema_version"],
+        "schema_version": SCHEMA_VERSION,
         "types": [node_type.__name__ for node_type in TYPE_ORDER],
         "edge_names": list(EDGE_NAMES),
         # 図に既定で描かないもの。現在は全ノード・全エッジを描く。

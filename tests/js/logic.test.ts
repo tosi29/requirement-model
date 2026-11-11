@@ -17,7 +17,6 @@ import {
   edgeControl,
   edgeItems,
   encodeHash,
-  escapeHtml,
   estimateTextWidth,
   explainCommand,
   FIELD_LABELS,
@@ -25,7 +24,6 @@ import {
   fieldLabel,
   focusSet,
   graphElements,
-  graphSvg,
   groupFindings,
   impactScope,
   impactSets,
@@ -33,7 +31,6 @@ import {
   isBandElement,
   isEdgeElement,
   isNodeElement,
-  isNodeVisible,
   LABEL_FONT,
   LABEL_MAX_LENGTH,
   LABEL_WRAP_WIDTH,
@@ -487,10 +484,6 @@ test("nodeSize は fit が無ければ矩形として扱う", () => {
   const size = nodeSize("あいう", undefined);
 
   assert.equal(size.w, 3 * EM + 20);
-});
-
-test("escapeHtml は < & > だけを潰す", () => {
-  assert.equal(escapeHtml('<a href="x">&</a>'), '&lt;a href="x"&gt;&amp;&lt;/a&gt;');
 });
 
 test("safeHref は閲覧用 URL だけを許可し、実行可能な scheme を拒否する", () => {
@@ -1489,44 +1482,6 @@ test("quadraticPoint は描画と同じ曲線上のラベル位置を返す", ()
   });
 });
 
-// --- 選択ノードの追従 -------------------------------------------------------
-
-const EXTENT = { x1: 0, y1: 0, x2: 400, y2: 300 };
-const box = (x1: number, y1: number, width = 60, height = 30) => ({
-  x1,
-  y1,
-  x2: x1 + width,
-  y2: y1 + height,
-});
-
-test("表示範囲の内側にあるノードは見えている扱い", () => {
-  assert.equal(isNodeVisible(EXTENT, box(100, 100)), true);
-});
-
-test("表示範囲の外にあるノードは見えていない扱い", () => {
-  assert.equal(isNodeVisible(EXTENT, box(500, 100)), false);
-  assert.equal(isNodeVisible(EXTENT, box(-100, 100)), false);
-  assert.equal(isNodeVisible(EXTENT, box(100, 400)), false);
-  assert.equal(isNodeVisible(EXTENT, box(100, -50)), false);
-});
-
-test("端に掛かっているノードは余白の分だけ外側と見なす", () => {
-  const edge = box(350, 100); // x2 = 410 で右端 (400) をはみ出す
-  assert.equal(isNodeVisible(EXTENT, edge), false);
-
-  const inside = box(300, 100); // x2 = 360。余白 40 でちょうど収まる
-  assert.equal(isNodeVisible(EXTENT, inside, 40), true);
-  assert.equal(isNodeVisible(EXTENT, box(310, 100), 40), false);
-});
-
-test("視野より大きいノードは中心が見えていれば十分", () => {
-  const huge = box(-100, -50, 600, 400);
-  assert.equal(isNodeVisible(EXTENT, huge), true);
-
-  const offCenter = box(300, -50, 600, 400); // 中心 x=600 は右端の外
-  assert.equal(isNodeVisible(EXTENT, offCenter), false);
-});
-
 // --- 詳細ペインのエッジ一覧 --------------------------------------------------
 
 test("エッジ一覧は相手の id と本文を持つ", () => {
@@ -1740,78 +1695,4 @@ test("記号だけが異なる id でもノードは融合しない", () => {
   assert.notEqual(dash, under);
   assert.ok(text.includes(`    ${dash} -->|satisfies| `));
   assert.ok(text.includes(`    ${under} -->|satisfies| `));
-});
-
-// --- 書き出し (SVG) ----------------------------------------------------------
-
-const scene = (overrides = {}) => ({
-  nodes: [
-    {
-      id: "Goal-1",
-      type: "Goal",
-      status: "approved",
-      label: "Goal-1\n経費精算",
-      x: 0,
-      y: 0,
-      w: 100,
-      h: 40,
-    },
-    {
-      id: "Need-1",
-      type: "Need",
-      status: "proposed",
-      label: "Need-1\n撮影するだけ",
-      x: 0,
-      y: 120,
-      w: 100,
-      h: 40,
-    },
-  ],
-  edges: [{ name: "motivates", dashed: false, x1: 0, y1: 20, x2: 0, y2: 100 }],
-  bands: [],
-  meta: fixture().meta,
-  palette: { fg: "#000", bg: "#fff", panel: "#f7f8fa", border: "#ccc", muted: "#666" },
-  title: "テスト",
-  ...overrides,
-});
-
-test("SVG は図の全体が収まる viewBox を持つ", () => {
-  const svg = graphSvg(scene());
-
-  assert.ok(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"'));
-  //: 余白 (SVG_PADDING = 24) のぶんだけ外に広がる。
-  assert.ok(svg.includes('viewBox="-74 -44 148 208"'));
-  assert.ok(svg.trimEnd().endsWith("</svg>"));
-});
-
-test("SVG にはノードのラベル・配色・エッジ名が入る", () => {
-  const svg = graphSvg(scene());
-
-  assert.ok(svg.includes(">経費精算</tspan>"));
-  assert.ok(svg.includes(">motivates</text>"));
-  //: 型の配色 (meta.types) と status の線種 (meta.statuses) が効く。
-  assert.equal((svg.match(/fill="#fff"/g) ?? []).length >= 2, true);
-  assert.ok(svg.includes('stroke-dasharray="1 3"')); // proposed = 点線
-});
-
-test("SVG の矢印先端は参照元の線色に追従する", () => {
-  const svg = graphSvg(scene());
-
-  assert.ok(svg.includes('fill="context-stroke"'));
-});
-
-test("ノードが 1 つも無くても SVG は壊れない", () => {
-  const svg = graphSvg({ ...scene(), nodes: [], edges: [], bands: [] });
-
-  assert.ok(svg.startsWith("<svg "));
-  assert.ok(svg.includes('viewBox="-24 -24 48 48"'));
-});
-
-test("SVG に入る文字列はエスケープされる", () => {
-  const nodes = [{ ...scene().nodes[0], label: '<script>&"' }];
-  const svg = graphSvg({ ...scene(), nodes, title: "<b>題</b>" });
-
-  assert.ok(!svg.includes("<script>"));
-  assert.ok(svg.includes("&lt;script&gt;&amp;"));
-  assert.ok(svg.includes("<title>&lt;b&gt;題&lt;/b&gt;</title>"));
 });

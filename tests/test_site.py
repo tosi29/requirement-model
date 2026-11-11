@@ -761,8 +761,8 @@ def test_site_command_defaults_the_repo_ref(tmp_path: Path):
 def test_page_has_the_export_buttons(tmp_path: Path):
     """絞り込んだ図を持ち出す口がテンプレートにある。
 
-    書き出す中身そのものは `mermaidText()` / `graphSvg()` のテスト
-    (tests/js/logic.test.ts) と `test_site_js.py` の CLI 突き合わせが見る。
+    Mermaid の中身は `mermaidText()` のテスト (tests/js/logic.test.ts) と
+    `test_site_js.py` の CLI 突き合わせが見る。SVG は表示中の DOM をそのまま写す。
     """
     index = build_site(chain(), FindingList(), tmp_path)
     html = index.read_text(encoding="utf-8")

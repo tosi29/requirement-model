@@ -1,6 +1,7 @@
+import { IMPACT_DEPTHS, initialSelection, parseFocus, statusNames } from "./site_graph.ts";
 import { TABLE_COLUMNS } from "./site_table.ts";
-import { parseFocus, IMPACT_DEPTHS, initialSelection, statusFilters, statusNames } from "./site_graph.ts";
 import type { SiteData, ViewState } from "./site_types.ts";
+
 // --- URL ハッシュ ----------------------------------------------------------
 //
 // 表示状態を URL に載せ、「この FR を見て」と URL だけ渡せば相手にも同じ画面が
@@ -39,8 +40,7 @@ const SET_FILTERS = [
 ];
 
 /** 軸の初期選択。`initial` を持たない軸は全選択。 */
-const initialOf = (filter, data) =>
-  filter.initial ? filter.initial(data) : filter.all(data);
+const initialOf = (filter, data) => (filter.initial ? filter.initial(data) : filter.all(data));
 
 /** ハッシュが無いときの状態。ページの初期 state でもある。 */
 export function defaultState(data: SiteData): ViewState {
@@ -71,7 +71,10 @@ export function encodeHash(state, data) {
   const put = (key, value) => params.push(`${key}=${value}`);
   //: 選択の順ではなく定義順で並べる。同じ絞り込みなら常に同じ URL になる。
   const list = (selected, all) =>
-    all.filter((name) => selected.has(name)).map(encodeURIComponent).join(",");
+    all
+      .filter((name) => selected.has(name))
+      .map(encodeURIComponent)
+      .join(",");
   const sort = state.sort || DEFAULT_SORT;
   const query = (state.query || "").trim();
 
@@ -91,7 +94,12 @@ export function encodeHash(state, data) {
   if (state.direction === "LR") put("dir", "LR");
   if (state.mode === "table" || state.mode === "analysis") put("view", state.mode);
   if (parseFocus(String(state.focus))) put("focus", String(state.focus));
-  if (state.mode === "analysis" && state.selected && state.detail && state.detail !== state.selected) {
+  if (
+    state.mode === "analysis" &&
+    state.selected &&
+    state.detail &&
+    state.detail !== state.selected
+  ) {
     put("detail", encodeURIComponent(state.detail));
   }
   if (IMPACT_DEPTHS.includes(state.depth)) put("depth", String(state.depth));
@@ -114,7 +122,12 @@ export function decodeHash(hash: string | null, data: SiteData): ViewState {
   const state = defaultState(data);
   const params = parseHash(hash);
   const subset = (raw, all) =>
-    new Set(raw.split(",").map((name) => name.trim()).filter((name) => all.includes(name)));
+    new Set(
+      raw
+        .split(",")
+        .map((name) => name.trim())
+        .filter((name) => all.includes(name)),
+    );
 
   const node = params.get("node");
   if (node && data.nodes.some((item) => item.id === node)) state.selected = node;
@@ -123,10 +136,16 @@ export function decodeHash(hash: string | null, data: SiteData): ViewState {
     state[filter.key] = subset(params.get(filter.param), filter.all(data));
   }
   if (params.get("dir") === "LR") state.direction = "LR";
-  if (params.get("view") === "table" || params.get("view") === "analysis") state.mode = params.get("view");
+  if (params.get("view") === "table" || params.get("view") === "analysis")
+    state.mode = params.get("view");
   state.focus = parseFocus(params.get("focus") || "0");
   const detail = params.get("detail");
-  if (state.mode === "analysis" && state.selected && detail !== state.selected && data.nodes.some((node) => node.id === detail)) {
+  if (
+    state.mode === "analysis" &&
+    state.selected &&
+    detail !== state.selected &&
+    data.nodes.some((node) => node.id === detail)
+  ) {
     state.detail = detail;
   }
   const depth = Number(params.get("depth"));
@@ -181,7 +200,16 @@ export const THEME_STORAGE_KEY = "reqmodel:site:theme";
 
 /** 次回に持ち越す状態を `#...` にしたもの。既定のままなら空文字。 */
 export function storableHash(state, data) {
-  return encodeHash({ ...state, selected: null, detail: null, mode: state.mode === "analysis" ? "graph" : state.mode, query: "" }, data);
+  return encodeHash(
+    {
+      ...state,
+      selected: null,
+      detail: null,
+      mode: state.mode === "analysis" ? "graph" : state.mode,
+      query: "",
+    },
+    data,
+  );
 }
 
 /** 開いたときに適用するハッシュ。URL に何か載っていればそれ、無ければ保存。 */

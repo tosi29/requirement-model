@@ -2,13 +2,7 @@
 
 import { initialSelection } from "../../src/reqmodel/presentation/site_logic.ts";
 
-export const EDGE_NAMES = [
-  "refines",
-  "motivates",
-  "satisfies",
-  "qualifies",
-  "constrains",
-];
+export const EDGE_NAMES = ["refines", "motivates", "satisfies", "qualifies", "constrains"];
 
 export const EDGE_NAMES_BY_TYPE = {
   Goal: ["refines", "motivates"],
@@ -25,13 +19,7 @@ export const STATUS_RANK = {
   verified: 3,
 };
 
-export const TYPES = [
-  "Goal",
-  "Need",
-  "FunctionalRequirement",
-  "QualityRequirement",
-  "Constraint",
-];
+export const TYPES = ["Goal", "Need", "FunctionalRequirement", "QualityRequirement", "Constraint"];
 
 //: 図に既定で描かないもの (`site_data()` の hidden_by_default と同じ形)。
 export const HIDDEN_BY_DEFAULT = {
@@ -50,7 +38,13 @@ export function fixture(overrides = {}) {
       id: "Goal-1",
       text: "経費精算を速くする",
       status: "approved",
-      source: [{ title: "申請者となる一般社員", url: "https://example.com/interviews/employee", note: "申請者ヒアリング" }],
+      source: [
+        {
+          title: "申請者となる一般社員",
+          url: "https://example.com/interviews/employee",
+          note: "申請者ヒアリング",
+        },
+      ],
       refines: [],
       motivates: ["Need-1"],
     },
@@ -59,15 +53,33 @@ export function fixture(overrides = {}) {
       id: "Need-1",
       text: "領収書を撮影するだけで申請したい",
       status: "approved",
-      source: [{ title: "申請者となる一般社員", url: "https://example.com/interviews/employee", note: "申請者ヒアリング" }],
+      source: [
+        {
+          title: "申請者となる一般社員",
+          url: "https://example.com/interviews/employee",
+          note: "申請者ヒアリング",
+        },
+      ],
     },
     {
       type: "FunctionalRequirement",
       id: "FR-1",
       text: "領収書画像から金額を抽出すること",
       status: "proposed",
-      source: [{ title: "申請者となる一般社員", url: "https://example.com/interviews/employee", note: "申請者ヒアリング" }],
-      evidence: [{ title: "受入テスト第 1 回", url: "https://example.com/tests/receipt-ocr", note: "正解率 96%" }],
+      source: [
+        {
+          title: "申請者となる一般社員",
+          url: "https://example.com/interviews/employee",
+          note: "申請者ヒアリング",
+        },
+      ],
+      evidence: [
+        {
+          title: "受入テスト第 1 回",
+          url: "https://example.com/tests/receipt-ocr",
+          note: "正解率 96%",
+        },
+      ],
       acceptance_criteria: ["正解率が 95% 以上である"],
       satisfies: ["Need-1"],
       refines: [],
@@ -124,7 +136,11 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60 } = {
   const edges = [];
   const link = (source, name, target) => edges.push({ source, name, target });
   const pick = (index, count) => (index % count) + 1;
-  const reference = (index) => ({ title: `源泉 ${index}`, url: `https://example.com/source/${index}`, note: "合成データ" });
+  const reference = (index) => ({
+    title: `源泉 ${index}`,
+    url: `https://example.com/source/${index}`,
+    note: "合成データ",
+  });
 
   for (let i = 1; i <= goals; i++) {
     const id = `G-${i}`;
@@ -140,7 +156,13 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60 } = {
 
   for (let i = 1; i <= needs; i++) {
     const id = `N-${i}`;
-    nodes.push({ type: "Need", id, text: `ニーズ ${i} を満たしたい`, status: "approved", source: [reference(pick(i, 3))] });
+    nodes.push({
+      type: "Need",
+      id,
+      text: `ニーズ ${i} を満たしたい`,
+      status: "approved",
+      source: [reference(pick(i, 3))],
+    });
     //: 葉に近い Goal (後半) から動機づける。
     link(`G-${goals - (i % Math.max(1, Math.floor(goals / 2)))}`, "motivates", id);
   }

@@ -5,11 +5,15 @@
  * 繋ぐ」に徹する。esbuild が依存モジュールと bundle し、`site.py` は生成物を HTML に埋め込む。
  */
 
-import { applyGraphTheme, createGraphViewPrimitives, createPanZoom } from "./site_graph_view.ts";
 import type { PanZoomController } from "./site_graph_view.ts";
+import { applyGraphTheme, createGraphViewPrimitives, createPanZoom } from "./site_graph_view.ts";
 import type {
-  GraphBandElement, GraphEdgeElement, GraphElementDefinition, GraphNodeElement,
-  SiteData, ViewState,
+  GraphBandElement,
+  GraphEdgeElement,
+  GraphElementDefinition,
+  GraphNodeElement,
+  SiteData,
+  ViewState,
 } from "./site_types.ts";
 
 interface PageElement extends HTMLElement {
@@ -29,30 +33,26 @@ import {
   ALL_SEVERITIES,
   ANALYSIS_BANDS,
   analysisBandLayout,
-  FOCUS_DEPTHS,
-  IMPACT_DEPTHS,
-  LABEL_FONT,
-  TABLE_COLUMNS,
-  THEME_LABELS,
-  THEME_STORAGE_KEY,
-  VIEW_STORAGE_KEY,
   bandDefs,
-  bandId,
   bandedLayout,
+  bandId,
   createView,
   decodeHash,
-  edgeItems,
   edgeControl,
+  edgeItems,
   encodeHash,
   estimateTextWidth,
   explainCommand,
+  FOCUS_DEPTHS,
   fieldLabel,
   focusedNodes,
   focusTrail,
   graphElements,
   groupFindings,
+  IMPACT_DEPTHS,
   impactSets,
   initialHash,
+  LABEL_FONT,
   layoutOptions,
   legendGroups,
   matchesQuery,
@@ -64,24 +64,29 @@ import {
   parseFocus,
   quadraticPath,
   quadraticPoint,
-  searchHits,
   safeHref,
-  severityTabs,
+  searchHits,
   selectNodeState,
+  severityTabs,
   sortRows,
   sourceUrl,
   statusFilters,
   stepHit,
   storableHash,
+  TABLE_COLUMNS,
+  THEME_LABELS,
+  THEME_STORAGE_KEY,
   tableRows,
   truncate,
+  VIEW_STORAGE_KEY,
   visibleBandKeys,
 } from "./site_logic.ts";
 
 const dagre = window.dagre;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-const DATA: SiteData = JSON.parse(getElement("model-data").textContent!);
+// 要素の textContent は null にならない (null は Document などの Node だけ)。
+const DATA: SiteData = JSON.parse(getElement("model-data").textContent ?? "");
 const METRICS: {
   startedAt: number;
   initialRenderMs: number | null;
@@ -89,9 +94,9 @@ const METRICS: {
   filters: { ms: number; nodes: number; edges: number }[];
 } = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
 // 影響範囲の色は背景に対する明度差で読ませるので、ノードの配色と同じくテーマ別に持つ。
-const impactColors = () => (palette().dark ? DATA.meta.dark_impact_colors : null)
-  ?? DATA.meta.impact_colors
-  ?? { selected: "", upstream: "", downstream: "", related: "" };
+const impactColors = () =>
+  (palette().dark ? DATA.meta.dark_impact_colors : null) ??
+  DATA.meta.impact_colors ?? { selected: "", upstream: "", downstream: "", related: "" };
 
 // --- 保存 (localStorage) ----------------------------------------------------
 //
@@ -131,8 +136,19 @@ let view = createView(DATA, state);
 // --- SVG graph view adapter -------------------------------------------------
 
 const graphPrimitives = createGraphViewPrimitives();
-const { svgEl, htmlEl, setAttrs, classed, labelMeasurer, renderLabel, shapeEl, polygonCoords, updateShape, palette } = graphPrimitives;
-const graphEl = getElement("graph")!;
+const {
+  svgEl,
+  htmlEl,
+  setAttrs,
+  classed,
+  labelMeasurer,
+  renderLabel,
+  shapeEl,
+  polygonCoords,
+  updateShape,
+  palette,
+} = graphPrimitives;
+const graphEl = getElement("graph");
 let svg: SVGSVGElement | null = null;
 let viewport: SVGRectElement | null = null;
 let graphLayer: SVGGElement | null = null;
@@ -145,34 +161,52 @@ const bandItems = new Map<string, GraphBandElement>();
 
 function initGraph() {
   if (!dagre) {
-    graphEl.replaceChildren(htmlEl(
-      "p",
-      { class: "empty" },
-      "描画ライブラリ (dagre) を読み込めなかった。図の元データは ",
-      htmlEl("a", { href: "graph.mmd" }, "graph.mmd"),
-      " / ",
-      htmlEl("a", { href: "graph.dot" }, "graph.dot"),
-      " にある。",
-    ));
+    graphEl.replaceChildren(
+      htmlEl(
+        "p",
+        { class: "empty" },
+        "描画ライブラリ (dagre) を読み込めなかった。図の元データは ",
+        htmlEl("a", { href: "graph.mmd" }, "graph.mmd"),
+        " / ",
+        htmlEl("a", { href: "graph.dot" }, "graph.dot"),
+        " にある。",
+      ),
+    );
     return;
   }
   graph = graphElements(DATA, labelMeasurer());
   graphEl.replaceChildren();
   svg = svgEl("svg", { class: "req-graph", tabindex: 0, role: "img", "aria-label": DATA.title });
   defs = svgEl("defs");
-  viewport = svgEl("rect", { class: "graph-bg", x: -100000, y: -100000, width: 200000, height: 200000 });
+  viewport = svgEl("rect", {
+    class: "graph-bg",
+    x: -100000,
+    y: -100000,
+    width: 200000,
+    height: 200000,
+  });
   graphLayer = svgEl("g", { class: "graph-layer" });
   panZoom = createPanZoom(graphEl, graphLayer);
   svg.append(defs, viewport, graphLayer);
   graphEl.append(svg);
   buildGraphDom();
-  panZoom.bind(svg, viewport, () => { if (state.mode !== "analysis") selectNode(state.selected); });
+  panZoom.bind(svg, viewport, () => {
+    if (state.mode !== "analysis") selectNode(state.selected);
+  });
   runLayout();
 }
 
 function buildGraphDom() {
   const pal = palette();
-  const arrow = svgEl("marker", { id: "req-arrow", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: "auto" });
+  const arrow = svgEl("marker", {
+    id: "req-arrow",
+    viewBox: "0 0 10 10",
+    refX: 9,
+    refY: 5,
+    markerWidth: 6,
+    markerHeight: 6,
+    orient: "auto",
+  });
   // 強調時に線色が変わっても、先端が同じ色になるよう線の色を継承する。
   arrow.append(svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "context-stroke" }));
   defs.replaceChildren(arrow);
@@ -195,22 +229,34 @@ function buildGraphDom() {
     });
     group.append(path, label);
     edgeLayer.append(group);
-    edgeItemsByKey.set(item.data.id, { ...item.data, group, path, label, points: [] } as GraphEdgeElement);
+    edgeItemsByKey.set(item.data.id, {
+      ...item.data,
+      group,
+      path,
+      label,
+      points: [],
+    } as GraphEdgeElement);
   }
 
   const types = DATA.meta.types || {};
-  const statuses = DATA.meta.statuses || {};
   const impact = impactColors();
   graphEl.style.setProperty("--impact-selected", impact.selected || pal.fg);
   graphEl.style.setProperty("--impact-upstream", impact.upstream || pal.fg);
   graphEl.style.setProperty("--impact-downstream", impact.downstream || pal.fg);
   graphEl.style.setProperty("--impact-related", impact.related || pal.fg);
-  graphEl.style.setProperty("--search-hit", (DATA.meta.search || {}).hit || pal.fg);
+  graphEl.style.setProperty("--search-hit", DATA.meta.search?.hit || pal.fg);
   const analysisFrames = Object.entries(ANALYSIS_BANDS).map(([key, label]) => ({
     data: { id: bandId(`analysis:${key}`), bandKey: `analysis:${key}`, label },
   }));
-  for (const item of [...graph.filter((element) => element.classes === "band"), ...analysisFrames]) {
-    const group = svgEl("g", { class: "node band", "data-id": item.data.id, "data-band-key": item.data.bandKey });
+  for (const item of [
+    ...graph.filter((element) => element.classes === "band"),
+    ...analysisFrames,
+  ]) {
+    const group = svgEl("g", {
+      class: "node band",
+      "data-id": item.data.id,
+      "data-band-key": item.data.bandKey,
+    });
     const shape = svgEl("rect", { class: "node-shape", rx: 8 });
     const label = svgEl("text", { class: "node-label band-label" });
     renderLabel(label, item.data.label, 0, -11, 11, "bold");
@@ -241,7 +287,16 @@ function buildGraphDom() {
       chooseNode(item.data.id);
     });
     nodeLayer.append(group);
-    nodeItems.set(item.data.id, { ...item.data, shapeName: typeMeta.shape, x: 0, y: 0, group, shape, statusRing, label } as GraphNodeElement);
+    nodeItems.set(item.data.id, {
+      ...item.data,
+      shapeName: typeMeta.shape,
+      x: 0,
+      y: 0,
+      group,
+      shape,
+      statusRing,
+      label,
+    } as GraphNodeElement);
   }
   restyleGraph();
 }
@@ -264,16 +319,33 @@ function focusedIds() {
 //: 直近のレイアウトが対象にしたフォーカス (`深さ:選択ノード`)。
 let laidOutFocus = "";
 
-const focusKey = () => state.mode === "analysis"
-  ? JSON.stringify(["analysis", state.selected, state.depth, [...state.types], [...state.statuses], [...state.edges]])
-  : focusedIds() ? `${state.focus}:${state.selected}` : "";
+const focusKey = () =>
+  state.mode === "analysis"
+    ? JSON.stringify([
+        "analysis",
+        state.selected,
+        state.depth,
+        [...state.types],
+        [...state.statuses],
+        [...state.edges],
+      ])
+    : focusedIds()
+      ? `${state.focus}:${state.selected}`
+      : "";
 
 /** 分析の図とその書き出しを起点の影響範囲に限定する。 */
-function analysisIds() { return state.mode === "analysis" ? focusedIds() : null; }
+function analysisIds() {
+  return state.mode === "analysis" ? focusedIds() : null;
+}
 function displayedView() {
   const ids = analysisIds();
-  return ids ? { ...view, nodes: view.nodes.filter((node) => ids.has(node.id)),
-    edges: view.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target)) } : view;
+  return ids
+    ? {
+        ...view,
+        nodes: view.nodes.filter((node) => ids.has(node.id)),
+        edges: view.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target)),
+      }
+    : view;
 }
 
 /**
@@ -317,7 +389,7 @@ function rectangleEndpoint(from, to) {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   if (!dx && !dy) return { x: from.x, y: from.y };
-  const scale = Math.min(Math.abs((from.w / 2) / (dx || 1e-9)), Math.abs((from.h / 2) / (dy || 1e-9)));
+  const scale = Math.min(Math.abs(from.w / 2 / (dx || 1e-9)), Math.abs(from.h / 2 / (dy || 1e-9)));
   return { x: from.x + dx * scale, y: from.y + dy * scale };
 }
 
@@ -373,7 +445,10 @@ function updateEdges() {
     setAttrs(edge.path, { d: quadraticPath(from, control, to) });
     const middle = quadraticPoint(from, control, to);
     setAttrs(edge.label, { x: middle.x, y: middle.y - 4 });
-    edge.x1 = from.x; edge.y1 = from.y; edge.x2 = to.x; edge.y2 = to.y;
+    edge.x1 = from.x;
+    edge.y1 = from.y;
+    edge.x2 = to.x;
+    edge.y2 = to.y;
     edge.points = [from, control, to];
   }
 }
@@ -384,12 +459,18 @@ function applyBanding() {
   const bands = bandDefs(DATA);
   if (!bands.length && state.mode !== "analysis") return;
   const placed = shownNodeItems().map((item) => ({
-    id: item.id, type: item.type, x: item.x, y: item.y, w: item.w, h: item.h,
+    id: item.id,
+    type: item.type,
+    x: item.x,
+    y: item.y,
+    w: item.w,
+    h: item.h,
   }));
   if (!placed.length) return;
-  const { positions, frames } = state.mode === "analysis"
-    ? analysisBandLayout(view, placed, state.direction)
-    : bandedLayout(bands, placed, view.edges, state.direction, { groupMaxWidth: 600 });
+  const { positions, frames } =
+    state.mode === "analysis"
+      ? analysisBandLayout(view, placed, state.direction)
+      : bandedLayout(bands, placed, view.edges, state.direction, { groupMaxWidth: 600 });
   for (const item of bandItems.values()) classed(item.group, "hidden", !frames.has(item.bandKey));
   for (const [id, position] of positions) {
     const item = nodeItems.get(id);
@@ -398,7 +479,8 @@ function applyBanding() {
   for (const [key, frame] of frames) {
     const item = bandItems.get(bandId(key));
     if (!item) continue;
-    item.w = frame.w; item.h = frame.h;
+    item.w = frame.w;
+    item.h = frame.h;
     updateShape(item.shape, "round-rectangle", item);
     moveItem(item, frame.x, frame.y);
     // renderLabel() puts the coordinates on tspans, so changing the parent
@@ -421,7 +503,12 @@ function runLayout() {
   const startedAt = Date.now();
   const g = new dagre.graphlib.Graph({ multigraph: true });
   const opts = layoutOptions(state.direction);
-  g.setGraph({ rankdir: opts.rankDir, nodesep: opts.nodeSep, ranksep: opts.rankSep, edgesep: opts.edgeSep });
+  g.setGraph({
+    rankdir: opts.rankDir,
+    nodesep: opts.nodeSep,
+    ranksep: opts.rankSep,
+    edgesep: opts.edgeSep,
+  });
   g.setDefaultEdgeLabel(() => ({}));
   const nodes = new Set(shownNodeItems().map((item) => item.id));
   for (const item of shownNodeItems()) g.setNode(item.id, { width: item.w, height: item.h });
@@ -429,7 +516,12 @@ function runLayout() {
   for (const item of shownEdgeItems()) {
     const edge = DATA.edges[item.index];
     if (!nodes.has(edge.source) || !nodes.has(edge.target)) continue;
-    g.setEdge(edge.source, edge.target, { width: estimateTextWidth(edge.name), height: 12 }, item.id);
+    g.setEdge(
+      edge.source,
+      edge.target,
+      { width: estimateTextWidth(edge.name), height: 12 },
+      item.id,
+    );
     const key = [edge.source, edge.target].sort().join("\u0000");
     const siblings = parallel.get(key) || [];
     siblings.push(item);
@@ -465,20 +557,42 @@ function applyVisibility() {
   const focused = focusedIds();
   const shown = focused ? view.nodes.filter((node) => focused.has(node.id)) : view.nodes;
   const nodes = new Set(shown.map((node) => node.id));
-  const edges = new Set(view.edges.filter((edge) => nodes.has(edge.source) && nodes.has(edge.target)));
-  const visibleBands = state.mode === "analysis"
-    ? new Set(analysisBandLayout(view, [...nodeItems.values()].filter((item) => nodes.has(item.id)), state.direction).frames.keys())
-    : visibleBandKeys(DATA, shown);
+  const edges = new Set(
+    view.edges.filter((edge) => nodes.has(edge.source) && nodes.has(edge.target)),
+  );
+  const visibleBands =
+    state.mode === "analysis"
+      ? new Set(
+          analysisBandLayout(
+            view,
+            [...nodeItems.values()].filter((item) => nodes.has(item.id)),
+            state.direction,
+          ).frames.keys(),
+        )
+      : visibleBandKeys(DATA, shown);
   for (const item of nodeItems.values()) classed(item.group, "hidden", !nodes.has(item.id));
-  for (const item of bandItems.values()) classed(item.group, "hidden", !visibleBands.has(item.bandKey));
-  for (const item of edgeItemsByKey.values()) classed(item.group, "hidden", !edges.has(DATA.edges[item.index]));
+  for (const item of bandItems.values())
+    classed(item.group, "hidden", !visibleBands.has(item.bandKey));
+  for (const item of edgeItemsByKey.values())
+    classed(item.group, "hidden", !edges.has(DATA.edges[item.index]));
   METRICS.filters.push({ ms: Date.now() - startedAt, nodes: nodes.size, edges: edges.size });
   svg.dataset.filterMs = String(METRICS.filters.at(-1).ms);
 }
 
 function applyHighlight() {
   if (!svg) return;
-  for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()]) item.group.classList.remove("sel", "up", "down", "rel", "dim", "on-path", "detail-target", "detail-path", "trail-muted");
+  for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()])
+    item.group.classList.remove(
+      "sel",
+      "up",
+      "down",
+      "rel",
+      "dim",
+      "on-path",
+      "detail-target",
+      "detail-path",
+      "trail-muted",
+    );
   if (!state.selected || !view.byId.has(state.selected)) return;
   const { upstream, downstream, whole, undirected } = impactSets(view, state.selected);
   for (const item of nodeItems.values()) {
@@ -503,7 +617,11 @@ function applyHighlight() {
     for (const item of edgeItemsByKey.values()) {
       classed(item.group, "detail-path", trail.edges.has(DATA.edges[item.index]));
       if (trail.edges.has(DATA.edges[item.index])) item.group.classList.remove("dim");
-      classed(item.group, "trail-muted", trail.nodes.size && !trail.edges.has(DATA.edges[item.index]));
+      classed(
+        item.group,
+        "trail-muted",
+        trail.nodes.size && !trail.edges.has(DATA.edges[item.index]),
+      );
     }
   }
 }
@@ -532,7 +650,9 @@ function moveCursor(delta) {
   if (active) active.scrollIntoView({ block: "nearest" });
 }
 
-function relayout() { runLayout(); }
+function relayout() {
+  runLayout();
+}
 
 function graphBox() {
   const boxes = [...shownNodeItems(), ...shownBandItems()];
@@ -575,7 +695,10 @@ function appendReferenceSection(panel, title, references) {
     const item = htmlEl("li", {}, htmlEl("span", { class: "id" }, reference.title || "(untitled)"));
     const href = safeHref(reference.url);
     if (href) {
-      item.append(" ", htmlEl("a", { href, target: "_blank", rel: "noopener noreferrer" }, reference.url));
+      item.append(
+        " ",
+        htmlEl("a", { href, target: "_blank", rel: "noopener noreferrer" }, reference.url),
+      );
     } else if (reference.url) {
       // 安全でない URL も情報としては失わず、操作できないテキストで表示する。
       item.append(" ", reference.url);
@@ -595,7 +718,13 @@ function renderDetail() {
   panel.replaceChildren();
   const detailId = state.mode === "analysis" && state.detail ? state.detail : state.selected;
   if (!detailId || !view.byId.has(detailId)) {
-    panel.append(htmlEl("p", { class: "empty" }, "グラフのノードをクリックすると、本文・根拠・影響範囲を表示する。"));
+    panel.append(
+      htmlEl(
+        "p",
+        { class: "empty" },
+        "グラフのノードをクリックすると、本文・根拠・影響範囲を表示する。",
+      ),
+    );
     return;
   }
   const node = view.byId.get(detailId);
@@ -623,23 +752,38 @@ function renderDetail() {
   appendReferenceSection(panel, fieldLabel("evidence"), node.evidence);
   if ((node.acceptance_criteria || []).length) {
     panel.append(htmlEl("h2", {}, "受け入れ基準"));
-    panel.append(htmlEl("ul", {}, ...node.acceptance_criteria.map((criterion) => htmlEl("li", {}, criterion))));
+    panel.append(
+      htmlEl("ul", {}, ...node.acceptance_criteria.map((criterion) => htmlEl("li", {}, criterion))),
+    );
   }
   if ((node.suppress || []).length) {
     panel.append(htmlEl("h2", {}, "抑制中の指摘"));
-    panel.append(htmlEl("ul", {}, ...node.suppress.map(([code, reason]) =>
-      htmlEl("li", {}, htmlEl("code", {}, code), `: ${reason}`))));
+    panel.append(
+      htmlEl(
+        "ul",
+        {},
+        ...node.suppress.map(([code, reason]) =>
+          htmlEl("li", {}, htmlEl("code", {}, code), `: ${reason}`),
+        ),
+      ),
+    );
   }
 
   const appendEdges = (title, items) => {
     if (!items.length) return;
     const list = htmlEl("ul", { class: "plain" });
     for (const item of items) {
-      const button = htmlEl("button", { class: "node-btn", "data-goto": item.id },
-        htmlEl("span", { class: "arrow" }, item.arrow), " ",
-        htmlEl("span", { class: "id" }, item.id), " ",
-        htmlEl("span", { class: "type" }, item.type), " ",
-        htmlEl("span", { class: "text" }, truncate(item.text, 40)));
+      const button = htmlEl(
+        "button",
+        { class: "node-btn", "data-goto": item.id },
+        htmlEl("span", { class: "arrow" }, item.arrow),
+        " ",
+        htmlEl("span", { class: "id" }, item.id),
+        " ",
+        htmlEl("span", { class: "type" }, item.type),
+        " ",
+        htmlEl("span", { class: "text" }, truncate(item.text, 40)),
+      );
       list.append(htmlEl("li", { class: "edge" }, button));
     }
     panel.append(htmlEl("h2", {}, title), list);
@@ -658,8 +802,12 @@ function renderDetail() {
   panel.append(
     htmlEl("h2", {}, "LLM 連携"),
     copyButton,
-    htmlEl("p", { class: "hint" }, htmlEl("code", {}, explainCommand(view, node.id)),
-      " と同じ内容をクリップボードに入れる。"),
+    htmlEl(
+      "p",
+      { class: "hint" },
+      htmlEl("code", {}, explainCommand(view, node.id)),
+      " と同じ内容をクリップボードに入れる。",
+    ),
   );
 
   panel.querySelectorAll<HTMLElement>("button[data-goto]").forEach((button: HTMLElement) => {
@@ -680,7 +828,11 @@ function renderDetail() {
 function locationElement(location) {
   const href = safeHref(sourceUrl(DATA, location));
   return href
-    ? htmlEl("a", { href, target: "_blank", rel: "noopener", title: "GitHub でこの定義を開く" }, `${location} ↗`)
+    ? htmlEl(
+        "a",
+        { href, target: "_blank", rel: "noopener", title: "GitHub でこの定義を開く" },
+        `${location} ↗`,
+      )
     : document.createTextNode(location);
 }
 
@@ -688,16 +840,27 @@ function locationElement(location) {
 function findingElement(finding, interactive = true) {
   const where = finding.node_id ? ` (${finding.node_id})` : "";
   const content = [
-    htmlEl("div", { class: "code" }, `${finding.severity.toUpperCase()} · L${finding.layer} · ${finding.code}${where}`),
+    htmlEl(
+      "div",
+      { class: "code" },
+      `${finding.severity.toUpperCase()} · L${finding.layer} · ${finding.code}${where}`,
+    ),
     htmlEl("div", {}, finding.message),
   ];
   if (interactive && finding.node_id) {
     if (finding.location) content.push(htmlEl("div", { class: "loc" }, finding.location));
-    return htmlEl("button", {
-      type: "button", class: `finding ${finding.severity}`, "data-id": finding.node_id,
-    }, ...content);
+    return htmlEl(
+      "button",
+      {
+        type: "button",
+        class: `finding ${finding.severity}`,
+        "data-id": finding.node_id,
+      },
+      ...content,
+    );
   }
-  if (finding.location) content.push(htmlEl("div", { class: "loc" }, locationElement(finding.location)));
+  if (finding.location)
+    content.push(htmlEl("div", { class: "loc" }, locationElement(finding.location)));
   return htmlEl("div", { class: `finding ${finding.severity}` }, ...content);
 }
 
@@ -706,14 +869,29 @@ function findingElement(finding, interactive = true) {
 function renderNodeList() {
   const list = getElement("node-list");
   const matched = view.nodes.filter((node) => matchesQuery(node, state.query));
-  list.replaceChildren(...matched.map((node) => {
-    const marks = [node.id === state.selected ? "active" : "", node.id === cursor ? "cursor" : ""]
-      .filter(Boolean).join(" ");
-    return htmlEl("li", {}, htmlEl("button", {
-      class: `node-btn ${marks}`.trim(), "data-id": node.id,
-    }, htmlEl("span", { class: "id" }, node.id), " ",
-    htmlEl("span", { class: "type" }, node.type), htmlEl("br"), truncate(node.text, 34)));
-  }));
+  list.replaceChildren(
+    ...matched.map((node) => {
+      const marks = [node.id === state.selected ? "active" : "", node.id === cursor ? "cursor" : ""]
+        .filter(Boolean)
+        .join(" ");
+      return htmlEl(
+        "li",
+        {},
+        htmlEl(
+          "button",
+          {
+            class: `node-btn ${marks}`.trim(),
+            "data-id": node.id,
+          },
+          htmlEl("span", { class: "id" }, node.id),
+          " ",
+          htmlEl("span", { class: "type" }, node.type),
+          htmlEl("br"),
+          truncate(node.text, 34),
+        ),
+      );
+    }),
+  );
   list.querySelectorAll<HTMLElement>("button[data-id]").forEach((button: HTMLElement) => {
     button.addEventListener("click", () => selectRoot(button.dataset.id));
   });
@@ -724,10 +902,21 @@ function renderNodeList() {
  * チェックの有無は state の集合から取る (ハッシュ付きの URL で開いたとき用)。
  */
 function renderToggles(containerId, attribute, items, set) {
-  getElement(containerId).replaceChildren(...items.map((item) =>
-    htmlEl("label", { class: "toggle" },
-      htmlEl("input", { type: "checkbox", [`data-${attribute}`]: item.key, checked: set.has(item.key) }),
-      ` ${item.label}`, htmlEl("span", { class: "count" }, String(item.count)))));
+  getElement(containerId).replaceChildren(
+    ...items.map((item) =>
+      htmlEl(
+        "label",
+        { class: "toggle" },
+        htmlEl("input", {
+          type: "checkbox",
+          [`data-${attribute}`]: item.key,
+          checked: set.has(item.key),
+        }),
+        ` ${item.label}`,
+        htmlEl("span", { class: "count" }, String(item.count)),
+      ),
+    ),
+  );
 }
 
 /**
@@ -787,8 +976,8 @@ function renderFocusOptions() {
   );
 }
 
-const directionName = (direction) => direction === "LR" ? "横 (LR)" : "縦 (TD)";
-const focusName = () => state.focus ? `近傍 ${state.focus} ホップ` : "フォーカス: 切";
+const directionName = (direction) => (direction === "LR" ? "横 (LR)" : "縦 (TD)");
+const focusName = () => (state.focus ? `近傍 ${state.focus} ホップ` : "フォーカス: 切");
 
 /** アイコンだけの向き・フォーカス操作にも現在値を伝える。 */
 function syncGraphControlLabels() {
@@ -850,12 +1039,14 @@ function renderStats() {
     htmlEl("span", { class: "chip" }, `${DATA.stats.edges} エッジ`),
   ];
   for (const severity of ["error", "severe", "warning", "info"]) {
-    if (counts[severity]) chips.push(htmlEl("span", { class: `chip ${severity}` }, `${severity} ${counts[severity]}`));
+    if (counts[severity])
+      chips.push(htmlEl("span", { class: `chip ${severity}` }, `${severity} ${counts[severity]}`));
   }
   if (!counts.error && !counts.severe && !counts.warning && !counts.info) {
     chips.push(htmlEl("span", { class: "chip" }, "指摘なし"));
   }
-  if (DATA.stats.suppressed) chips.push(htmlEl("span", { class: "chip" }, `抑制 ${DATA.stats.suppressed} 件`));
+  if (DATA.stats.suppressed)
+    chips.push(htmlEl("span", { class: "chip" }, `抑制 ${DATA.stats.suppressed} 件`));
   getElement("stats").replaceChildren(...chips);
   getElement("sources").textContent = DATA.generated_from.join(", ");
   renderLegend();
@@ -902,15 +1093,24 @@ function renderFindings() {
 
   const tabBar = getElement("finding-tabs");
   const refocus = tabBar.contains(document.activeElement);
-  tabBar.replaceChildren(...tabs.map((tab) => htmlEl("button", {
-    type: "button",
-    role: "tab",
-    "aria-controls": "findings",
-    "data-severity": tab.key,
-    class: tab.key === findingSeverity ? "active" : "",
-    "aria-selected": tab.key === findingSeverity,
-    tabindex: tab.key === findingSeverity ? 0 : -1,
-  }, tab.label, htmlEl("span", { class: "count" }, String(tab.count)))));
+  tabBar.replaceChildren(
+    ...tabs.map((tab) =>
+      htmlEl(
+        "button",
+        {
+          type: "button",
+          role: "tab",
+          "aria-controls": "findings",
+          "data-severity": tab.key,
+          class: tab.key === findingSeverity ? "active" : "",
+          "aria-selected": tab.key === findingSeverity,
+          tabindex: tab.key === findingSeverity ? 0 : -1,
+        },
+        tab.label,
+        htmlEl("span", { class: "count" }, String(tab.count)),
+      ),
+    ),
+  );
   tabBar.querySelectorAll<HTMLElement>("button[data-severity]").forEach((button: HTMLElement) => {
     button.addEventListener("click", () => showSeverity(button));
   });
@@ -923,8 +1123,14 @@ function renderFindings() {
   else {
     const children = [];
     for (const group of groups) {
-      children.push(htmlEl("div", { class: "code-head" },
-        htmlEl("span", {}, group.code), htmlEl("span", {}, `${group.items.length} 件`)));
+      children.push(
+        htmlEl(
+          "div",
+          { class: "code-head" },
+          htmlEl("span", {}, group.code),
+          htmlEl("span", {}, `${group.items.length} 件`),
+        ),
+      );
       children.push(...group.items.map((finding) => findingElement(finding)));
     }
     panel.replaceChildren(...children);
@@ -947,20 +1153,37 @@ function renderTable() {
     const active = state.sort.key === column.key;
     const order = active ? (state.sort.asc ? "ascending" : "descending") : "none";
     const arrow = active ? (state.sort.asc ? "▲" : "▼") : "";
-    headRow.append(htmlEl("th", { class: column.numeric ? "num" : "", "aria-sort": order },
-      htmlEl("button", { "data-key": column.key, title: "この列で並べ替える" },
-        column.label, htmlEl("span", { class: "arrow" }, arrow))));
+    headRow.append(
+      htmlEl(
+        "th",
+        { class: column.numeric ? "num" : "", "aria-sort": order },
+        htmlEl(
+          "button",
+          { "data-key": column.key, title: "この列で並べ替える" },
+          column.label,
+          htmlEl("span", { class: "arrow" }, arrow),
+        ),
+      ),
+    );
   }
 
   const cell = (row, key) => {
     if (key === "text") return htmlEl("td", { class: "text" }, row.text);
     if (key === "findings") {
       return row.findings
-        ? htmlEl("td", { class: "num" }, htmlEl("button", {
-          class: `finding-count ${row.severity || ""}`.trim(),
-          "data-findings": row.id,
-          title: "このノードへの指摘を見る",
-        }, String(row.findings)))
+        ? htmlEl(
+            "td",
+            { class: "num" },
+            htmlEl(
+              "button",
+              {
+                class: `finding-count ${row.severity || ""}`.trim(),
+                "data-findings": row.id,
+                title: "このノードへの指摘を見る",
+              },
+              String(row.findings),
+            ),
+          )
         : htmlEl("td", { class: "num dash" }, "—");
     }
     if (key === "evidence") {
@@ -974,14 +1197,33 @@ function renderTable() {
   const body = htmlEl("tbody");
   if (rows.length) {
     for (const row of rows) {
-      body.append(htmlEl("tr", {
-        "data-id": row.id, tabindex: 0, class: row.id === state.selected ? "sel" : "",
-      }, ...TABLE_COLUMNS.map((column) => cell(row, column.key))));
+      body.append(
+        htmlEl(
+          "tr",
+          {
+            "data-id": row.id,
+            tabindex: 0,
+            class: row.id === state.selected ? "sel" : "",
+          },
+          ...TABLE_COLUMNS.map((column) => cell(row, column.key)),
+        ),
+      );
     }
   } else {
-    body.append(htmlEl("tr", {}, htmlEl("td", {
-      class: "empty", colspan: TABLE_COLUMNS.length,
-    }, "条件に合うノードは無い。")));
+    body.append(
+      htmlEl(
+        "tr",
+        {},
+        htmlEl(
+          "td",
+          {
+            class: "empty",
+            colspan: TABLE_COLUMNS.length,
+          },
+          "条件に合うノードは無い。",
+        ),
+      ),
+    );
   }
 
   const table = getElement("node-table");
@@ -1032,7 +1274,9 @@ function showFindings(id) {
 function bindTabKeys(container: HTMLElement, activate: (tab: HTMLElement) => void) {
   const keys = { ArrowLeft: -1, ArrowRight: 1 };
   container.onkeydown = (event) => {
-    const buttons = [...container.querySelectorAll<HTMLElement>('[role="tab"]')].filter((button) => !button.hasAttribute("disabled"));
+    const buttons = [...container.querySelectorAll<HTMLElement>('[role="tab"]')].filter(
+      (button) => !button.hasAttribute("disabled"),
+    );
     const at = buttons.indexOf(event.target as HTMLElement);
     if (at < 0) return;
     let next = null;
@@ -1058,7 +1302,10 @@ function setMode(mode) {
   if (mode !== state.mode) state.detail = null;
   state.mode = mode;
   getElement("graph-frame").hidden = mode === "table";
-  getElement("graph-frame").setAttribute("aria-label", mode === "analysis" ? "フォーカス分析" : "グラフ");
+  getElement("graph-frame").setAttribute(
+    "aria-label",
+    mode === "analysis" ? "フォーカス分析" : "グラフ",
+  );
   getElement("table-frame").hidden = mode !== "table";
   for (const element of queryElements(".graph-only")) {
     element.hidden = mode === "table";
@@ -1158,7 +1405,8 @@ function chooseNode(id) {
 
 function refresh() {
   view = createView(DATA, state);
-  if (state.mode === "analysis" && state.detail && !analysisIds()?.has(state.detail)) state.detail = null;
+  if (state.mode === "analysis" && state.detail && !analysisIds()?.has(state.detail))
+    state.detail = null;
   syncGraphControlLabels();
   renderLegend();
   renderFindings();
@@ -1299,9 +1547,10 @@ function positionExportMenu() {
   const gap = 4;
   const width = document.documentElement.clientWidth;
   const height = document.documentElement.clientHeight;
-  const top = anchor.bottom + gap + menu.height <= height - margin
-    ? anchor.bottom + gap
-    : anchor.top - gap - menu.height;
+  const top =
+    anchor.bottom + gap + menu.height <= height - margin
+      ? anchor.bottom + gap
+      : anchor.top - gap - menu.height;
   exportOptions.style.left = `${Math.max(margin, Math.min(anchor.right - menu.width, width - margin - menu.width))}px`;
   exportOptions.style.top = `${Math.max(margin, Math.min(top, height - margin - menu.height))}px`;
 }
@@ -1332,7 +1581,7 @@ function download(name, text, type) {
 function currentSvg() {
   if (!svg) return null;
   const copy = svg.cloneNode(true) as SVGSVGElement;
-  copy.querySelectorAll(".hidden").forEach((element) => element.remove());
+  for (const element of copy.querySelectorAll(".hidden")) element.remove();
   copy.querySelectorAll("[tabindex], [role], [aria-label]").forEach((element) => {
     element.removeAttribute("tabindex");
     element.removeAttribute("role");
@@ -1351,13 +1600,14 @@ function currentSvg() {
   copy.querySelector(".graph-layer")?.removeAttribute("transform");
   const pal = palette();
   const background = copy.querySelector(".graph-bg");
-  if (background) setAttrs(background, {
-    x: box.x1 - padding,
-    y: box.y1 - padding,
-    width,
-    height,
-    fill: pal.bg,
-  });
+  if (background)
+    setAttrs(background, {
+      x: box.x1 - padding,
+      y: box.y1 - padding,
+      width,
+      height,
+      fill: pal.bg,
+    });
   const impact = impactColors();
   const style = svgEl("style");
   style.textContent = `
@@ -1374,7 +1624,7 @@ function currentSvg() {
     .node.down .node-shape { stroke: ${impact.downstream || pal.fg}; stroke-width: 3; }
     .node.rel .node-shape { stroke: ${impact.related || pal.fg}; stroke-width: 3; }
     .edge.on-path .edge-line { stroke: ${pal.fg}; stroke-width: 2; }
-    .hit .node-shape { filter: drop-shadow(0 0 8px ${(DATA.meta.search || {}).hit || pal.fg}); }
+    .hit .node-shape { filter: drop-shadow(0 0 8px ${DATA.meta.search?.hit || pal.fg}); }
     .dim.hit { opacity: .65; }
     .trail-muted { opacity: .35; }
     .node.detail-path:not(.sel) .node-shape { stroke: ${impact.related || pal.fg}; stroke-width: 4; }

@@ -92,7 +92,7 @@ jobs:
           uv run --locked req validate --strict examples/bench.py
 
   site-js:
-    # 埋め込み前の TypeScript を、単体で型検査してユニットテストにかける。
+    # 埋め込み前の TypeScript を、単体で lint・型検査してユニットテストにかける。
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
@@ -103,6 +103,9 @@ jobs:
 
       - name: Node 依存をインストール
         run: npm ci
+
+      - name: lint と整形
+        run: npm run check:js
 
       - name: 型検査
         run: npm run typecheck:ts

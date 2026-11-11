@@ -10,9 +10,12 @@
     "test": "npm run check:bundle && node --import tsx --test tests/js/*.test.mjs",
     "bench": "node --import tsx tests/js/bench.mjs",
     "typecheck:py": "pyright",
-    "typecheck:ts": "tsc --noEmit"
+    "typecheck:ts": "tsc --noEmit",
+    "check:js": "biome ci --error-on-warnings",
+    "fix:js": "biome check --write"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.6",
     "esbuild": "^0.25.9",
     "happy-dom": "^21.0.4",
     "pyright": "^1.1.414",

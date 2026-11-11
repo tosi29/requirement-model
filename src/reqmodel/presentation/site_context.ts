@@ -1,5 +1,13 @@
-import { compare, activeEdgeNames, edgeSelection, hiddenByDefault, impactScope, impactSets, rankOf, reach } from "./site_graph.ts";
+import {
+  compare,
+  edgeSelection,
+  hiddenByDefault,
+  impactScope,
+  impactSets,
+  rankOf,
+} from "./site_graph.ts";
 import type { GraphViewModel, SiteData } from "./site_types.ts";
+
 // --- LLM 用コンテキスト -----------------------------------------------------
 //
 // 以下は `explain.py` の explain_text() / _describe() / _all_edge_names() の写し。
@@ -41,7 +49,11 @@ export function allEdgeNames(data: SiteData): string[] {
  * コピー本文と同じ内容を出す `req explain` のコマンド行。詳細ペインの案内に使う。
  * 画面の設定 (エッジ種別・深さ・向き) がそのまま引数になる。
  */
-export function explainCommand(view: GraphViewModel, id: string, scope: { depth: number | null; undirected: boolean } | null = null): string {
+export function explainCommand(
+  view: GraphViewModel,
+  id: string,
+  scope: { depth: number | null; undirected: boolean } | null = null,
+): string {
   const { depth, undirected } = scope || impactScope(view.state);
   const selection = edgeSelection(view);
   const parts = [`req explain ${id}`];
@@ -57,7 +69,11 @@ export function explainCommand(view: GraphViewModel, id: string, scope: { depth:
  *
  * scope を省略すると view の state から取るので、画面の色分けと同じ範囲になる。
  */
-export function nodeContext(view: GraphViewModel, id: string, scope: { depth: number | null; undirected: boolean } | null = null): string {
+export function nodeContext(
+  view: GraphViewModel,
+  id: string,
+  scope: { depth: number | null; undirected: boolean } | null = null,
+): string {
   const settings = scope || impactScope(view.state);
   const selection = edgeSelection(view);
   const edgeFilter = Array.isArray(selection) ? selection : null;
@@ -95,9 +111,7 @@ export function nodeContext(view: GraphViewModel, id: string, scope: { depth: nu
   }
 
   // 部分グラフのエッジは種別で絞らない (CLI の subgraph_edges と同じ)。
-  const edges = view.data.edges.filter(
-    (edge) => whole.has(edge.source) && whole.has(edge.target),
-  );
+  const edges = view.data.edges.filter((edge) => whole.has(edge.source) && whole.has(edge.target));
   if (edges.length) {
     lines.push("", `## 部分グラフのエッジ (${edges.length} 件)`);
     const sorted = [...edges].sort(
@@ -119,5 +133,5 @@ export function nodeContext(view: GraphViewModel, id: string, scope: { depth: nu
     lines.push("", `(部分グラフに現れなかったエッジ種別: ${unused.join(", ")})`);
   }
 
-  return lines.join("\n") + "\n";
+  return `${lines.join("\n")}\n`;
 }

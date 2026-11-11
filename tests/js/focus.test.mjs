@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  createView, defaultState, decodeHash, encodeHash, focusedNodes, focusTrail,
-  analysisBandLayout, impactScope, selectNodeState, storableHash,
+  analysisBandLayout,
+  createView,
+  decodeHash,
+  defaultState,
+  encodeHash,
+  focusedNodes,
+  focusTrail,
+  impactScope,
+  selectNodeState,
+  storableHash,
 } from "../../src/reqmodel/presentation/site_logic.ts";
 import { fixture } from "./fixture.mjs";
 
@@ -12,7 +20,12 @@ const ids = (set) => [...set].sort();
 
 test("分析の上流・下流は向きを反転して兄弟へ広がらない", () => {
   assert.deepEqual(ids(focusedNodes(viewFor())), ["FR-1", "Need-1", "QR-1"]);
-  assert.deepEqual(ids(focusedNodes(viewFor({ mode: "graph", focus: 2 }))), ["FR-1", "Goal-1", "Need-1", "QR-1"]);
+  assert.deepEqual(ids(focusedNodes(viewFor({ mode: "graph", focus: 2 }))), [
+    "FR-1",
+    "Goal-1",
+    "Need-1",
+    "QR-1",
+  ]);
 });
 
 test("分析の深さ・種別・エッジの絞り込みを探索にも適用する", () => {
@@ -31,7 +44,10 @@ test("起点がフィルタで消えたら空の図を保ち、選択なし・�
 
 test("分析中は有向、近傍と通常表示では元の向き設定を使う", () => {
   assert.equal(impactScope(viewFor({ undirected: true }).state).undirected, false);
-  assert.equal(impactScope(viewFor({ mode: "graph", focus: 2, undirected: true }).state).undirected, true);
+  assert.equal(
+    impactScope(viewFor({ mode: "graph", focus: 2, undirected: true }).state).undirected,
+    true,
+  );
 });
 
 test("フォーカス中のクリック・再クリックは起点と表示範囲を固定する", () => {
@@ -87,7 +103,11 @@ test("起点・向き・detail を URL から復元し、次回訪問にはノ�
   assert.equal(hash, "#node=FR-1&view=analysis&detail=QR-1&depth=2");
   assert.deepEqual(decodeHash(hash, view.data), view.state);
   assert.equal(storableHash(view.state, view.data), "#depth=2");
-  for (const hash of ["#detail=QR-1", "#node=FR-1&detail=QR-1", "#node=FR-1&view=analysis&detail=NOPE"]) {
+  for (const hash of [
+    "#detail=QR-1",
+    "#node=FR-1&detail=QR-1",
+    "#node=FR-1&view=analysis&detail=NOPE",
+  ]) {
     assert.equal(decodeHash(hash, view.data).detail, null);
   }
   assert.equal(decodeHash("#focus=bogus", view.data).focus, 0);
@@ -115,7 +135,8 @@ test("通常グラフの近傍表示は選択を固定せず、分析タブだ�
 
 test("分析は型や要求グループに関係なく上流・起点・下流を順に配置する", () => {
   const view = viewFor();
-  const placed = view.nodes.filter(n => focusedNodes(view).has(n.id))
+  const placed = view.nodes
+    .filter((n) => focusedNodes(view).has(n.id))
     .map((n, i) => ({ ...n, x: i * 80, y: i * 60, w: 50, h: 30 }));
   for (const direction of ["TD", "LR"]) {
     const { positions, frames } = analysisBandLayout(view, placed, direction);
@@ -123,8 +144,12 @@ test("分析は型や要求グループに関係なく上流・起点・下流�
     const axis = direction === "TD" ? "y" : "x";
     assert(positions.get("QR-1")[axis] < positions.get("FR-1")[axis]);
     assert(positions.get("FR-1")[axis] < positions.get("Need-1")[axis]);
-    for (const [id, key] of [["QR-1", "analysis:upstream"], ["Need-1", "analysis:downstream"]]) {
-      const box = frames.get(key), point = positions.get(id);
+    for (const [id, key] of [
+      ["QR-1", "analysis:upstream"],
+      ["Need-1", "analysis:downstream"],
+    ]) {
+      const box = frames.get(key),
+        point = positions.get(id);
       assert(point.x - 25 >= box.x - box.w / 2);
       assert(point.x + 25 <= box.x + box.w / 2);
       assert(point.y - 15 >= box.y - box.h / 2);
@@ -137,7 +162,8 @@ test("循環で両方向に属するノードも重複させず配置する", ()
   const data = fixture();
   data.edges.push({ source: "Need-1", target: "FR-1", name: "motivates" });
   const view = viewFor({}, data);
-  const placed = view.nodes.filter(n => focusedNodes(view).has(n.id))
+  const placed = view.nodes
+    .filter((n) => focusedNodes(view).has(n.id))
     .map((n, i) => ({ ...n, x: i * 80, y: i * 60, w: 50, h: 30 }));
   const layout = analysisBandLayout(view, placed, "TD");
   assert(layout.frames.has("analysis:shared"));

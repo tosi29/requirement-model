@@ -87,6 +87,7 @@ uv run --locked req validate --strict requirements.py
 uv run --locked req validate --strict examples/sample.py
 uv run --locked req validate --strict examples/bench.py
 
+npm run check:js
 npm run typecheck:ts
 npm test
 ```

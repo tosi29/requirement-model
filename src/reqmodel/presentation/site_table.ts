@@ -1,5 +1,4 @@
-import { truncate } from "./site_text.ts";
-import { compare, fieldLabel, rankOf, reach } from "./site_graph.ts";
+import { compare, fieldLabel, rankOf } from "./site_graph.ts";
 import type { Finding, GraphViewModel, NormalizedNode, SiteData, SortState } from "./site_types.ts";
 // --- テーブル --------------------------------------------------------------
 //
@@ -23,10 +22,7 @@ const SEVERITY_ORDER = ["error", "severe", "warning", "info"];
 export function matchesQuery(node: NormalizedNode, query: string): boolean {
   const needle = (query || "").trim().toLowerCase();
   if (!needle) return true;
-  return (
-    node.id.toLowerCase().includes(needle) ||
-    node.text.toLowerCase().includes(needle)
-  );
+  return node.id.toLowerCase().includes(needle) || node.text.toLowerCase().includes(needle);
 }
 
 /**
@@ -43,7 +39,11 @@ export function searchHits(view: GraphViewModel, query: string): string[] {
  * ↑↓ で候補を送ったときの次の id。delta は +1 (下) か -1 (上)。
  * 端では巻き戻す。候補が無ければ null、現在位置が候補に無ければ端から始める。
  */
-export function stepHit(hits: readonly string[], current: string | null, delta: number): string | null {
+export function stepHit(
+  hits: readonly string[],
+  current: string | null,
+  delta: number,
+): string | null {
   if (!hits.length) return null;
   const at = hits.indexOf(current);
   if (at < 0) return delta > 0 ? hits[0] : hits[hits.length - 1];
@@ -91,7 +91,7 @@ function sortValue(view, row, key) {
     case "type":
       return view.data.types.indexOf(row.type);
     case "status": {
-      const rank = (view.data.status_rank || {})[row.status];
+      const rank = view.data.status_rank?.[row.status];
       return rank === undefined ? MISSING_VALUE : rank;
     }
     default:
@@ -103,7 +103,11 @@ function sortValue(view, row, key) {
  * 行の並び替え。同値のときは正規化 JSON の並び (型順 → id 順) で決めるので、
  * 何度押しても結果が揺れない。
  */
-export function sortRows(view: GraphViewModel, rows: ReturnType<typeof tableRows>, sort: SortState) {
+export function sortRows(
+  view: GraphViewModel,
+  rows: ReturnType<typeof tableRows>,
+  sort: SortState,
+) {
   const sign = sort.asc ? 1 : -1;
   return [...rows].sort((a, b) => {
     const left = sortValue(view, a, sort.key);
@@ -165,8 +169,8 @@ export function edgeItems(view: GraphViewModel, id: string) {
  * リポジトリ内の位置が決まらない。黙って null にする (誤ったリンクは出さない)。
  */
 export function sourceUrl(data: SiteData, location: string): string | null {
-  const repo = (data || {}).repo;
-  if (!repo || !repo.url || !location) return null;
+  const repo = data?.repo;
+  if (!repo?.url || !location) return null;
   const match = /^(.+?)(?::(\d+))?$/.exec(String(location).trim());
   if (!match) return null;
   const path = match[1].replace(/\\/g, "/").replace(/^\.\//, "");

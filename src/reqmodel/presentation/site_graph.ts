@@ -1,4 +1,3 @@
-import { labelChunks, nodeSize, estimateTextWidth } from "./site_text.ts";
 import type {
   GraphViewModel,
   NormalizedEdge,
@@ -22,14 +21,11 @@ import type {
 export function createView(data: SiteData, state: ViewState): GraphViewModel {
   const byId = new Map(data.nodes.map((node) => [node.id, node]));
   const nodes = data.nodes.filter(
-    (node) =>
-      state.types.has(node.type) &&
-      (!state.statuses || state.statuses.has(node.status)),
+    (node) => state.types.has(node.type) && (!state.statuses || state.statuses.has(node.status)),
   );
   const shown = new Set(nodes.map((node) => node.id));
   const edges = data.edges.filter(
-    (edge) =>
-      state.edges.has(edge.name) && shown.has(edge.source) && shown.has(edge.target),
+    (edge) => state.edges.has(edge.name) && shown.has(edge.source) && shown.has(edge.target),
   );
   const order = new Map(data.nodes.map((node, index) => [node.id, index]));
   return { data, state, byId, nodes, edges, order, adjacency: buildAdjacency(nodes, edges) };
@@ -78,7 +74,7 @@ export const FIELD_LABELS = Object.freeze({
 export const fieldLabel = (name) => FIELD_LABELS[name] || name;
 
 /** status の一覧。並びは成熟度 (`meta.statuses` の順 = `STATUS_RANK`)。 */
-export const statusNames = (data) => Object.keys((data.meta || {}).statuses || {});
+export const statusNames = (data) => Object.keys(data.meta?.statuses || {});
 
 /** status の選択肢。 */
 export function statusFilters(data: SiteData) {
@@ -92,11 +88,15 @@ export function statusFilters(data: SiteData) {
 
 /** 図に既定で描かないもの (`site_data()` の `hidden_by_default`)。 */
 export function hiddenByDefault(data: SiteData, key: "types" | "edges"): readonly string[] {
-  return ((data || {}).hidden_by_default || {})[key] || [];
+  return data?.hidden_by_default?.[key] || [];
 }
 
 /** ある軸の既定の選択。全体から「既定で隠すもの」を引いたもの。 */
-export function initialSelection(data: SiteData, all: readonly string[], key: "types" | "edges"): string[] {
+export function initialSelection(
+  data: SiteData,
+  all: readonly string[],
+  key: "types" | "edges",
+): string[] {
   const hidden = new Set(hiddenByDefault(data, key));
   return all.filter((name) => !hidden.has(name));
 }
@@ -165,7 +165,12 @@ function walk(view, start, direction, depth = null) {
  * depth はホップ数の上限 (null なら無制限)。
  * 見えているエッジだけを使うので、絞り込みは影響範囲の計算にも効く。
  */
-export function reach(view: GraphViewModel, start: string, forward: boolean, depth: number | null = null): Set<string> {
+export function reach(
+  view: GraphViewModel,
+  start: string,
+  forward: boolean,
+  depth: number | null = null,
+): Set<string> {
   return walk(view, start, forward ? "out" : "in", depth);
 }
 
@@ -173,7 +178,11 @@ export function reach(view: GraphViewModel, start: string, forward: boolean, dep
  * 向きを無視して辿れるノード (`req explain --undirected` と同じ)。
  * 「この FR はなぜ作るのか (Goal)」のように、有向では繋がらない文脈を集める。
  */
-export function related(view: GraphViewModel, start: string, depth: number | null = null): Set<string> {
+export function related(
+  view: GraphViewModel,
+  start: string,
+  depth: number | null = null,
+): Set<string> {
   return walk(view, start, "both", depth);
 }
 
@@ -191,10 +200,10 @@ export const IMPACT_DEPTHS = [1, 2, 3, 4, 5];
  * state.depth の 0 (既定) は「無制限」なので null に写す。
  */
 export function impactScope(state: ViewState) {
-  const depth = (state || {}).depth;
+  const depth = state?.depth;
   return {
     depth: IMPACT_DEPTHS.includes(depth) ? depth : null,
-    undirected: state?.mode !== "analysis" && Boolean((state || {}).undirected),
+    undirected: state?.mode !== "analysis" && Boolean(state?.undirected),
   };
 }
 
@@ -206,7 +215,11 @@ export function impactScope(state: ViewState) {
  * downstream 側に入れる (呼び出し側は 1 つの「関連ノード」として扱う)。
  * scope を省略すると view の state から取る。
  */
-export function impactSets(view: GraphViewModel, id: string, scope: { depth: number | null; undirected: boolean } | null = null) {
+export function impactSets(
+  view: GraphViewModel,
+  id: string,
+  scope: { depth: number | null; undirected: boolean } | null = null,
+) {
   const { depth, undirected } = scope || impactScope(view.state);
   if (undirected) {
     const neighbours = related(view, id, depth);
@@ -268,7 +281,15 @@ export function focusedNodes(view: GraphViewModel): Set<string> | null {
 export function focusTrail(view: GraphViewModel, shown = focusedNodes(view)) {
   const { selected, detail, mode } = view.state;
   const result = { nodes: new Set<string>(), edges: new Set<NormalizedEdge>() };
-  if (mode !== "analysis" || !shown || !selected || !detail || !shown.has(selected) || !shown.has(detail)) return result;
+  if (
+    mode !== "analysis" ||
+    !shown ||
+    !selected ||
+    !detail ||
+    !shown.has(selected) ||
+    !shown.has(detail)
+  )
+    return result;
   const nodes = view.nodes.filter((node) => shown.has(node.id));
   const edges = view.edges.filter((edge) => shown.has(edge.source) && shown.has(edge.target));
   const scoped = { ...view, nodes, edges, adjacency: buildAdjacency(nodes, edges) };
@@ -291,7 +312,6 @@ export function focusTrail(view: GraphViewModel, shown = focusedNodes(view)) {
 const MISSING_RANK = 10 ** 6;
 
 /** ノードが現れる順 (正規化 JSON の並び = 型順 → id 順)。 */
-export const rankOf = (view, id) =>
-  view.order.has(id) ? view.order.get(id) : MISSING_RANK;
+export const rankOf = (view, id) => (view.order.has(id) ? view.order.get(id) : MISSING_RANK);
 
 export const compare = (a, b) => (a < b ? -1 : a > b ? 1 : 0);

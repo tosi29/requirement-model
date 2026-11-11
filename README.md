@@ -933,15 +933,20 @@ $ npm run typecheck:py
 lint と整形は ruff、型検査は pyright が担う。pyright の本体は Node 製なので npm 側
 (`package-lock.json`) で固定し、型の解決には `uv sync` が作る `.venv` を使う。
 
+TypeScript / JavaScript 側は lint と整形を Biome (`biome.jsonc`)、型検査を tsc が担う。
+一括整形のコミットは `.git-blame-ignore-revs` に登録してあり、手元の `git blame` では
+`git config blame.ignoreRevsFile .git-blame-ignore-revs` で除外できる。
+
 静的サイトの TypeScript だけを回すなら Node (18 以上) で、`npm install` 後に次を叩く。
 
 ```console
+$ npm run check:js      # Biome の lint と整形の検査 (fix:js で自動修正)
 $ npm run typecheck:ts
 $ npm test
 $ npm run bench   # 300 ノード級の合成グラフで探索の時間を測る
 ```
 
-`pytest` からも同じものが走る (`tests/test_site_js.py`)。node が入っていない環境では
+型検査とユニットテストは `pytest` からも走る (`tests/test_site_js.py`)。node が入っていない環境では
 skip されるので、CI では `.github/workflows/ci.yml` が node を明示的に用意している。
 
 ## パッケージ構成

@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    // 生成物 (esbuild の bundle と公開用サイト) は検査しない。
+    "includes": [
+      "**/*.ts",
+      "**/*.mjs",
+      "**/*.js",
+      "*.json",
+      "*.jsonc",
+      "!src/reqmodel/presentation/site_bundle.js",
+      "!site"
+    ]
+  },
+  "formatter": { "indentStyle": "space", "lineWidth": 100 },
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        // strictNullChecks (#182) で、! による黙殺を機械的に禁止する。
+        "noNonNullAssertion": "error",
+        // 推奨ルールでは info 扱いで CI を落とさないため、明示的に有効にする。
+        // 文字列連結を template literal に揃える。
+        "useTemplate": "error"
+      }
+    }
+  }
+}

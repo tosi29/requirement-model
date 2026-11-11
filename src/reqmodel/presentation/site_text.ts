@@ -14,7 +14,7 @@
 
 /** 表示用に長い本文を切り詰める。 */
 export function truncate(text: string, limit = 42): string {
-  return text.length > limit ? text.slice(0, limit - 1) + "…" : text;
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
 }
 
 export function escapeHtml(text: string): string {

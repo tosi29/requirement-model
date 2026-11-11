@@ -334,6 +334,7 @@ SVG の書き出しは、画面にある SVG DOM を複製し、非表示要素�
 
 ```console
 $ npm run build          # 配布用 bundle を更新
+$ npm run check:js       # Biome による lint と整形の検査
 $ npm run typecheck:ts   # source modules の型検査
 $ npm test               # bundle の鮮度検査 + node:test
 ```

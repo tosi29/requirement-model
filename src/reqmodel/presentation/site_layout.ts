@@ -1,24 +1,36 @@
-import { LABEL_FONT, LABEL_MAX_LENGTH, LABEL_WRAP_WIDTH, escapeAttr, escapeHtml, labelChunks, nodeSize, truncate, estimateTextWidth, wrapLabel } from "./site_text.ts";
 import { compare, fieldLabel, impactSets } from "./site_graph.ts";
-import type { GraphElementDefinition, GraphViewModel, RenderMetadata, SiteData } from "./site_types.ts";
+import {
+  escapeAttr,
+  escapeHtml,
+  estimateTextWidth,
+  LABEL_FONT,
+  LABEL_MAX_LENGTH,
+  LABEL_WRAP_WIDTH,
+  nodeSize,
+  truncate,
+  wrapLabel,
+} from "./site_text.ts";
+import type {
+  GraphElementDefinition,
+  GraphViewModel,
+  RenderMetadata,
+  SiteData,
+} from "./site_types.ts";
+
 // --- SVG 描画に渡す値 -------------------------------------------------------
 //
 // 生成するのはただのオブジェクトなので、ライブラリを読み込まなくてもテストできる。
 
 /** Requirements 段に入る型。 */
-const REQUIREMENT_TYPES = new Set([
-  "FunctionalRequirement",
-  "QualityRequirement",
-  "Constraint",
-]);
+const REQUIREMENT_TYPES = new Set(["FunctionalRequirement", "QualityRequirement", "Constraint"]);
 
 /** 帯 (枠) の定義。Goal / Need は型ごと、Requirements は表示用グループごとに作る。 */
 export function bandDefs(data: SiteData) {
-  const top = ((data.meta || {}).bands || [])
+  const top = (data.meta?.bands || [])
     .filter((band) => data.nodes.some((node) => node.type === band.type))
     .map((band) => ({ ...band, key: band.type }));
 
-  if (!Object.prototype.hasOwnProperty.call(data, "requirement_groups")) return top;
+  if (!Object.hasOwn(data, "requirement_groups")) return top;
 
   const groups = [...(data.requirement_groups || [])].sort(
     (a, b) => (a.order || 0) - (b.order || 0) || compare(a.id, b.id),
@@ -62,9 +74,7 @@ export function visibleBandKeys(data, shownNodes) {
   const types = new Set(shownNodes.map((node) => node.type));
   const keys = new Set();
   for (const band of bandDefs(data)) {
-    const visible = band.members
-      ? band.members.some((id) => ids.has(id))
-      : types.has(band.type);
+    const visible = band.members ? band.members.some((id) => ids.has(id)) : types.has(band.type);
     if (visible) keys.add(band.type || band.key);
   }
   return keys;
@@ -86,14 +96,17 @@ export const bandId = (key) => `band:${key}`;
  * ラベルの外接矩形になり、六角形や菱形では文字が図形の外に出る。measure は
  * ラベル 1 行の幅 (px) を返す関数で、省略すると概算 (`estimateTextWidth`) を使う。
  */
-export function graphElements(data: SiteData, measure = estimateTextWidth): GraphElementDefinition[] {
+export function graphElements(
+  data: SiteData,
+  measure = estimateTextWidth,
+): GraphElementDefinition[] {
   const bands = bandDefs(data);
-  const types = (data.meta || {}).types || {};
+  const types = data.meta?.types || {};
   return [
     ...data.nodes.map((node) => {
       const text = wrapLabel(truncate(node.text, LABEL_MAX_LENGTH), LABEL_WRAP_WIDTH, measure);
       const label = `${node.id}\n${text}`;
-      const size = nodeSize(label, (types[node.type] || {}).fit, measure);
+      const size = nodeSize(label, types[node.type]?.fit, measure);
       return {
         data: {
           id: node.id,
@@ -195,20 +208,14 @@ export function isNodeVisible(extent, box, margin = 0) {
     x2: extent.x2 - margin,
     y2: extent.y2 - margin,
   };
-  const fits =
-    box.x2 - box.x1 <= inner.x2 - inner.x1 && box.y2 - box.y1 <= inner.y2 - inner.y1;
+  const fits = box.x2 - box.x1 <= inner.x2 - inner.x1 && box.y2 - box.y1 <= inner.y2 - inner.y1;
   if (fits) {
-    return (
-      box.x1 >= inner.x1 && box.x2 <= inner.x2 && box.y1 >= inner.y1 && box.y2 <= inner.y2
-    );
+    return box.x1 >= inner.x1 && box.x2 <= inner.x2 && box.y1 >= inner.y1 && box.y2 <= inner.y2;
   }
   const centerX = (box.x1 + box.x2) / 2;
   const centerY = (box.y1 + box.y2) / 2;
   return (
-    centerX >= extent.x1 &&
-    centerX <= extent.x2 &&
-    centerY >= extent.y1 &&
-    centerY <= extent.y2
+    centerX >= extent.x1 && centerX <= extent.x2 && centerY >= extent.y1 && centerY <= extent.y2
   );
 }
 
@@ -305,7 +312,8 @@ function bandRows(members, edges) {
   const rows = [];
   for (const node of members) {
     const row = depthOf(node.id, new Set());
-    (rows[row] ||= []).push(node);
+    rows[row] ||= [];
+    rows[row].push(node);
   }
   return rows.filter(Boolean);
 }
@@ -324,7 +332,13 @@ function bandRows(members, edges) {
  * RequirementGroup 自体は 1 行のまま保ち、その全体幅を Goal / Need の共通幅にも
  * 使う。グループ内のノードだけを指定された最大幅で折り返す。
  */
-export function bandedLayout(bands, placed, edges, direction, options: { groupMaxWidth?: number } = {}) {
+export function bandedLayout(
+  bands,
+  placed,
+  edges,
+  direction,
+  options: { groupMaxWidth?: number } = {},
+) {
   const positions = new Map();
   const frames = new Map();
   const membersOf = bands.map((band) => {
@@ -411,10 +425,7 @@ export function bandedLayout(bands, placed, edges, direction, options: { groupMa
           const local = group.positions.get(node.id);
           positions.set(
             node.id,
-            at(
-              groupLeft + BAND_FRAME_PAD + local.sec,
-              sectionFrom + BAND_FRAME_PAD + local.pri,
-            ),
+            at(groupLeft + BAND_FRAME_PAD + local.sec, sectionFrom + BAND_FRAME_PAD + local.pri),
           );
         }
         spans.set(index, {
@@ -514,12 +525,8 @@ export function bandedLayout(bands, placed, edges, direction, options: { groupMa
     if (bands[bandIndex].members) {
       frames.set(bands[bandIndex].key, {
         ...at((span.secMin + span.secMax) / 2, (span.from + span.to) / 2),
-        w: vertical
-          ? span.secMax - span.secMin
-          : span.to - span.from,
-        h: vertical
-          ? span.to - span.from
-          : span.secMax - span.secMin,
+        w: vertical ? span.secMax - span.secMin : span.to - span.from,
+        h: vertical ? span.to - span.from : span.secMax - span.secMin,
       });
       continue;
     }
@@ -567,7 +574,7 @@ const EXPORT_LABEL_LIMIT = 40;
 function collapse(text, limit) {
   const collapsed = String(text).split(/\s+/).filter(Boolean).join(" ");
   const chars = [...collapsed];
-  if (limit > 0 && chars.length > limit) return chars.slice(0, limit - 1).join("") + "…";
+  if (limit > 0 && chars.length > limit) return `${chars.slice(0, limit - 1).join("")}…`;
   return collapsed;
 }
 
@@ -607,7 +614,7 @@ export function mermaidText(view: GraphViewModel, maxLabel = EXPORT_LABEL_LIMIT)
   const lines = ["flowchart TD"];
 
   for (const node of view.nodes) {
-    const shape = (types[node.type] || {}).mermaid || { open: "[", close: "]" };
+    const shape = types[node.type]?.mermaid || { open: "[", close: "]" };
     const label = [
       `<b>${node.id}</b> [${node.type}]`,
       mermaidEscape(collapse(node.text, maxLabel)),
@@ -628,7 +635,7 @@ export function mermaidText(view: GraphViewModel, maxLabel = EXPORT_LABEL_LIMIT)
   }
   for (const node of view.nodes) lines.push(`    class ${ids.get(node.id)} ${node.type}`);
 
-  return lines.join("\n") + "\n";
+  return `${lines.join("\n")}\n`;
 }
 
 // --- SVG --------------------------------------------------------------------
@@ -687,7 +694,13 @@ function shapeElement(shape, box, style) {
     });
 
   if (shape === "ellipse") {
-    return element("ellipse", { cx: round(x), cy: round(y), rx: round(w / 2), ry: round(h / 2), ...style });
+    return element("ellipse", {
+      cx: round(x),
+      cy: round(y),
+      rx: round(w / 2),
+      ry: round(h / 2),
+      ...style,
+    });
   }
   if (SVG_POLYGONS[shape]) return polygon(SVG_POLYGONS[shape]);
   if (shape === "cut-rectangle") {
@@ -695,7 +708,22 @@ function shapeElement(shape, box, style) {
     const cx = cut / (w / 2);
     const cy = cut / (h / 2);
     return polygon([
-      -1 + cx, -1, 1 - cx, -1, 1, -1 + cy, 1, 1 - cy, 1 - cx, 1, -1 + cx, 1, -1, 1 - cy, -1, -1 + cy,
+      -1 + cx,
+      -1,
+      1 - cx,
+      -1,
+      1,
+      -1 + cy,
+      1,
+      1 - cy,
+      1 - cx,
+      1,
+      -1 + cx,
+      1,
+      -1,
+      1 - cy,
+      -1,
+      -1 + cy,
     ]);
   }
   const radius = shape === "barrel" ? Math.min(w, h) * SVG_BARREL_RATIO : SVG_CORNER;
@@ -710,7 +738,16 @@ function shapeElement(shape, box, style) {
 }
 
 /** 改行入りのラベル。中心 (x, y) に上下中央で置く。 */
-function labelElement(label, x, y, { size = LABEL_FONT.size, fill = undefined, weight = undefined }: { size?: number; fill?: string; weight?: string } = {}) {
+function labelElement(
+  label,
+  x,
+  y,
+  {
+    size = LABEL_FONT.size,
+    fill = undefined,
+    weight = undefined,
+  }: { size?: number; fill?: string; weight?: string } = {},
+) {
   const lines = String(label).split("\n");
   const step = size * LABEL_FONT.lineHeight;
   const top = y - ((lines.length - 1) * step) / 2 + size * 0.35;
@@ -867,18 +904,17 @@ export function graphSvg(scene) {
     ),
   );
 
-  return (
-    element(
-      "svg",
-      {
-        xmlns: "http://www.w3.org/2000/svg",
-        viewBox: `${round(minX)} ${round(minY)} ${round(width)} ${round(height)}`,
-        width: round(width),
-        height: round(height),
-      },
-      `\n${element("title", {}, escapeHtml(scene.title || "要求グラフ"))}\n${defs}\n${body.join("\n")}\n`,
-    ) + "\n"
+  const svg = element(
+    "svg",
+    {
+      xmlns: "http://www.w3.org/2000/svg",
+      viewBox: `${round(minX)} ${round(minY)} ${round(width)} ${round(height)}`,
+      width: round(width),
+      height: round(height),
+    },
+    `\n${element("title", {}, escapeHtml(scene.title || "要求グラフ"))}\n${defs}\n${body.join("\n")}\n`,
   );
+  return `${svg}\n`;
 }
 
 /** 分析では要求グループでなく、起点からの到達方向で枠を作る。 */
@@ -896,14 +932,20 @@ export function analysisBandLayout(view: GraphViewModel, placed, direction: stri
   if (!selected || !placed.length) return { positions, frames };
   const { upstream, downstream } = impactSets(view, selected);
   const vertical = direction !== "LR";
-  const pri = (node) => vertical ? node.y : node.x;
-  const sec = (node) => vertical ? node.x : node.y;
-  const priSize = (node) => vertical ? node.h : node.w;
-  const secSize = (node) => vertical ? node.w : node.h;
-  const at = (primary, secondary) => vertical ? { x: secondary, y: primary } : { x: primary, y: secondary };
-  const bucket = (node) => node.id === selected ? "root"
-    : upstream.has(node.id) && downstream.has(node.id) ? "shared"
-    : upstream.has(node.id) ? "upstream" : "downstream";
+  const pri = (node) => (vertical ? node.y : node.x);
+  const sec = (node) => (vertical ? node.x : node.y);
+  const priSize = (node) => (vertical ? node.h : node.w);
+  const secSize = (node) => (vertical ? node.w : node.h);
+  const at = (primary, secondary) =>
+    vertical ? { x: secondary, y: primary } : { x: primary, y: secondary };
+  const bucket = (node) =>
+    node.id === selected
+      ? "root"
+      : upstream.has(node.id) && downstream.has(node.id)
+        ? "shared"
+        : upstream.has(node.id)
+          ? "upstream"
+          : "downstream";
   let cursor = 0;
   for (const key of ["upstream", "shared", "root", "downstream"]) {
     const members = placed.filter((node) => bucket(node) === key);
@@ -919,12 +961,20 @@ export function analysisBandLayout(view: GraphViewModel, placed, direction: stri
     const length = maxPri - minPri + primaryBefore + padding;
     const width = maxSec - minSec + secondaryBefore + padding;
     for (const node of members) {
-      positions.set(node.id, at(cursor + primaryBefore + pri(node) - minPri,
-        sec(node) - (minSec + maxSec) / 2 + (vertical ? 0 : labelSpace / 2)));
+      positions.set(
+        node.id,
+        at(
+          cursor + primaryBefore + pri(node) - minPri,
+          sec(node) - (minSec + maxSec) / 2 + (vertical ? 0 : labelSpace / 2),
+        ),
+      );
     }
-    if (key !== "root") frames.set(`analysis:${key}`, {
-      ...at(cursor + length / 2, 0), w: vertical ? width : length, h: vertical ? length : width,
-    });
+    if (key !== "root")
+      frames.set(`analysis:${key}`, {
+        ...at(cursor + length / 2, 0),
+        w: vertical ? width : length,
+        h: vertical ? length : width,
+      });
     cursor += length + 56;
   }
   return { positions, frames };

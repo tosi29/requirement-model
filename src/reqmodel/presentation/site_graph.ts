@@ -1,5 +1,6 @@
 import type {
   GraphViewModel,
+  NodeId,
   NormalizedEdge,
   NormalizedNode,
   SiteData,
@@ -11,8 +12,7 @@ import type {
  * 絞り込みを適用した「いま見えているグラフ」。
  *
  * 1 回の再描画につき 1 つ作り、以降の計算はすべてこれを介して行う。
- * state は `{ types: Set<string>, edges: Set<string>, statuses?: Set<string> }`。
- * statuses は省略すると「絞り込み無し」。
+ * ノードは state の types / statuses の両方に入っているものだけが残る。
  *
  * エッジは「見えているノード同士」を繋ぐものだけが残る。ノード側の条件が
  * 何であれ (種別・status) 同じ扱いになるので、絞り込みはそのまま
@@ -21,7 +21,7 @@ import type {
 export function createView(data: SiteData, state: ViewState): GraphViewModel {
   const byId = new Map(data.nodes.map((node) => [node.id, node]));
   const nodes = data.nodes.filter(
-    (node) => state.types.has(node.type) && (!state.statuses || state.statuses.has(node.status)),
+    (node) => state.types.has(node.type) && state.statuses.has(node.status),
   );
   const shown = new Set(nodes.map((node) => node.id));
   const edges = data.edges.filter(
@@ -61,8 +61,8 @@ function buildAdjacency(nodes: readonly NormalizedNode[], edges: readonly Normal
 // 左サイドバーのチェックボックス 1 群ぶん。件数は絞り込み前の全ノードで数える
 // (チェックを外しても数字が動かないほうが、何を外したか分かる)。
 
-const countBy = (nodes, keyOf) => {
-  const counts = new Map();
+const countBy = <K>(nodes: readonly NormalizedNode[], keyOf: (node: NormalizedNode) => K) => {
+  const counts = new Map<K, number>();
   for (const node of nodes) counts.set(keyOf(node), (counts.get(keyOf(node)) || 0) + 1);
   return counts;
 };
@@ -76,10 +76,11 @@ export const FIELD_LABELS = Object.freeze({
 });
 
 /** 内部フィールド名を画面表示用ラベルに変換する。 */
-export const fieldLabel = (name) => FIELD_LABELS[name] || name;
+export const fieldLabel = (name: string): string =>
+  Object.hasOwn(FIELD_LABELS, name) ? FIELD_LABELS[name as keyof typeof FIELD_LABELS] : name;
 
 /** status の一覧。並びは成熟度 (`meta.statuses` の順 = `STATUS_RANK`)。 */
-export const statusNames = (data) => Object.keys(data.meta?.statuses || {});
+export const statusNames = (data: SiteData) => Object.keys(data.meta?.statuses || {});
 
 /** status の選択肢。 */
 export function statusFilters(data: SiteData) {
@@ -324,6 +325,7 @@ export function focusTrail(view: GraphViewModel, shown = focusedNodes(view)) {
 const MISSING_RANK = 10 ** 6;
 
 /** ノードが現れる順 (正規化 JSON の並び = 型順 → id 順)。 */
-export const rankOf = (view, id) => (view.order.has(id) ? view.order.get(id) : MISSING_RANK);
+export const rankOf = (view: GraphViewModel, id: NodeId): number =>
+  view.order.get(id) ?? MISSING_RANK;
 
-export const compare = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+export const compare = <T extends string | number>(a: T, b: T) => (a < b ? -1 : a > b ? 1 : 0);

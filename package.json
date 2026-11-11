@@ -5,10 +5,10 @@
   "description": "req site の責務別 ES modules を検査し、配布用 bundle を生成する",
   "type": "module",
   "scripts": {
-    "build": "node tools/build-site.mjs",
-    "check:bundle": "node tools/build-site.mjs --check",
-    "test": "npm run check:bundle && node --import tsx --test tests/js/*.test.mjs",
-    "bench": "node --import tsx tests/js/bench.mjs",
+    "build": "node --import tsx tools/build-site.ts",
+    "check:bundle": "node --import tsx tools/build-site.ts --check",
+    "test": "npm run check:bundle && node --import tsx --test tests/js/*.test.ts",
+    "bench": "node --import tsx tests/js/bench.ts",
     "typecheck:py": "pyright",
     "typecheck:ts": "tsc --noEmit",
     "check:js": "biome ci --error-on-warnings",
@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
+    "@types/node": "^22.20.5",
     "esbuild": "^0.25.9",
     "happy-dom": "^21.0.4",
     "pyright": "^1.1.414",

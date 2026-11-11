@@ -7,11 +7,11 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "strict": true,
-    "noImplicitAny": false,
+    "noImplicitAny": true,
     "strictNullChecks": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "skipLibCheck": true
   },
-  "include": ["src/reqmodel/presentation/site_*.ts"]
+  "include": ["src/reqmodel/presentation/site_*.ts", "tests/js/*.ts", "tools/*.ts"]
 }

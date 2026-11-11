@@ -12,11 +12,18 @@ import {
   selectNodeState,
   storableHash,
 } from "../../src/reqmodel/presentation/site_logic.ts";
-import { fixture } from "./fixture.mjs";
+import type {
+  Direction,
+  GraphViewModel,
+  ViewState,
+} from "../../src/reqmodel/presentation/site_types.ts";
+import { defined, entry, fixture } from "./fixture.ts";
 
-const viewFor = (overrides = {}, data = fixture()) =>
+const viewFor = (overrides: Partial<ViewState> = {}, data = fixture()) =>
   createView(data, { ...defaultState(data), selected: "FR-1", mode: "analysis", ...overrides });
-const ids = (set) => [...set].sort();
+const ids = (set: Iterable<string> | null) => [...defined(set, "ノード集合")].sort();
+//: フォーカスが効いている (null = 全体表示 ではない) ことを前提にした表示対象。
+const focused = (view: GraphViewModel) => defined(focusedNodes(view), "フォーカスの表示対象");
 
 test("分析の上流・下流は向きを反転して兄弟へ広がらない", () => {
   assert.deepEqual(ids(focusedNodes(viewFor())), ["FR-1", "Need-1", "QR-1"]);
@@ -33,12 +40,12 @@ test("分析の深さ・種別・エッジの絞り込みを探索にも適用�
   assert.deepEqual(ids(focusedNodes(viewFor({ edges: new Set(["qualifies"]) }))), ["FR-1", "QR-1"]);
   const view = viewFor({ types: new Set(["QualityRequirement", "Need"]), selected: "QR-1" });
   assert.deepEqual(ids(focusedNodes(view)), ["QR-1"]);
-  assert.equal(focusedNodes(viewFor({ statuses: new Set(["approved"]) })).size, 0);
+  assert.equal(focused(viewFor({ statuses: new Set(["approved"]) })).size, 0);
 });
 
 test("起点がフィルタで消えたら空の図を保ち、選択なし・切では全体を表示する", () => {
-  assert.equal(focusedNodes(viewFor({ types: new Set() })).size, 0);
-  assert.equal(focusedNodes(viewFor({ selected: null })).size, 0);
+  assert.equal(focused(viewFor({ types: new Set() })).size, 0);
+  assert.equal(focused(viewFor({ selected: null })).size, 0);
   assert.equal(focusedNodes(viewFor({ mode: "graph", focus: 0 })), null);
 });
 
@@ -85,11 +92,12 @@ test("detail の経路は実際に辿ったエッジだけを含む", () => {
 
 test("循環・複数経路・平行エッジを落とさず全経路を強調する", () => {
   const data = fixture();
-  data.edges.push(
+  data.edges = [
+    ...data.edges,
     { source: "QR-1", target: "Need-1", name: "qualifies" },
     { source: "Need-1", target: "QR-1", name: "motivates" },
     { source: "QR-1", target: "Need-1", name: "constrains" },
-  );
+  ];
   const view = viewFor({ selected: "QR-1", detail: "Need-1" }, data);
   const trail = focusTrail(view);
   assert.deepEqual(ids(trail.nodes), ["FR-1", "Need-1", "QR-1"]);
@@ -136,20 +144,21 @@ test("通常グラフの近傍表示は選択を固定せず、分析タブだ�
 test("分析は型や要求グループに関係なく上流・起点・下流を順に配置する", () => {
   const view = viewFor();
   const placed = view.nodes
-    .filter((n) => focusedNodes(view).has(n.id))
+    .filter((n) => focused(view).has(n.id))
     .map((n, i) => ({ ...n, x: i * 80, y: i * 60, w: 50, h: 30 }));
-  for (const direction of ["TD", "LR"]) {
+  const directions: Direction[] = ["TD", "LR"];
+  for (const direction of directions) {
     const { positions, frames } = analysisBandLayout(view, placed, direction);
     assert.deepEqual([...frames.keys()], ["analysis:upstream", "analysis:downstream"]);
     const axis = direction === "TD" ? "y" : "x";
-    assert(positions.get("QR-1")[axis] < positions.get("FR-1")[axis]);
-    assert(positions.get("FR-1")[axis] < positions.get("Need-1")[axis]);
+    assert(entry(positions, "QR-1")[axis] < entry(positions, "FR-1")[axis]);
+    assert(entry(positions, "FR-1")[axis] < entry(positions, "Need-1")[axis]);
     for (const [id, key] of [
       ["QR-1", "analysis:upstream"],
       ["Need-1", "analysis:downstream"],
     ]) {
-      const box = frames.get(key),
-        point = positions.get(id);
+      const box = entry(frames, key);
+      const point = entry(positions, id);
       assert(point.x - 25 >= box.x - box.w / 2);
       assert(point.x + 25 <= box.x + box.w / 2);
       assert(point.y - 15 >= box.y - box.h / 2);
@@ -160,10 +169,10 @@ test("分析は型や要求グループに関係なく上流・起点・下流�
 
 test("循環で両方向に属するノードも重複させず配置する", () => {
   const data = fixture();
-  data.edges.push({ source: "Need-1", target: "FR-1", name: "motivates" });
+  data.edges = [...data.edges, { source: "Need-1", target: "FR-1", name: "motivates" }];
   const view = viewFor({}, data);
   const placed = view.nodes
-    .filter((n) => focusedNodes(view).has(n.id))
+    .filter((n) => focused(view).has(n.id))
     .map((n, i) => ({ ...n, x: i * 80, y: i * 60, w: 50, h: 30 }));
   const layout = analysisBandLayout(view, placed, "TD");
   assert(layout.frames.has("analysis:shared"));
@@ -172,7 +181,7 @@ test("循環で両方向に属するノードも重複させず配置する", ()
 
 test("Need-4 から FR-18 を確認すると直結と FR-10 経由の両方を強調する", () => {
   const base = fixture();
-  const node = (id) => ({ ...base.nodes[2], id });
+  const node = (id: string) => ({ ...base.nodes[2], id });
   const data = fixture({
     nodes: ["Need-4", "FR-18", "FR-10", "Goal-2", "Constraint-1"].map(node),
     edges: [

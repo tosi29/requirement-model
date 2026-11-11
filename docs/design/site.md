@@ -335,11 +335,23 @@ SVG の書き出しは、画面にある SVG DOM を複製し、非表示要素�
 ```console
 $ npm run build          # 配布用 bundle を更新
 $ npm run check:js       # Biome による lint と整形の検査
-$ npm run typecheck:ts   # source modules の型検査
+$ npm run typecheck:ts   # source modules・テスト・ビルドスクリプトの型検査
 $ npm test               # bundle の鮮度検査 + node:test
 ```
 
-型検査は `strictNullChecks` を有効にしている。ID からノードを引く処理が中心なので、
+型検査は `strict` を個別に緩めず、`noImplicitAny` と `strictNullChecks` も有効にしている。
+対象は source modules (`src/reqmodel/presentation/site_*.ts`) だけでなく、テスト (`tests/js/`) と
+ビルドスクリプト (`tools/build-site.ts`) も含む。source の型を変えたとき、それを使うテストや
+橋渡し (`tests/js/*_bridge.ts`) の食い違いも同じ検査で見つかるようにするためである。
+
+テストとビルドスクリプトは JSDoc 付きの `.mjs` (`checkJs`) ではなく `.ts` で書く。
+もともと `node --import tsx` で実行しており (Python 側の `tests/test_site_js.py` も同じ)、
+`.ts` にしても実行方法は変わらない。JSDoc で型を書くと source と記法が分かれ、
+型注釈がコメントに埋もれて読み落としやすい。テストのデータは `site_data()` と同じ形
+(`SiteData` / `ViewState`) で組み、あるはずの値は `defined()` / `entry()` で取り出して
+無ければその場で落とす (`!` で黙らせない)。
+
+`strictNullChecks` について。ID からノードを引く処理が中心なので、
 「見つからなかった」場合を型で追えないと実行時まで気づけない。無い場合の扱いは
 意図が読める形で書き、検査を通すためだけの記法は使わない。
 
@@ -364,10 +376,10 @@ $ npm test               # bundle の鮮度検査 + node:test
 
 ```console
 $ req site examples/bench.py -o bench-site && python -m http.server -d bench-site
-$ npm run bench          # 探索まわりの時間 (tests/js/bench.mjs)
+$ npm run bench          # 探索まわりの時間 (tests/js/bench.ts)
 ```
 
 `reach()` は隣接マップを 1 度組んでから辿る。組む前は BFS の 1 ステップごとに
 全エッジを走査していたため 1 回が O(V×E) で、300 ノードで **10 倍以上**、1200 ノード
-(`node tests/js/bench.mjs 4`) では **60 倍以上**の差になる。フォーカスは選択のたびに探索を呼ぶので、
+(`node --import tsx tests/js/bench.ts 4`) では **60 倍以上**の差になる。フォーカスは選択のたびに探索を呼ぶので、
 ここが線形であることが前提になる。

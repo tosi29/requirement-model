@@ -6,7 +6,7 @@ import {
   impactSets,
   rankOf,
 } from "./site_graph.ts";
-import type { GraphViewModel, SiteData } from "./site_types.ts";
+import type { ExternalReference, GraphViewModel, NodeId, SiteData } from "./site_types.ts";
 
 // --- LLM 用コンテキスト -----------------------------------------------------
 //
@@ -14,11 +14,12 @@ import type { GraphViewModel, SiteData } from "./site_types.ts";
 // 出力が 1 文字でもずれるとテストが落ちるので、片方を直したら両方を直すこと。
 
 /** ノード 1 件の記述。`explain.py` の `_describe()` と同じ整形。 */
-function describe(view, id) {
+function describe(view: GraphViewModel, id: NodeId) {
   const node = view.byId.get(id);
+  if (!node) throw new Error(`記述するノードが無い: ${id}`);
   const attrs = [`status=${node.status}`];
   const lines = [`- [${node.type}] ${node.id}: ${node.text}`, `    (${attrs.join(", ")})`];
-  const pushReference = (label, item) => {
+  const pushReference = (label: string, item: ExternalReference) => {
     lines.push(`    ${label}: ${item.title}${item.url ? ` <${item.url}>` : ""}`);
     if (item.note) lines.push(`      note: ${item.note}`);
   };
@@ -95,7 +96,7 @@ export function nodeContext(
   if (edgeFilter) lines.push(`エッジ種別フィルタ: ${edgeFilter.join(", ")}`);
   if (settings.depth !== null) lines.push(`探索深さ: ${settings.depth}`);
 
-  const block = (title, ids) => {
+  const block = (title: string, ids: Iterable<NodeId>) => {
     const sorted = [...ids].sort((a, b) => rankOf(view, a) - rankOf(view, b));
     if (!sorted.length) return;
     lines.push("", `## ${title} (${sorted.length} 件)`);

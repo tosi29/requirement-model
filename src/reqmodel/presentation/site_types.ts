@@ -164,7 +164,7 @@ export interface GraphNodeElement extends Box {
 export interface GraphBandElement extends Box {
   id: string;
   bandType?: string;
-  bandKey?: string;
+  bandKey: string;
   label: SVGTextElement;
   group: SVGGElement;
   shape: SVGRectElement;

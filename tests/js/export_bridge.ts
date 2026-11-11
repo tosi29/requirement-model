@@ -8,17 +8,27 @@
  * これ自体はテストではない (`tests/test_site_js.py` から呼ばれる)。
  */
 
+import { text } from "node:stream/consumers";
 import {
   createView,
-  initialSelection,
+  defaultState,
   mermaidText,
 } from "../../src/reqmodel/presentation/site_logic.ts";
+import type { SiteData } from "../../src/reqmodel/presentation/site_types.ts";
 
-const { data, types, edges } = JSON.parse(await new Response(process.stdin).text());
+interface ExportInput {
+  data: SiteData;
+  types?: string[];
+  edges?: string[];
+}
 
+const { data, types, edges }: ExportInput = JSON.parse(await text(process.stdin));
+
+const initial = defaultState(data);
 const view = createView(data, {
-  types: new Set(types ?? initialSelection(data, data.types, "types")),
-  edges: new Set(edges ?? initialSelection(data, data.edge_names, "edges")),
+  ...initial,
+  types: types ? new Set(types) : initial.types,
+  edges: edges ? new Set(edges) : initial.edges,
 });
 
 process.stdout.write(mermaidText(view));

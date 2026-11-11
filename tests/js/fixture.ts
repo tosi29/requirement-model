@@ -1,10 +1,17 @@
 /** テスト用の埋め込みデータ。`site_data()` が出す形の最小版。 */
 
-import { initialSelection } from "../../src/reqmodel/presentation/site_logic.ts";
+import { defaultState } from "../../src/reqmodel/presentation/site_logic.ts";
+import type {
+  NormalizedEdge,
+  NormalizedNode,
+  RenderMetadata,
+  SiteData,
+  ViewState,
+} from "../../src/reqmodel/presentation/site_types.ts";
 
 export const EDGE_NAMES = ["refines", "motivates", "satisfies", "qualifies", "constrains"];
 
-export const EDGE_NAMES_BY_TYPE = {
+export const EDGE_NAMES_BY_TYPE: Readonly<Record<string, readonly string[]>> = {
   Goal: ["refines", "motivates"],
   Need: [],
   FunctionalRequirement: ["satisfies", "refines"],
@@ -19,10 +26,26 @@ export const STATUS_RANK = {
   verified: 3,
 };
 
+/**
+ * あるはずの値を取り出す。無ければ前提が崩れているので、その場でテストを落とす
+ * (`!` で型検査だけを黙らせると、落ちる場所が分かりにくくなる)。
+ */
+export function defined<T>(value: T | null | undefined, what: string): T {
+  if (value === null || value === undefined) throw new Error(`値が無い: ${what}`);
+  return value;
+}
+
+/** Map から、あるはずの値を引く。 */
+export const entry = <K, V>(map: ReadonlyMap<K, V>, key: K): V =>
+  defined(map.get(key), String(key));
+
+//: 指摘の件数 (`site_data()` の stats.findings)。fixture は指摘を持たない。
+const NO_FINDINGS = { error: 0, severe: 0, warning: 0, info: 0 };
+
 export const TYPES = ["Goal", "Need", "FunctionalRequirement", "QualityRequirement", "Constraint"];
 
 //: 図に既定で描かないもの (`site_data()` の hidden_by_default と同じ形)。
-export const HIDDEN_BY_DEFAULT = {
+export const HIDDEN_BY_DEFAULT: SiteData["hidden_by_default"] = {
   types: [],
   edges: [],
 };
@@ -31,8 +54,8 @@ export const HIDDEN_BY_DEFAULT = {
  * Goal-1 --motivates--> Need-1 <--satisfies-- FR-1 <--qualifies-- QR-1
  * 外部参照は source / evidence の Reference 値としてノードに直接持つ。
  */
-export function fixture(overrides = {}) {
-  const nodes = [
+export function fixture(overrides: Partial<SiteData> = {}): SiteData {
+  const nodes: NormalizedNode[] = [
     {
       type: "Goal",
       id: "Goal-1",
@@ -96,7 +119,7 @@ export function fixture(overrides = {}) {
     },
   ];
 
-  const edges = [
+  const edges: NormalizedEdge[] = [
     { source: "Goal-1", name: "motivates", target: "Need-1" },
     { source: "FR-1", name: "satisfies", target: "Need-1" },
     { source: "QR-1", name: "qualifies", target: "FR-1" },
@@ -105,15 +128,18 @@ export function fixture(overrides = {}) {
   return {
     title: "テスト",
     generated_from: ["t.py"],
+    repo: null,
+    schema_version: 4,
     types: TYPES,
     edge_names: EDGE_NAMES,
     hidden_by_default: HIDDEN_BY_DEFAULT,
     edge_names_by_type: EDGE_NAMES_BY_TYPE,
     status_rank: STATUS_RANK,
+    requirement_groups: [],
     nodes,
     edges,
     findings: [],
-    stats: { nodes: nodes.length, edges: edges.length, findings: {} },
+    stats: { nodes: nodes.length, edges: edges.length, findings: NO_FINDINGS, suppressed: 0 },
     //: 呼ぶたびに複製する。META をそのまま渡すと、書き換えるテストの影響が
     //: 後続のテストに漏れる (実行順で結果が変わる)。
     meta: structuredClone(META),
@@ -131,12 +157,13 @@ export const ELLIPSE_FIT = { wmul: 1.42, wpad: 14, hmul: 1.42, hpad: 10 };
  * スケール時の振る舞い (探索の計算量・フォーカスの効き) を、Python を通さずに
  * テストとベンチから使うためのもの。件数を渡せば任意の規模になる。
  */
-export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60 } = {}) {
-  const nodes = [];
-  const edges = [];
-  const link = (source, name, target) => edges.push({ source, name, target });
-  const pick = (index, count) => (index % count) + 1;
-  const reference = (index) => ({
+export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60 } = {}): SiteData {
+  const nodes: NormalizedNode[] = [];
+  const edges: NormalizedEdge[] = [];
+  const link = (source: string, name: string, target: string) =>
+    edges.push({ source, name, target });
+  const pick = (index: number, count: number) => (index % count) + 1;
+  const reference = (index: number) => ({
     title: `源泉 ${index}`,
     url: `https://example.com/source/${index}`,
     note: "合成データ",
@@ -200,20 +227,23 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60 } = {
   return {
     title: "大きいテスト",
     generated_from: ["bench.py"],
+    repo: null,
+    schema_version: 4,
     types: TYPES,
     edge_names: EDGE_NAMES,
     hidden_by_default: HIDDEN_BY_DEFAULT,
     edge_names_by_type: EDGE_NAMES_BY_TYPE,
     status_rank: STATUS_RANK,
+    requirement_groups: [],
     nodes,
     edges,
     findings: [],
-    stats: { nodes: nodes.length, edges: edges.length, findings: {} },
+    stats: { nodes: nodes.length, edges: edges.length, findings: NO_FINDINGS, suppressed: 0 },
     meta: structuredClone(META),
   };
 }
 
-export const META = {
+export const META: RenderMetadata = {
   types: Object.fromEntries(
     TYPES.map((type) => [
       type,
@@ -255,8 +285,9 @@ export const META = {
 };
 
 /** すべて表示した state。 */
-export function allOn(data) {
+export function allOn(data: SiteData): ViewState {
   return {
+    ...defaultState(data),
     types: new Set(data.types),
     edges: new Set(data.edge_names),
     statuses: new Set(Object.keys(data.meta.statuses)),
@@ -267,10 +298,6 @@ export function allOn(data) {
  * ページの初期 state (`defaultState()` と同じ選択)。
  * 既定の振る舞いを見るテストはこちらを使う。
  */
-export function defaultOn(data) {
-  return {
-    ...allOn(data),
-    types: new Set(initialSelection(data, data.types, "types")),
-    edges: new Set(initialSelection(data, data.edge_names, "edges")),
-  };
+export function defaultOn(data: SiteData): ViewState {
+  return defaultState(data);
 }

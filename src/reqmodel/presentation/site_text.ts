@@ -92,7 +92,7 @@ const NUMBER = /^[0-9]+(?:[.,][0-9]+)*[%％]?$/;
 //: 仮名・漢字・ラテン文字のいずれか。1 つも無い行は数字か記号だけの行。
 const HAS_CONTENT = /[A-Za-z\u3041-\u30ff\u3400-\u9fff]/;
 
-const charClass = (char) => {
+const charClass = (char: string) => {
   if (/\s/.test(char)) return "space";
   if (/[0-9A-Za-z]/.test(char)) return "word";
   if (/[\u3041-\u309f]/.test(char)) return "kana";
@@ -179,7 +179,7 @@ export function labelChunks(text: string): string[] {
 }
 
 /** 幅に入るところまでを 1 文字単位で切る。1 つのまとまりが長すぎるときの最後の手段。 */
-function hardSplit(text, maxWidth, measure) {
+function hardSplit(text: string, maxWidth: number, measure: (text: string) => number) {
   let head = "";
   for (const char of text) {
     if (head && measure(head + char) > maxWidth) break;

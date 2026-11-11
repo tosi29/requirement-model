@@ -928,7 +928,7 @@ FR_FOCUS = FunctionalRequirement(
         Reference(
             title="フォーカス分析のロジック・DOM 操作テスト",
             url="https://github.com/tosi29/requirement-model/tree/main/tests/js",
-            note="focus.test.mjs と focus_ui.test.mjs が起点固定・影響範囲・タブ操作・経路・URL 復元を検証する。",
+            note="focus.test.ts と focus_ui.test.ts が起点固定・影響範囲・タブ操作・経路・URL 復元を検証する。",
         ),
     ],
     acceptance_criteria=[

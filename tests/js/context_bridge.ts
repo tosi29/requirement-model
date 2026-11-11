@@ -10,20 +10,34 @@
  * これ自体はテストではない (`tests/test_site_js.py` から呼ばれる)。
  */
 
+import { text } from "node:stream/consumers";
 import {
   createView,
-  initialSelection,
+  defaultState,
   nodeContext,
 } from "../../src/reqmodel/presentation/site_logic.ts";
+import type { SiteData } from "../../src/reqmodel/presentation/site_types.ts";
 
-const input = JSON.parse(await new Response(process.stdin).text());
-const { data, requests } = input;
+interface ContextInput {
+  data: SiteData;
+  requests: {
+    id: string;
+    types?: string[];
+    edges?: string[];
+    depth?: number;
+    undirected?: boolean;
+  }[];
+}
 
+const { data, requests }: ContextInput = JSON.parse(await text(process.stdin));
+
+const initial = defaultState(data);
 const output = requests.map(({ id, types, edges, depth, undirected }) =>
   nodeContext(
     createView(data, {
-      types: new Set(types ?? initialSelection(data, data.types, "types")),
-      edges: new Set(edges ?? initialSelection(data, data.edge_names, "edges")),
+      ...initial,
+      types: types ? new Set(types) : initial.types,
+      edges: edges ? new Set(edges) : initial.edges,
       depth: depth ?? 0,
       undirected: Boolean(undirected),
     }),

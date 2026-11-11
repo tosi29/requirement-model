@@ -12,12 +12,21 @@ import {
 } from "./site_text.ts";
 import type {
   Box,
+  Direction,
+  Extent,
   GraphBandDefinition,
   GraphEdgeDefinition,
   GraphElementDefinition,
   GraphNodeDefinition,
   GraphViewModel,
+  LayoutResult,
+  NodeId,
+  NormalizedEdge,
+  NormalizedNode,
+  Point,
   RenderMetadata,
+  RenderStatusMetadata,
+  RenderTypeMetadata,
   SiteData,
 } from "./site_types.ts";
 
@@ -40,7 +49,7 @@ export interface BandDef {
 }
 
 /** 帯に並べるノード。中心 `(x, y)` と外形 `(w, h)` は dagre の配置結果。 */
-interface PlacedNode extends Box {
+export interface PlacedNode extends Box {
   id: string;
   type: string;
 }
@@ -56,7 +65,7 @@ export function bandDefs(data: SiteData): BandDef[] {
   const groups = [...(data.requirement_groups || [])].sort(
     (a, b) => (a.order || 0) - (b.order || 0) || compare(a.id, b.id),
   );
-  const assigned = new Set();
+  const assigned = new Set<NodeId>();
   const requirementIds = new Set(
     data.nodes.filter((node) => REQUIREMENT_TYPES.has(node.type)).map((node) => node.id),
   );
@@ -90,19 +99,24 @@ export function bandDefs(data: SiteData): BandDef[] {
 }
 
 /** 表示中ノードに対して可視にする帯枠の key。 */
-export function visibleBandKeys(data, shownNodes) {
+export function visibleBandKeys(
+  data: SiteData,
+  shownNodes: readonly NormalizedNode[],
+): Set<string> {
   const ids = new Set(shownNodes.map((node) => node.id));
   const types = new Set(shownNodes.map((node) => node.type));
-  const keys = new Set();
+  const keys = new Set<string>();
   for (const band of bandDefs(data)) {
-    const visible = band.members ? band.members.some((id) => ids.has(id)) : types.has(band.type);
+    const visible = band.members
+      ? band.members.some((id) => ids.has(id))
+      : band.type !== undefined && types.has(band.type);
     if (visible) keys.add(band.type || band.key);
   }
   return keys;
 }
 
 /** 帯枠ノードの id。ノード id と衝突しない接頭辞を付ける。 */
-export const bandId = (key) => `band:${key}`;
+export const bandId = (key: string) => `band:${key}`;
 
 /**
  * 図の要素定義。ノードとエッジの全件を一度だけ作る。
@@ -248,7 +262,7 @@ export function legendGroups(meta: RenderMetadata, colorScheme = "light"): Legen
  * ノードが視野より大きくて収めようが無いときは、中心が見えていれば十分とする
  * (そうしないと選ぶたびに毎回パンすることになる)。
  */
-export function isNodeVisible(extent, box, margin = 0) {
+export function isNodeVisible(extent: Extent, box: Extent, margin = 0): boolean {
   const inner = {
     x1: extent.x1 + margin,
     y1: extent.y1 + margin,
@@ -267,7 +281,7 @@ export function isNodeVisible(extent, box, margin = 0) {
 }
 
 /** 最終ノード座標から、短い二次 Bézier の制御点を作る。 */
-export function edgeControl(source, target, direction, offset = 0) {
+export function edgeControl(source: Point, target: Point, direction: Direction, offset = 0): Point {
   const dx = target.x - source.x;
   const dy = target.y - source.y;
   const length = Math.hypot(dx, dy) || 1;
@@ -285,13 +299,13 @@ export function edgeControl(source, target, direction, offset = 0) {
 }
 
 /** 二次 Bézier の SVG path。 */
-export function quadraticPath(start, control, end) {
-  const coord = (value) => Math.round(value * 100) / 100;
+export function quadraticPath(start: Point, control: Point, end: Point): string {
+  const coord = (value: number) => Math.round(value * 100) / 100;
   return `M ${coord(start.x)} ${coord(start.y)} Q ${coord(control.x)} ${coord(control.y)} ${coord(end.x)} ${coord(end.y)}`;
 }
 
 /** 二次 Bézier 上の点。ラベル位置にも描画と同じ曲線を使う。 */
-export function quadraticPoint(start, control, end, t = 0.5) {
+export function quadraticPoint(start: Point, control: Point, end: Point, t = 0.5): Point {
   const rest = 1 - t;
   return {
     x: rest * rest * start.x + 2 * rest * t * control.x + t * t * end.x,
@@ -300,7 +314,7 @@ export function quadraticPoint(start, control, end, t = 0.5) {
 }
 
 /** dagre のレイアウト設定。direction は "TD" か "LR"。 */
-export function layoutOptions(direction) {
+export function layoutOptions(direction: Direction) {
   return {
     name: "dagre",
     rankDir: direction === "LR" ? "LR" : "TB",
@@ -338,17 +352,22 @@ const REQUIREMENT_GROUP_GAP = 48;
  * 親子が無い型 (Need) は 1 行になる。閉路は validate が指摘するので、
  * ここでは無限ループしないことだけを保証する。
  */
-function bandRows(members: readonly PlacedNode[], edges): PlacedNode[][] {
+function bandRows(
+  members: readonly PlacedNode[],
+  edges: readonly NormalizedEdge[],
+): PlacedNode[][] {
   const ids = new Set(members.map((node) => node.id));
-  const parents = new Map();
+  const parents = new Map<NodeId, NodeId[]>();
   for (const edge of edges) {
     if (edge.name !== "refines" || !ids.has(edge.source) || !ids.has(edge.target)) continue;
-    if (!parents.has(edge.source)) parents.set(edge.source, []);
-    parents.get(edge.source).push(edge.target);
+    const known = parents.get(edge.source);
+    if (known) known.push(edge.target);
+    else parents.set(edge.source, [edge.target]);
   }
-  const depth = new Map();
-  const depthOf = (id, trail) => {
-    if (depth.has(id)) return depth.get(id);
+  const depth = new Map<NodeId, number>();
+  const depthOf = (id: NodeId, trail: Set<NodeId>): number => {
+    const known = depth.get(id);
+    if (known !== undefined) return known;
     if (trail.has(id)) return 0;
     trail.add(id);
     const above = (parents.get(id) || []).map((parent) => depthOf(parent, trail));
@@ -380,14 +399,14 @@ function bandRows(members: readonly PlacedNode[], edges): PlacedNode[][] {
  * 使う。グループ内のノードだけを指定された最大幅で折り返す。
  */
 export function bandedLayout(
-  bands,
-  placed,
-  edges,
-  direction,
+  bands: readonly BandDef[],
+  placed: readonly PlacedNode[],
+  edges: readonly NormalizedEdge[],
+  direction: Direction,
   options: { groupMaxWidth?: number } = {},
-) {
-  const positions = new Map();
-  const frames = new Map();
+): LayoutResult {
+  const positions = new Map<NodeId, Point>();
+  const frames = new Map<string, Box>();
   const membersOf = bands.map((band) => {
     const ids = band.members ? new Set(band.members) : null;
     return placed.filter((node) => (ids ? ids.has(node.id) : node.type === band.type));
@@ -396,23 +415,30 @@ export function bandedLayout(
 
   //: TD では y が主軸 (帯の積み方向)・x が副軸。LR では逆になる。
   const vertical = direction !== "LR";
-  const pri = (node) => (vertical ? node.y : node.x);
-  const sec = (node) => (vertical ? node.x : node.y);
-  const priSize = (node) => (vertical ? node.h : node.w);
-  const secSize = (node) => (vertical ? node.w : node.h);
-  const at = (secValue, priValue) =>
+  const pri = (node: PlacedNode) => (vertical ? node.y : node.x);
+  const sec = (node: PlacedNode) => (vertical ? node.x : node.y);
+  const priSize = (node: PlacedNode) => (vertical ? node.h : node.w);
+  const secSize = (node: PlacedNode) => (vertical ? node.w : node.h);
+  const at = (secValue: number, priValue: number): Point =>
     vertical ? { x: secValue, y: priValue } : { x: priValue, y: secValue };
-  const positionSec = (id) => {
+  //: 手順 1・2 で全ノードに位置を与えるので、手順 3 以降で欠けるのは手順の誤り。
+  const positionOf = (id: NodeId) => {
     const position = positions.get(id);
+    if (!position) throw new Error(`帯レイアウトで位置が決まっていないノード: ${id}`);
+    return position;
+  };
+  const positionSec = (id: NodeId) => {
+    const position = positionOf(id);
     return vertical ? position.x : position.y;
   };
-  const topOf = (nodes) => Math.min(...nodes.map((node) => pri(node) - priSize(node) / 2));
+  const topOf = (nodes: readonly PlacedNode[]) =>
+    Math.min(...nodes.map((node) => pri(node) - priSize(node) / 2));
   const groupMaxWidth = Math.max(1, options.groupMaxWidth || REQUIREMENT_GROUP_MAX_WIDTH);
 
   /** 1 グループを原点基準で詰める。dagre の座標は順序にだけ使う。 */
-  const layoutGroup = (members, maxWidth) => {
+  const layoutGroup = (members: readonly PlacedNode[], maxWidth: number) => {
     const contentLimit = Math.max(1, maxWidth - BAND_FRAME_PAD * 2);
-    const positions = new Map();
+    const positions = new Map<NodeId, { sec: number; pri: number }>();
     let rowTop = 0;
     let contentWidth = 0;
     for (const depthRow of bandRows(members, edges)) {
@@ -449,15 +475,20 @@ export function bandedLayout(
   };
 
   // 1. 型帯は縦に積み、RequirementGroup は同じ Requirements 段の中で横に並べる。
-  const banded = new Set();
-  const spans = new Map();
+  const banded = new Set<NodeId>();
+  //: 帯の主軸方向の範囲。RequirementGroup の帯は副軸方向の範囲も持つ。
+  const typeSpans = new Map<number, { from: number; to: number }>();
+  const groupSpans = new Map<
+    number,
+    { from: number; to: number; secMin: number; secMax: number }
+  >();
   let cursor = topOf(placed);
   let index = 0;
   while (index < bands.length) {
     if (bands[index].members) {
       const sectionFrom = cursor;
       const sectionStart = Math.min(...placed.map((node) => sec(node) - secSize(node) / 2));
-      const sectionBandIndexes: number[] = [];
+      const sectionSpans: { to: number }[] = [];
       let groupLeft = sectionStart;
       let sectionTo = sectionFrom;
       while (index < bands.length && bands[index].members) {
@@ -470,23 +501,25 @@ export function bandedLayout(
         const group = layoutGroup(members, groupMaxWidth);
         for (const node of members) {
           const local = group.positions.get(node.id);
+          if (!local) throw new Error(`グループ内の位置が決まっていないノード: ${node.id}`);
           positions.set(
             node.id,
             at(groupLeft + BAND_FRAME_PAD + local.sec, sectionFrom + BAND_FRAME_PAD + local.pri),
           );
         }
-        spans.set(index, {
+        const span = {
           from: sectionFrom,
           to: sectionFrom + group.height,
           secMin: groupLeft,
           secMax: groupLeft + group.width,
-        });
-        sectionBandIndexes.push(index);
+        };
+        groupSpans.set(index, span);
+        sectionSpans.push(span);
         sectionTo = Math.max(sectionTo, sectionFrom + group.height);
         groupLeft += group.width + REQUIREMENT_GROUP_GAP;
         index += 1;
       }
-      for (const bandIndex of sectionBandIndexes) spans.get(bandIndex).to = sectionTo;
+      for (const span of sectionSpans) span.to = sectionTo;
       cursor = sectionTo + BAND_GAP;
       continue;
     }
@@ -511,7 +544,7 @@ export function bandedLayout(
       }
       cursor += height + BAND_ROW_GAP;
     }
-    spans.set(index, { from, to: cursor - BAND_ROW_GAP });
+    typeSpans.set(index, { from, to: cursor - BAND_ROW_GAP });
     cursor += BAND_GAP - BAND_ROW_GAP;
     index += 1;
   }
@@ -526,7 +559,7 @@ export function bandedLayout(
   }
 
   // 3. 図の全幅 (副軸方向の範囲) を測る。型帯の枠幅と、中身を寄せる中心になる。
-  const secCenter = (node) => positionSec(node.id);
+  const secCenter = (node: PlacedNode) => positionSec(node.id);
   let secMin = Infinity;
   let secMax = -Infinity;
   for (const node of placed) {
@@ -535,9 +568,7 @@ export function bandedLayout(
   }
   let requirementSecMin = Infinity;
   let requirementSecMax = -Infinity;
-  for (let bandIndex = 0; bandIndex < bands.length; bandIndex++) {
-    if (!bands[bandIndex].members || !spans.has(bandIndex)) continue;
-    const span = spans.get(bandIndex);
+  for (const span of groupSpans.values()) {
     requirementSecMin = Math.min(requirementSecMin, span.secMin);
     requirementSecMax = Math.max(requirementSecMax, span.secMax);
     secMin = Math.min(secMin, span.secMin);
@@ -566,10 +597,10 @@ export function bandedLayout(
   for (let bandIndex = 0; bandIndex < bands.length; bandIndex++) {
     const members = membersOf[bandIndex];
     if (!members.length) continue;
-    const span = spans.get(bandIndex);
-    if (!span) continue;
 
     if (bands[bandIndex].members) {
+      const span = groupSpans.get(bandIndex);
+      if (!span) continue;
       frames.set(bands[bandIndex].key, {
         ...at((span.secMin + span.secMax) / 2, (span.from + span.to) / 2),
         w: vertical ? span.secMax - span.secMin : span.to - span.from,
@@ -577,6 +608,8 @@ export function bandedLayout(
       });
       continue;
     }
+    const span = typeSpans.get(bandIndex);
+    if (!span) continue;
 
     let min = Infinity;
     let max = -Infinity;
@@ -586,7 +619,7 @@ export function bandedLayout(
     }
     const shift = bandMiddle - (min + max) / 2;
     for (const node of members) {
-      const position = positions.get(node.id);
+      const position = positionOf(node.id);
       positions.set(
         node.id,
         vertical
@@ -618,7 +651,7 @@ export function bandedLayout(
 const EXPORT_LABEL_LIMIT = 40;
 
 /** `render.py` の `_truncate()`。空白を潰してから切る。 */
-function collapse(text, limit) {
+function collapse(text: string, limit: number): string {
   const collapsed = String(text).split(/\s+/).filter(Boolean).join(" ");
   const chars = [...collapsed];
   if (limit > 0 && chars.length > limit) return `${chars.slice(0, limit - 1).join("")}…`;
@@ -632,12 +665,12 @@ function collapse(text, limit) {
  * 識別子になり、図の上で 1 ノードに融合する)。描く順の索引で連番を振れば
  * 衝突は起こり得ず、元の id はラベルに出るので情報も失われない。
  */
-function exportIds(nodes) {
+function exportIds(nodes: readonly NormalizedNode[]): Map<NodeId, string> {
   return new Map(nodes.map((node, index) => [node.id, `n${index + 1}`]));
 }
 
 /** `render.py` の `_mermaid_escape()`。 */
-function mermaidEscape(text) {
+function mermaidEscape(text: string): string {
   return text
     .replace(/\\/g, "＼")
     .replace(/"/g, "#quot;")
@@ -698,12 +731,12 @@ export function mermaidText(view: GraphViewModel, maxLabel = EXPORT_LABEL_LIMIT)
 export const SVG_PADDING = 24;
 
 //: 多角形を、外形の矩形に内接する頂点 (-1..1 の座標) で写したもの。
-const SVG_POLYGONS = {
-  hexagon: [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1],
-  rhomboid: [-1, -1, 0.333, -1, 1, 1, -0.333, 1],
-  diamond: [0, -1, 1, 0, 0, 1, -1, 0],
-  tag: [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1],
-};
+const SVG_POLYGONS: ReadonlyMap<string, readonly number[]> = new Map([
+  ["hexagon", [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1]],
+  ["rhomboid", [-1, -1, 0.333, -1, 1, 1, -0.333, 1]],
+  ["diamond", [0, -1, 1, 0, 0, 1, -1, 0]],
+  ["tag", [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1]],
+]);
 
 //: 角を落とす比率 (cut-rectangle)。画面表示と同じく、書き出しでは
 //: 大きさに対する比で近似する。
@@ -714,25 +747,35 @@ const SVG_BARREL_RATIO = 0.3;
 
 //: status の線種 → SVG の stroke-dasharray。二重線 (verified) は SVG に無いので
 //: 実線で近似する (太さは meta の border_width が残るので区別は付く)。
-const SVG_DASH = { dotted: "1 3", dashed: "6 4", solid: "", double: "" };
+//: 破線。帯枠と、破線にするエッジ種別 (meta.dashed_edges) にも使う。
+const SVG_DASHED = "6 4";
+const SVG_DASH: ReadonlyMap<string, string> = new Map([
+  ["dotted", "1 3"],
+  ["dashed", SVG_DASHED],
+  ["solid", ""],
+  ["double", ""],
+]);
 
-const attrs = (values) =>
+/** SVG の属性値。null / undefined / 空文字の属性は書かない。 */
+type SvgAttrs = Readonly<Record<string, string | number | null | undefined>>;
+
+const attrs = (values: SvgAttrs) =>
   Object.entries(values)
     .filter(([, value]) => value !== null && value !== undefined && value !== "")
     .map(([name, value]) => `${name}="${escapeAttr(value)}"`)
     .join(" ");
 
-const element = (name: string, values, children?: string) => {
+const element = (name: string, values: SvgAttrs, children?: string) => {
   const head = [name, attrs(values)].filter(Boolean).join(" ");
   return children === undefined ? `<${head}/>` : `<${head}>${children}</${name}>`;
 };
 
-const round = (value) => Math.round(value * 100) / 100;
+const round = (value: number) => Math.round(value * 100) / 100;
 
 /** 図形 1 つぶんの要素。box は中心と外形 `{ x, y, w, h }`。 */
-function shapeElement(shape, box, style) {
+function shapeElement(shape: string | undefined, box: Box, style: SvgAttrs) {
   const { x, y, w, h } = box;
-  const polygon = (points) =>
+  const polygon = (points: readonly number[]) =>
     element("polygon", {
       points: points
         .map((value, index) => round(index % 2 ? y + (value * h) / 2 : x + (value * w) / 2))
@@ -749,7 +792,8 @@ function shapeElement(shape, box, style) {
       ...style,
     });
   }
-  if (SVG_POLYGONS[shape]) return polygon(SVG_POLYGONS[shape]);
+  const points = shape === undefined ? undefined : SVG_POLYGONS.get(shape);
+  if (points) return polygon(points);
   if (shape === "cut-rectangle") {
     const cut = Math.min(w, h) * SVG_CUT_RATIO;
     const cx = cut / (w / 2);
@@ -786,9 +830,9 @@ function shapeElement(shape, box, style) {
 
 /** 改行入りのラベル。中心 (x, y) に上下中央で置く。 */
 function labelElement(
-  label,
-  x,
-  y,
+  label: string,
+  x: number,
+  y: number,
   {
     size = LABEL_FONT.size,
     fill = undefined,
@@ -816,6 +860,16 @@ function labelElement(
   );
 }
 
+/** `graphSvg()` に渡す、図に描かれているものの実測値。 */
+export interface SvgScene {
+  nodes?: readonly (Box & { type: string; status: string; label: string })[];
+  edges?: readonly (Extent & { name: string; dashed: boolean })[];
+  bands?: readonly (Box & { type: string; label: string })[];
+  meta?: Partial<RenderMetadata>;
+  palette?: Partial<Record<"fg" | "bg" | "border" | "muted", string>>;
+  title?: string;
+}
+
 /**
  * いま図に描かれているものを SVG 1 枚にする。
  *
@@ -828,7 +882,7 @@ function labelElement(
  *
  * ノードが 1 つも無ければ空の図 (背景だけ) を返す。
  */
-export function graphSvg(scene) {
+export function graphSvg(scene: SvgScene): string {
   const nodes = scene.nodes || [];
   const edges = scene.edges || [];
   const bands = scene.bands || [];
@@ -866,14 +920,14 @@ export function graphSvg(scene) {
 
   //: 帯枠はノード・エッジの下に敷く (画面と同じ重なり順)。
   for (const band of bands) {
-    const typeMeta = types[band.type] || {};
+    const typeMeta: RenderTypeMetadata = types[band.type] || {};
     body.push(
       shapeElement("round-rectangle", band, {
         fill: typeMeta.fill || "none",
         "fill-opacity": 0.3,
         stroke: typeMeta.stroke || palette.border,
         "stroke-width": 1,
-        "stroke-dasharray": SVG_DASH.dashed,
+        "stroke-dasharray": SVG_DASHED,
       }),
     );
     body.push(
@@ -894,7 +948,7 @@ export function graphSvg(scene) {
         y2: round(edge.y2),
         stroke: palette.border,
         "stroke-width": 1.2,
-        "stroke-dasharray": edge.dashed ? SVG_DASH.dashed : "",
+        "stroke-dasharray": edge.dashed ? SVG_DASHED : "",
         "marker-end": "url(#req-arrow)",
       }),
     );
@@ -919,14 +973,15 @@ export function graphSvg(scene) {
   }
 
   for (const node of nodes) {
-    const typeMeta = types[node.type] || {};
-    const statusMeta = statuses[node.status] || {};
+    const typeMeta: RenderTypeMetadata = types[node.type] || {};
+    const statusMeta: Partial<RenderStatusMetadata> = statuses[node.status] || {};
     body.push(
       shapeElement(typeMeta.shape, node, {
         fill: typeMeta.fill || "#ffffff",
         stroke: typeMeta.stroke || palette.fg,
         "stroke-width": statusMeta.border_width || 1.5,
-        "stroke-dasharray": SVG_DASH[statusMeta.border_style] || "",
+        "stroke-dasharray":
+          (statusMeta.border_style && SVG_DASH.get(statusMeta.border_style)) || "",
       }),
     );
     //: ラベルの色は図の塗り (明るい固定色) に対して読める色。テーマには従わない。
@@ -972,20 +1027,24 @@ export const ANALYSIS_BANDS = {
 };
 
 /** dagre の領域内の配置を保ち、上流 → 起点 → 下流の順に領域を並べる。 */
-export function analysisBandLayout(view: GraphViewModel, placed, direction: string) {
-  const positions = new Map();
-  const frames = new Map();
+export function analysisBandLayout(
+  view: GraphViewModel,
+  placed: readonly PlacedNode[],
+  direction: Direction,
+): LayoutResult {
+  const positions = new Map<NodeId, Point>();
+  const frames = new Map<string, Box>();
   const { selected } = view.state;
   if (!selected || !placed.length) return { positions, frames };
   const { upstream, downstream } = impactSets(view, selected);
   const vertical = direction !== "LR";
-  const pri = (node) => (vertical ? node.y : node.x);
-  const sec = (node) => (vertical ? node.x : node.y);
-  const priSize = (node) => (vertical ? node.h : node.w);
-  const secSize = (node) => (vertical ? node.w : node.h);
-  const at = (primary, secondary) =>
+  const pri = (node: PlacedNode) => (vertical ? node.y : node.x);
+  const sec = (node: PlacedNode) => (vertical ? node.x : node.y);
+  const priSize = (node: PlacedNode) => (vertical ? node.h : node.w);
+  const secSize = (node: PlacedNode) => (vertical ? node.w : node.h);
+  const at = (primary: number, secondary: number): Point =>
     vertical ? { x: secondary, y: primary } : { x: primary, y: secondary };
-  const bucket = (node) =>
+  const bucket = (node: PlacedNode) =>
     node.id === selected
       ? "root"
       : upstream.has(node.id) && downstream.has(node.id)

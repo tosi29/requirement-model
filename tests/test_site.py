@@ -762,7 +762,7 @@ def test_page_has_the_export_buttons(tmp_path: Path):
     """絞り込んだ図を持ち出す口がテンプレートにある。
 
     書き出す中身そのものは `mermaidText()` / `graphSvg()` のテスト
-    (tests/js/logic.test.mjs) と `test_site_js.py` の CLI 突き合わせが見る。
+    (tests/js/logic.test.ts) と `test_site_js.py` の CLI 突き合わせが見る。
     """
     index = build_site(chain(), FindingList(), tmp_path)
     html = index.read_text(encoding="utf-8")
@@ -796,7 +796,7 @@ def test_page_has_a_theme_toggle(tmp_path: Path):
 
 
 def test_page_has_a_finding_tab_bar(tmp_path: Path):
-    """まとめ方そのものは groupFindings() のテスト (tests/js/logic.test.mjs) が見る。"""
+    """まとめ方そのものは groupFindings() のテスト (tests/js/logic.test.ts) が見る。"""
     index = build_site(chain(), FindingList(), tmp_path)
     html = index.read_text(encoding="utf-8")
 

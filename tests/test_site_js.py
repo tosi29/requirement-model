@@ -86,7 +86,9 @@ def test_ts_modules_typecheck_on_their_own():
 
 
 def test_js_unit_tests_pass():
-    result = run_node(["--test", str(JS_TESTS / "logic.test.ts")])
+    tests = sorted(str(path) for path in JS_TESTS.glob("*.test.ts"))
+    assert tests
+    result = run_node(["--test", *tests])
     assert result.returncode == 0, result.stdout + result.stderr
 
 

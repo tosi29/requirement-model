@@ -8,7 +8,9 @@
     "noEmit": true,
     "strict": true,
     "noImplicitAny": false,
-    "strictNullChecks": false,
+    "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "skipLibCheck": true
   },
   "include": ["src/reqmodel/presentation/site_*.ts"]

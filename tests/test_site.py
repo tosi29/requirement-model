@@ -306,7 +306,7 @@ def test_page_uses_svg_dom_and_dagre_without_cytoscape(tmp_path: Path):
     assert 'svgEl("path", { class: "edge-line"' in html
     assert "cytoscape(" not in html
     assert "cytoscape.min.js" not in html
-    assert "svg.dataset.initialRenderMs" in html
+    assert "drawn.dataset.initialRenderMs" in html
 
 
 def test_svg_nodes_keep_semantic_shapes_statuses_and_keyboard_access(tmp_path: Path):
@@ -339,7 +339,7 @@ def test_svg_type_palette_comes_from_render_meta(tmp_path: Path):
     assert "fill: colors.fill" in html
     assert "stroke: colors.stroke" in html
     assert '"dark_fill": "#17233a"' in html
-    assert "shapeEl(typeMeta.shape)" in html
+    assert "shapeEl(shapeName)" in html
 
 
 def test_svg_preserves_four_distinct_status_patterns(tmp_path: Path):
@@ -378,7 +378,7 @@ def test_svg_theme_and_pan_zoom_use_shared_css_and_transform(tmp_path: Path):
     html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
 
     assert "fill: var(--graph-fg, var(--fg))" in html
-    assert 'graphLayer2.setAttribute("transform"' in html
+    assert 'graphLayer.setAttribute("transform"' in html
     assert "panZoom?.zoomBy(factor)" in html
     assert "if (ignoreClick)" in html
     assert "if (Math.hypot(dx, dy) >= 3) drag.moved = true" in html

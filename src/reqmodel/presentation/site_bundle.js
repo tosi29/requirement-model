@@ -194,10 +194,10 @@
       });
     }
   }
-  function createPanZoom(graphEl2, graphLayer2) {
+  function createPanZoom(graphEl2, graphLayer) {
     let zoom = 1;
     let pan = { x: 0, y: 0 };
-    const transform = () => graphLayer2.setAttribute("transform", `translate(${pan.x} ${pan.y}) scale(${zoom})`);
+    const transform = () => graphLayer.setAttribute("transform", `translate(${pan.x} ${pan.y}) scale(${zoom})`);
     const fit = (box, readable = false) => {
       const width = graphEl2.clientWidth || 800;
       const height = graphEl2.clientHeight || 480;
@@ -217,7 +217,7 @@
       transform();
     };
     return {
-      bind(svg2, viewport2, onBackgroundClick) {
+      bind(svg2, viewport, onBackgroundClick) {
         let ignoreClick = false;
         let drag = null;
         svg2.addEventListener("click", (event) => {
@@ -225,7 +225,7 @@
             ignoreClick = false;
             return;
           }
-          if (event.target === svg2 || event.target === viewport2) onBackgroundClick();
+          if (event.target === svg2 || event.target === viewport) onBackgroundClick();
         });
         svg2.addEventListener("pointerdown", (event) => {
           if (event.target.closest(".node:not(.band)")) return;
@@ -460,8 +460,13 @@
     const adjacency = /* @__PURE__ */ new Map();
     for (const node of nodes) adjacency.set(node.id, { out: [], in: [] });
     for (const edge of edges) {
-      adjacency.get(edge.source).out.push(edge.target);
-      adjacency.get(edge.target).in.push(edge.source);
+      const source = adjacency.get(edge.source);
+      const target = adjacency.get(edge.target);
+      if (!source || !target) {
+        throw new Error(`\u8868\u793A\u5BFE\u8C61\u306B\u7121\u3044\u30CE\u30FC\u30C9\u3092\u7E4B\u3050\u30A8\u30C3\u30B8: ${edge.source} -> ${edge.target}`);
+      }
+      source.out.push(edge.target);
+      target.in.push(edge.source);
     }
     return adjacency;
   }
@@ -511,6 +516,7 @@
       const next = [];
       for (const id of frontier) {
         const links = view2.adjacency.get(id);
+        if (!links) throw new Error(`\u96A3\u63A5\u30DE\u30C3\u30D7\u306B\u7121\u3044\u30CE\u30FC\u30C9: ${id}`);
         const neighbours = direction === "both" ? [...links.out, ...links.in] : links[direction];
         for (const other of neighbours) {
           if (other === start || seen.has(other)) continue;
@@ -755,32 +761,39 @@ ${text}`;
           }
         };
       }),
-      ...data.edges.map((edge, index) => ({
-        data: {
-          id: `e${index}`,
-          index,
-          source: edge.source,
-          target: edge.target,
-          name: edge.name
-        }
-      })),
-      ...bands.map((band) => ({
-        //: w / h は applyBanding が実測で入れ直すまでの仮の値。
-        data: {
-          id: bandId(band.key),
-          band: true,
-          bandType: band.type || "RequirementGroup",
-          bandKey: band.type || band.key,
-          label: band.label,
-          w: 10,
-          h: 10
-        },
-        classes: "band",
-        selectable: false,
-        grabbable: false
-      }))
+      ...data.edges.map(
+        (edge, index) => ({
+          data: {
+            id: `e${index}`,
+            index,
+            source: edge.source,
+            target: edge.target,
+            name: edge.name
+          }
+        })
+      ),
+      ...bands.map(
+        (band) => ({
+          //: w / h は applyBanding が実測で入れ直すまでの仮の値。
+          data: {
+            id: bandId(band.key),
+            band: true,
+            bandType: band.type || "RequirementGroup",
+            bandKey: band.type || band.key,
+            label: band.label,
+            w: 10,
+            h: 10
+          },
+          classes: "band",
+          selectable: false,
+          grabbable: false
+        })
+      )
     ];
   }
+  var isEdgeElement = (element) => "source" in element.data;
+  var isBandElement = (element) => "classes" in element && element.classes === "band";
+  var isNodeElement = (element) => !isEdgeElement(element) && !isBandElement(element);
   var LEGEND_MAX_BORDER = 3;
   function legendGroups(meta, colorScheme = "light") {
     const dark = colorScheme === "dark";
@@ -1195,7 +1208,7 @@ ${text}`;
   }
   function stepHit(hits2, current, delta) {
     if (!hits2.length) return null;
-    const at = hits2.indexOf(current);
+    const at = current === null ? -1 : hits2.indexOf(current);
     if (at < 0) return delta > 0 ? hits2[0] : hits2[hits2.length - 1];
     return hits2[(at + delta + hits2.length) % hits2.length];
   }
@@ -1469,6 +1482,16 @@ ${text}`;
 
   // src/reqmodel/presentation/site_app.ts
   var getElement = (id) => document.getElementById(id);
+  function requireElement(selector, root = document) {
+    const found = root.querySelector(selector);
+    if (!found) throw new Error(`\u30C6\u30F3\u30D7\u30EC\u30FC\u30C8\u306B\u8981\u7D20\u304C\u7121\u3044: ${selector}`);
+    return found;
+  }
+  function dataValue(element, name) {
+    const value = element.dataset[name];
+    if (value === void 0) throw new Error(`data \u5C5E\u6027\u304C\u7121\u3044: ${name}`);
+    return value;
+  }
   var queryElements = (selector) => document.querySelectorAll(selector);
   var dagre = window.dagre;
   var SVG_NS2 = "http://www.w3.org/2000/svg";
@@ -1506,8 +1529,6 @@ ${text}`;
   } = graphPrimitives;
   var graphEl = getElement("graph");
   var svg = null;
-  var viewport = null;
-  var graphLayer = null;
   var defs = null;
   var graph = [];
   var panZoom = null;
@@ -1527,30 +1548,39 @@ ${text}`;
           " \u306B\u3042\u308B\u3002"
         )
       );
-      return;
+      return null;
     }
     graph = graphElements(DATA, labelMeasurer());
     graphEl.replaceChildren();
-    svg = svgEl("svg", { class: "req-graph", tabindex: 0, role: "img", "aria-label": DATA.title });
-    defs = svgEl("defs");
-    viewport = svgEl("rect", {
+    const root = svgEl("svg", {
+      class: "req-graph",
+      tabindex: 0,
+      role: "img",
+      "aria-label": DATA.title
+    });
+    const defsEl = svgEl("defs");
+    const viewport = svgEl("rect", {
       class: "graph-bg",
       x: -1e5,
       y: -1e5,
       width: 2e5,
       height: 2e5
     });
-    graphLayer = svgEl("g", { class: "graph-layer" });
-    panZoom = createPanZoom(graphEl, graphLayer);
-    svg.append(defs, viewport, graphLayer);
-    graphEl.append(svg);
-    buildGraphDom();
-    panZoom.bind(svg, viewport, () => {
+    const graphLayer = svgEl("g", { class: "graph-layer" });
+    const controller = createPanZoom(graphEl, graphLayer);
+    root.append(defsEl, viewport, graphLayer);
+    graphEl.append(root);
+    svg = root;
+    defs = defsEl;
+    panZoom = controller;
+    buildGraphDom(defsEl, graphLayer);
+    controller.bind(root, viewport, () => {
       if (state.mode !== "analysis") selectNode(state.selected);
     });
     runLayout();
+    return root;
   }
-  function buildGraphDom() {
+  function buildGraphDom(defs2, graphLayer) {
     const pal = palette();
     const arrow = svgEl("marker", {
       id: "req-arrow",
@@ -1562,13 +1592,13 @@ ${text}`;
       orient: "auto"
     });
     arrow.append(svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "context-stroke" }));
-    defs.replaceChildren(arrow);
+    defs2.replaceChildren(arrow);
     const edgeLayer = svgEl("g", { class: "edges" });
     const bandLayer = svgEl("g", { class: "bands" });
     const nodeLayer = svgEl("g", { class: "nodes" });
     graphLayer.replaceChildren(bandLayer, edgeLayer, nodeLayer);
     const dashedEdges = new Set(DATA.meta.dashed_edges || []);
-    for (const item of graph.filter((element) => element.data.source)) {
+    for (const item of graph.filter(isEdgeElement)) {
       const path = svgEl("path", { class: "edge-line", "marker-end": "url(#req-arrow)" });
       const label = svgEl("text", { class: "edge-label", "text-anchor": "middle" });
       label.textContent = item.data.name;
@@ -1598,10 +1628,7 @@ ${text}`;
     const analysisFrames = Object.entries(ANALYSIS_BANDS).map(([key, label]) => ({
       data: { id: bandId(`analysis:${key}`), bandKey: `analysis:${key}`, label }
     }));
-    for (const item of [
-      ...graph.filter((element) => element.classes === "band"),
-      ...analysisFrames
-    ]) {
+    for (const item of [...graph.filter(isBandElement), ...analysisFrames]) {
       const group = svgEl("g", {
         class: "node band",
         "data-id": item.data.id,
@@ -1614,7 +1641,7 @@ ${text}`;
       bandLayer.append(group);
       bandItems.set(item.data.id, { ...item.data, x: 0, y: 0, w: 10, h: 10, group, shape, label });
     }
-    for (const item of graph.filter((element) => !element.classes && !element.data.source)) {
+    for (const item of graph.filter(isNodeElement)) {
       const typeMeta = types[item.data.type] || {};
       const group = svgEl("g", {
         class: `node status-${item.data.status || "unknown"}`,
@@ -1623,9 +1650,10 @@ ${text}`;
         role: "button",
         "aria-label": String(item.data.label).replaceAll("\n", " ")
       });
-      const shape = shapeEl(typeMeta.shape);
+      const shapeName = typeMeta.shape || "round-rectangle";
+      const shape = shapeEl(shapeName);
       shape.classList.add("node-shape");
-      const statusRing = shapeEl(typeMeta.shape);
+      const statusRing = shapeEl(shapeName);
       statusRing.classList.add("node-status-ring");
       const label = svgEl("text", { class: "node-label" });
       renderLabel(label, item.data.label, 0, 0);
@@ -1639,7 +1667,7 @@ ${text}`;
       nodeLayer.append(group);
       nodeItems.set(item.data.id, {
         ...item.data,
-        shapeName: typeMeta.shape,
+        shapeName,
         x: 0,
         y: 0,
         group,
@@ -1790,7 +1818,7 @@ ${text}`;
     updateEdges();
   }
   function runLayout() {
-    if (!svg) return;
+    if (!svg || !dagre) return;
     const startedAt = Date.now();
     const g = new dagre.graphlib.Graph({ multigraph: true });
     const opts = layoutOptions(state.direction);
@@ -1832,13 +1860,14 @@ ${text}`;
     }
     applyBanding();
     fitInitial();
+    const ms = Date.now() - startedAt;
     METRICS.layouts.push({
-      ms: Date.now() - startedAt,
+      ms,
       nodes: shownNodeItems().length,
       edges: shownEdgeItems().length,
       direction: state.direction
     });
-    svg.dataset.layoutMs = String(METRICS.layouts.at(-1).ms);
+    svg.dataset.layoutMs = String(ms);
   }
   function applyVisibility() {
     if (!svg) return;
@@ -1861,8 +1890,9 @@ ${text}`;
       classed(item.group, "hidden", !visibleBands.has(item.bandKey));
     for (const item of edgeItemsByKey.values())
       classed(item.group, "hidden", !edges.has(DATA.edges[item.index]));
-    METRICS.filters.push({ ms: Date.now() - startedAt, nodes: nodes.size, edges: edges.size });
-    svg.dataset.filterMs = String(METRICS.filters.at(-1).ms);
+    const ms = Date.now() - startedAt;
+    METRICS.filters.push({ ms, nodes: nodes.size, edges: edges.size });
+    svg.dataset.filterMs = String(ms);
   }
   function applyHighlight() {
     if (!svg) return;
@@ -1986,7 +2016,8 @@ ${text}`;
     const panel = getElement("detail");
     panel.replaceChildren();
     const detailId = state.mode === "analysis" && state.detail ? state.detail : state.selected;
-    if (!detailId || !view.byId.has(detailId)) {
+    const node = detailId ? view.byId.get(detailId) : void 0;
+    if (!node) {
       panel.append(
         htmlEl(
           "p",
@@ -1996,7 +2027,6 @@ ${text}`;
       );
       return;
     }
-    const node = view.byId.get(detailId);
     const impact = impactSets(view, node.id);
     panel.append(
       htmlEl("h3", {}, node.id, " ", htmlEl("span", { class: "node-btn type" }, `[${node.type}]`)),
@@ -2015,19 +2045,19 @@ ${text}`;
     appendReferenceSection(panel, fieldLabel("source"), node.source);
     appendReferenceSection(panel, fieldLabel("realized_by"), node.realized_by);
     appendReferenceSection(panel, fieldLabel("evidence"), node.evidence);
-    if ((node.acceptance_criteria || []).length) {
+    const criteria = node.acceptance_criteria || [];
+    if (criteria.length) {
       panel.append(htmlEl("h2", {}, "\u53D7\u3051\u5165\u308C\u57FA\u6E96"));
-      panel.append(
-        htmlEl("ul", {}, ...node.acceptance_criteria.map((criterion) => htmlEl("li", {}, criterion)))
-      );
+      panel.append(htmlEl("ul", {}, ...criteria.map((criterion) => htmlEl("li", {}, criterion))));
     }
-    if ((node.suppress || []).length) {
+    const suppressed = node.suppress || [];
+    if (suppressed.length) {
       panel.append(htmlEl("h2", {}, "\u6291\u5236\u4E2D\u306E\u6307\u6458"));
       panel.append(
         htmlEl(
           "ul",
           {},
-          ...node.suppress.map(
+          ...suppressed.map(
             ([code, reason]) => htmlEl("li", {}, htmlEl("code", {}, code), `: ${reason}`)
           )
         )
@@ -2072,7 +2102,7 @@ ${text}`;
       )
     );
     panel.querySelectorAll("button[data-goto]").forEach((button) => {
-      button.addEventListener("click", () => selectNode(button.dataset.goto));
+      button.addEventListener("click", () => selectNode(dataValue(button, "goto")));
     });
     copyButton.addEventListener("click", async () => {
       try {
@@ -2273,7 +2303,7 @@ ${text}`;
       const container = htmlEl("div", { class: "legend-group" }, htmlEl("b", {}, group.title));
       for (const { label, swatch } of group.items) {
         const mark = htmlEl("i", { class: "swatch" });
-        mark.style.background = swatch.background;
+        mark.style.background = swatch.background ?? "";
         mark.style.borderColor = swatch.borderColor || "currentColor";
         mark.style.borderStyle = swatch.borderStyle;
         mark.style.borderWidth = `${swatch.borderWidth}px`;
@@ -2417,7 +2447,7 @@ ${text}`;
     getElement("table-note").textContent = `${rows.length} \u4EF6\u3092\u8868\u793A\u4E2D (\u5168 ${DATA.nodes.length} \u4EF6)\u3002 \u884C\u3092\u30AF\u30EA\u30C3\u30AF (\u30AD\u30FC\u30DC\u30FC\u30C9\u306A\u3089 Enter) \u3059\u308B\u3068\u53F3\u30DA\u30A4\u30F3\u306B\u8A73\u7D30\u304C\u51FA\u308B\u3002\u5217\u898B\u51FA\u3057\u3067\u4E26\u3079\u66FF\u3048\u308B\u3002`;
     table.querySelectorAll("thead button[data-key]").forEach((button) => {
       button.addEventListener("click", () => {
-        state.sort = nextSort(state.sort, button.dataset.key);
+        state.sort = nextSort(state.sort, dataValue(button, "key"));
         renderTable();
         writeHash();
       });
@@ -2450,7 +2480,7 @@ ${text}`;
       );
       const at = buttons.indexOf(event.target);
       if (at < 0) return;
-      let next = null;
+      let next;
       if (event.key in keys) next = buttons[(at + keys[event.key] + buttons.length) % buttons.length];
       else if (event.key === "Home") next = buttons[0];
       else if (event.key === "End") next = buttons[buttons.length - 1];
@@ -2570,8 +2600,10 @@ ${text}`;
       writeHash();
     });
   }
-  bindTabKeys(document.querySelector(".tabs"), (tab) => {
-    setMode(VIEW_TABS.find(([id]) => id === tab.id)[1]);
+  bindTabKeys(requireElement(".tabs"), (tab) => {
+    const entry = VIEW_TABS.find(([id]) => id === tab.id);
+    if (!entry) return;
+    setMode(entry[1]);
     writeHash();
   });
   getElement("search").addEventListener("input", (event) => {
@@ -2642,11 +2674,12 @@ ${text}`;
     applyTheme();
   });
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", restyleGraph);
-  var exportMenu = document.querySelector(".export-menu");
-  var exportOptions = exportMenu.querySelector(".export-options");
+  var exportMenu = requireElement(".export-menu");
+  var exportSummary = requireElement("summary", exportMenu);
+  var exportOptions = requireElement(".export-options", exportMenu);
   function positionExportMenu() {
     if (!exportMenu.open) return;
-    const anchor = exportMenu.querySelector("summary").getBoundingClientRect();
+    const anchor = exportSummary.getBoundingClientRect();
     const menu = exportOptions.getBoundingClientRect();
     const margin = 8;
     const gap = 4;
@@ -2738,12 +2771,12 @@ ${new XMLSerializer().serializeToString(copy)}`;
     const text = currentSvg();
     if (!text) return;
     download("graph.svg", text, "image/svg+xml;charset=utf-8");
-    exportSvg.closest("details").open = false;
+    exportMenu.open = false;
   });
   var exportMmd = getElement("export-mmd");
   exportMmd.addEventListener("click", () => {
     download("graph.mmd", mermaidText(displayedView()), "text/plain;charset=utf-8");
-    exportMmd.closest("details").open = false;
+    exportMenu.open = false;
   });
   document.addEventListener("keydown", (event) => {
     if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -2776,8 +2809,8 @@ ${new XMLSerializer().serializeToString(copy)}`;
   window.addEventListener("popstate", applyHash);
   window.addEventListener("hashchange", applyHash);
   applyTheme();
-  initGraph();
-  exportSvg.disabled = !svg;
+  var drawn = initGraph();
+  exportSvg.disabled = !drawn;
   renderFilters();
   renderFocusOptions();
   renderImpactControls();
@@ -2786,5 +2819,5 @@ ${new XMLSerializer().serializeToString(copy)}`;
   setMode(state.mode);
   writeHash(false);
   METRICS.initialRenderMs = Date.now() - METRICS.startedAt;
-  if (svg) svg.dataset.initialRenderMs = String(METRICS.initialRenderMs);
+  if (drawn) drawn.dataset.initialRenderMs = String(METRICS.initialRenderMs);
 })();

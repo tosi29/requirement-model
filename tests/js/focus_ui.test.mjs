@@ -85,6 +85,18 @@ function page(hash = "", dataOverride = null) {
   };
 }
 
+test("初期描画でノードの図形に配色と寸法が入る", async () => {
+  const p = page();
+  try {
+    //: 図の DOM を組む時点でテーマ適用が効いていないと、ラベルだけが描かれクリックできない。
+    const shape = p.node("Goal-1").querySelector(".node-shape");
+    assert.ok(shape.getAttribute("fill"));
+    assert.ok(Number(shape.getAttribute("rx")) > 0);
+  } finally {
+    await p.window.happyDOM.close();
+  }
+});
+
 test("分析タブは図だけを上流・下流に絞り、一覧から起点を変更できる", async () => {
   const p = page();
   try {

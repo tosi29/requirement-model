@@ -45,7 +45,7 @@ export function stepHit(
   delta: number,
 ): string | null {
   if (!hits.length) return null;
-  const at = hits.indexOf(current);
+  const at = current === null ? -1 : hits.indexOf(current);
   if (at < 0) return delta > 0 ? hits[0] : hits[hits.length - 1];
   return hits[(at + delta + hits.length) % hits.length];
 }

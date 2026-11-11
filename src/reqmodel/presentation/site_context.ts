@@ -36,7 +36,7 @@ function describe(view, id) {
  * ノードの型から機械的に決まるので、型ごとの一覧は Python 側から受け取る。
  */
 export function allEdgeNames(data: SiteData): string[] {
-  const names = [];
+  const names: string[] = [];
   for (const node of data.nodes) {
     for (const name of data.edge_names_by_type[node.type] || []) {
       if (!names.includes(name)) names.push(name);

@@ -38,15 +38,20 @@ export function createView(data: SiteData, state: ViewState): GraphViewModel {
  * 走査すると 1 回が O(V×E) になり、深さ指定や近傍描画のように呼び出しが
  * 増えるほど効いてくる。組み立ては view 1 つにつき 1 回で O(V+E)。
  *
- * `createView()` がエッジの両端が見えていることを保証しているので、
- * ここでは端点の欠落を考えない。
+ * `createView()` がエッジの両端が見えていることを保証している。端点が欠けた
+ * エッジは呼び出し側の誤りなので、黙って捨てずに例外にする。
  */
 function buildAdjacency(nodes: readonly NormalizedNode[], edges: readonly NormalizedEdge[]) {
   const adjacency = new Map<string, { out: string[]; in: string[] }>();
   for (const node of nodes) adjacency.set(node.id, { out: [], in: [] });
   for (const edge of edges) {
-    adjacency.get(edge.source).out.push(edge.target);
-    adjacency.get(edge.target).in.push(edge.source);
+    const source = adjacency.get(edge.source);
+    const target = adjacency.get(edge.target);
+    if (!source || !target) {
+      throw new Error(`表示対象に無いノードを繋ぐエッジ: ${edge.source} -> ${edge.target}`);
+    }
+    source.out.push(edge.target);
+    target.in.push(edge.source);
   }
   return adjacency;
 }
@@ -140,14 +145,21 @@ export function activeEdgeNames(view: GraphViewModel): string[] | null {
  * 距離で切るために段 (frontier) ごとに進める。見えているグラフの隣接マップだけを
  * 見るので、絞り込みはそのまま探索にも効く。
  */
-function walk(view, start, direction, depth = null) {
+function walk(
+  view: GraphViewModel,
+  start: string,
+  direction: "out" | "in" | "both",
+  depth: number | null = null,
+): Set<string> {
   const seen = new Set<string>();
   if (!view.adjacency.has(start)) return seen;
   let frontier = [start];
   for (let step = 0; frontier.length && (depth === null || step < depth); step++) {
-    const next = [];
+    const next: string[] = [];
     for (const id of frontier) {
       const links = view.adjacency.get(id);
+      //: 隣接マップは見えている全ノードを鍵に持ち、辿る先もその中にしか無い。
+      if (!links) throw new Error(`隣接マップに無いノード: ${id}`);
       const neighbours = direction === "both" ? [...links.out, ...links.in] : links[direction];
       for (const other of neighbours) {
         if (other === start || seen.has(other)) continue;

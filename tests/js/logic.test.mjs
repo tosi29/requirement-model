@@ -4,18 +4,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  FOCUS_DEPTHS,
-  FIELD_LABELS,
-  LABEL_FONT,
-  LABEL_MAX_LENGTH,
-  LABEL_WRAP_WIDTH,
-  TABLE_COLUMNS,
   ALL_SEVERITIES,
   activeEdgeNames,
   allEdgeNames,
   bandDefs,
-  bandId,
   bandedLayout,
+  bandId,
   createView,
   decodeHash,
   defaultState,
@@ -25,6 +19,8 @@ import {
   escapeHtml,
   estimateTextWidth,
   explainCommand,
+  FIELD_LABELS,
+  FOCUS_DEPTHS,
   fieldLabel,
   focusSet,
   graphElements,
@@ -34,6 +30,9 @@ import {
   impactSets,
   initialHash,
   isNodeVisible,
+  LABEL_FONT,
+  LABEL_MAX_LENGTH,
+  LABEL_WRAP_WIDTH,
   labelChunks,
   layoutOptions,
   legendGroups,
@@ -44,24 +43,25 @@ import {
   nodeContext,
   nodeSize,
   normalizeTheme,
-  reach,
   quadraticPath,
   quadraticPoint,
+  reach,
   related,
-  searchHits,
   safeHref,
+  searchHits,
   severityTabs,
   sortRows,
   sourceUrl,
   statusFilters,
   stepHit,
   storableHash,
+  TABLE_COLUMNS,
   tableRows,
   truncate,
   visibleBandKeys,
   wrapLabel,
 } from "../../src/reqmodel/presentation/site_logic.ts";
-import { ELLIPSE_FIT, allOn, defaultOn, fixture, largeFixture } from "./fixture.mjs";
+import { allOn, defaultOn, ELLIPSE_FIT, fixture, largeFixture } from "./fixture.mjs";
 
 const viewOf = (state) => {
   const data = fixture();
@@ -76,7 +76,12 @@ test("利用者向けフィールド名は日本語ラベルへ変換する", ()
   assert.equal(fieldLabel("evidence"), "証跡");
   assert.equal(fieldLabel("status"), "ステータス");
   assert.equal(fieldLabel("id"), "id");
-  assert.deepEqual(Object.keys(FIELD_LABELS).sort(), ["evidence", "realized_by", "source", "status"]);
+  assert.deepEqual(Object.keys(FIELD_LABELS).sort(), [
+    "evidence",
+    "realized_by",
+    "source",
+    "status",
+  ]);
 });
 
 test("表と凡例の status 見出しは日本語で表示する", () => {
@@ -95,13 +100,13 @@ test("既定ではすべてのノードとエッジが見える", () => {
 test("ノード種別を外すと、その端点を持つエッジも消える", () => {
   const data = fixture();
   const types = new Set(data.types);
-    const view = createView(data, { ...allOn(data), types });
+  const view = createView(data, { ...allOn(data), types });
 
   assert.deepEqual(
     view.nodes.map((n) => n.id),
     ["Goal-1", "Need-1", "FR-1", "QR-1"],
   );
-  });
+});
 
 test("status を外すと、そのノードとそこに繋がるエッジが消える", () => {
   const data = fixture();
@@ -216,10 +221,7 @@ test("深さを指定すると、そのホップ数までしか辿らない", ()
   // QR-1 → FR-1 → Need-1 → (SRC-1)
   assert.deepEqual([...reach(view, "QR-1", true, 1)], ["FR-1"]);
   assert.deepEqual([...reach(view, "QR-1", true, 2)].sort(), ["FR-1", "Need-1"]);
-  assert.deepEqual(
-    [...reach(view, "QR-1", true, 5)].sort(),
-    [...reach(view, "QR-1", true)].sort(),
-  );
+  assert.deepEqual([...reach(view, "QR-1", true, 5)].sort(), [...reach(view, "QR-1", true)].sort());
 });
 
 test("深さ null は無制限 (既定)", () => {
@@ -269,10 +271,7 @@ test("scope を省略すると view の state から取る", () => {
   const data = fixture();
   const view = createView(data, { ...allOn(data), depth: 1, undirected: true });
 
-  assert.deepEqual(
-    [...impactSets(view, "FR-1").downstream].sort(),
-    ["Need-1", "QR-1"],
-  );
+  assert.deepEqual([...impactSets(view, "FR-1").downstream].sort(), ["Need-1", "QR-1"]);
 });
 
 test("impactScope は深さ 0 と知らない値を無制限に倒す", () => {
@@ -288,12 +287,12 @@ test("impactScope は深さ 0 と知らない値を無制限に倒す", () => {
 test("深さ・向きの設定は絞り込みと重ねて効く", () => {
   const data = fixture();
   const edges = new Set(data.edge_names);
-    const view = createView(data, { ...allOn(data), edges });
+  const view = createView(data, { ...allOn(data), edges });
 
-  assert.deepEqual([...impactSets(view, "FR-1", { depth: 1, undirected: true }).downstream].sort(), [
-    "Need-1",
-    "QR-1",
-  ]);
+  assert.deepEqual(
+    [...impactSets(view, "FR-1", { depth: 1, undirected: true }).downstream].sort(),
+    ["Need-1", "QR-1"],
+  );
 });
 
 /** 隣接マップを使わない素朴な実装 (書き換え前の reach())。突き合わせ用。 */
@@ -351,7 +350,7 @@ test("近傍は始点自身を含む", () => {
 test("絞り込みで消えたノードは近傍にも出ない", () => {
   const data = fixture();
   const types = new Set(data.types);
-    const view = createView(data, { ...allOn(data), types });
+  const view = createView(data, { ...allOn(data), types });
 
   assert.deepEqual([...focusSet(view, "FR-1", 1)].sort(), ["FR-1", "Need-1", "QR-1"]);
 });
@@ -377,7 +376,7 @@ test("大きいグラフでも近傍探索は読める規模に収まる", () =>
   assert.ok(focusSet(view, "FR-40", 2).size < view.nodes.length / 4);
 
   const edges = new Set(data.edge_names);
-    const trimmed = createView(data, { ...allOn(data), edges });
+  const trimmed = createView(data, { ...allOn(data), edges });
 
   assert.ok(focusSet(trimmed, "FR-40", 3).size < view.nodes.length / 4);
 });
@@ -521,15 +520,18 @@ test("tableRows は 1 ノード 1 行にし、根拠と指摘を数える", () =
   const { rows } = rowsOf();
 
   assert.equal(rows.length, 4);
-  assert.deepEqual(rows.find((row) => row.id === "FR-1"), {
-    id: "FR-1",
-    type: "FunctionalRequirement",
-    text: "領収書画像から金額を抽出すること",
-    status: "proposed",
-    evidence: 1,
-    findings: 1,
-    severity: "info",
-  });
+  assert.deepEqual(
+    rows.find((row) => row.id === "FR-1"),
+    {
+      id: "FR-1",
+      type: "FunctionalRequirement",
+      text: "領収書画像から金額を抽出すること",
+      status: "proposed",
+      evidence: 1,
+      findings: 1,
+      severity: "info",
+    },
+  );
 });
 
 test("行の severity は最も重い指摘のもの", () => {
@@ -542,19 +544,28 @@ test("行の severity は最も重い指摘のもの", () => {
 
 test("ノードに紐づかない指摘はどの行にも数えない", () => {
   const { rows } = rowsOf();
-  assert.equal(rows.reduce((total, row) => total + row.findings, 0), 3);
+  assert.equal(
+    rows.reduce((total, row) => total + row.findings, 0),
+    3,
+  );
 });
 
 test("テーブルは絞り込み後のノードだけを出す", () => {
   const types = new Set(fixture().types);
-    const { rows } = rowsOf({ types });
+  const { rows } = rowsOf({ types });
 
   assert.ok(!rows.some((row) => row.id === "SRC-1"));
 });
 
 test("検索語は id と本文の部分一致で効く", () => {
-  assert.deepEqual(rowsOf({}, "fr-").rows.map((row) => row.id), ["FR-1"]);
-  assert.deepEqual(rowsOf({}, "領収書").rows.map((row) => row.id), ["Need-1", "FR-1"]);
+  assert.deepEqual(
+    rowsOf({}, "fr-").rows.map((row) => row.id),
+    ["FR-1"],
+  );
+  assert.deepEqual(
+    rowsOf({}, "領収書").rows.map((row) => row.id),
+    ["Need-1", "FR-1"],
+  );
   assert.equal(rowsOf({}, "  ").rows.length, 4);
 });
 
@@ -581,9 +592,7 @@ test("絞り込みで消えたノードはヒットに入らない", () => {
   const types = new Set(data.types);
   types.delete("Need");
 
-  assert.deepEqual(searchHits(createView(data, { ...allOn(data), types }), "領収書"), [
-    "FR-1",
-  ]);
+  assert.deepEqual(searchHits(createView(data, { ...allOn(data), types }), "領収書"), ["FR-1"]);
 });
 
 test("↑↓ は候補を送り、端で巻き戻す", () => {
@@ -645,7 +654,10 @@ test("sortRows は渡された配列を書き換えない", () => {
   const before = rows.map((row) => row.id);
   sortRows(view, rows, { key: "id", asc: false });
 
-  assert.deepEqual(rows.map((row) => row.id), before);
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    before,
+  );
 });
 
 test("同じ列を押すと向きが反転する", () => {
@@ -834,7 +846,6 @@ test("nodeContext は対象・上流・下流・エッジを並べる", () => {
   assert.ok(text.endsWith("\n"));
 });
 
-
 test("エッジを絞ると nodeContext にフィルタ行が出る", () => {
   const data = fixture();
   const edges = new Set(["satisfies", "motivates"]);
@@ -872,7 +883,10 @@ test("nodeContext は scope を省略すると view の state を見る", () => 
   const data = fixture();
   const view = createView(data, { ...allOn(data), depth: 1, undirected: true });
 
-  assert.equal(nodeContext(view, "FR-1"), nodeContext(view, "FR-1", { depth: 1, undirected: true }));
+  assert.equal(
+    nodeContext(view, "FR-1"),
+    nodeContext(view, "FR-1", { depth: 1, undirected: true }),
+  );
   assert.match(nodeContext(view, "FR-1"), /探索深さ: 1/);
 });
 
@@ -897,12 +911,7 @@ test("部分グラフに現れなかったエッジ種別を末尾に並べる",
 });
 
 test("allEdgeNames はノード型から現れうるエッジ種別を数える", () => {
-  assert.deepEqual(allEdgeNames(fixture()), [
-    "refines",
-    "motivates",
-    "satisfies",
-    "qualifies",
-  ]);
+  assert.deepEqual(allEdgeNames(fixture()), ["refines", "motivates", "satisfies", "qualifies"]);
 });
 
 // --- SVG 描画に渡す値 -------------------------------------------------------
@@ -929,10 +938,7 @@ test("graphElements はラベルを測って外形をデータに載せる", () 
   const goal = elements[0];
 
   //: ラベル (id + 折り返した本文) を測った結果が w / h。
-  assert.deepEqual(
-    { w: goal.data.w, h: goal.data.h },
-    nodeSize(goal.data.label, ELLIPSE_FIT),
-  );
+  assert.deepEqual({ w: goal.data.w, h: goal.data.h }, nodeSize(goal.data.label, ELLIPSE_FIT));
   //: 折り返しは上限幅を超えない。
   for (const line of goal.data.label.split("\n")) {
     assert.ok(estimateTextWidth(line) <= LABEL_WRAP_WIDTH, line);
@@ -1060,7 +1066,6 @@ test("meta に bands が無ければ従来どおりの要素になる", () => {
   assert.equal(bandDefs(data).length, 0);
 });
 
-
 test("bandDefs は RequirementGroup から要求枠を order 順に作り未分類を残す", () => {
   const data = fixture({
     requirement_groups: [
@@ -1107,11 +1112,21 @@ test("visibleBandKeys は表示中メンバーを持つ RequirementGroup 枠だ�
   });
 
   assert.deepEqual(
-    [...visibleBandKeys(data, data.nodes.filter((node) => node.id !== "QR-1"))],
+    [
+      ...visibleBandKeys(
+        data,
+        data.nodes.filter((node) => node.id !== "QR-1"),
+      ),
+    ],
     ["Goal", "Need", "group:capture"],
   );
   assert.deepEqual(
-    [...visibleBandKeys(data, data.nodes.filter((node) => node.id === "QR-1"))],
+    [
+      ...visibleBandKeys(
+        data,
+        data.nodes.filter((node) => node.id === "QR-1"),
+      ),
+    ],
     ["group:quality"],
   );
 });
@@ -1250,8 +1265,10 @@ test("bandedLayout は RequirementGroup を Requirements 段の中で横に並�
   assert.equal(positions.get("FR-1").y, positions.get("QR-1").y);
   assert.ok(positions.get("FR-1").x < positions.get("QR-1").x);
   assert.ok(frames.get("group:capture").x < frames.get("group:notify").x);
-  assert.ok(frames.get("group:capture").w !== frames.get("Goal").w,
-    "Requirements 枠を Goal / Need の共通幅へ引き延ばさない");
+  assert.ok(
+    frames.get("group:capture").w !== frames.get("Goal").w,
+    "Requirements 枠を Goal / Need の共通幅へ引き延ばさない",
+  );
   assert.equal(frames.get("group:capture").h, frames.get("group:notify").h);
   assert.equal(frames.get("group:capture").y, frames.get("group:notify").y);
 });
@@ -1283,7 +1300,9 @@ test("bandedLayout は多数の RequirementGroup を折り返さず同じ段に�
     members: Array.from({ length: 4 }, (_, node) => `FR-${group}-${node}`),
   }));
   const placed = bands.flatMap((band, group) =>
-    band.members.map((id, node) => placedNode(id, "FunctionalRequirement", group * 1000 + node * 200, 0)),
+    band.members.map((id, node) =>
+      placedNode(id, "FunctionalRequirement", group * 1000 + node * 200, 0),
+    ),
   );
   const { positions, frames } = bandedLayout(bands, placed, [], "TD", {
     groupMaxWidth: 250,
@@ -1292,26 +1311,37 @@ test("bandedLayout は多数の RequirementGroup を折り返さず同じ段に�
   assert.equal(new Set(boxes.map((frame) => frame.y)).size, 1, "全グループが同じ段に残る");
   assert.equal(positions.size, 32);
   for (const band of bands) {
-    assert.ok(new Set(band.members.map((id) => positions.get(id).x)).size > 1,
-      "各グループを 1 ノード幅まで潰さない");
+    assert.ok(
+      new Set(band.members.map((id) => positions.get(id).x)).size > 1,
+      "各グループを 1 ノード幅まで潰さない",
+    );
   }
-  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
-    const a = boxes[i]; const b = boxes[j];
-    assert.ok(Math.abs(a.x - b.x) >= (a.w + b.w) / 2 || Math.abs(a.y - b.y) >= (a.h + b.h) / 2);
-  }
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i];
+      const b = boxes[j];
+      assert.ok(Math.abs(a.x - b.x) >= (a.w + b.w) / 2 || Math.abs(a.y - b.y) >= (a.h + b.h) / 2);
+    }
 });
 
 test("bandedLayout は単一グループ内の同階層ノードを詰めて折り返す", () => {
   const members = Array.from({ length: 12 }, (_, index) => `FR-${index}`);
-  const placed = members.map((id, index) => placedNode(id, "FunctionalRequirement", index * 500, 0));
+  const placed = members.map((id, index) =>
+    placedNode(id, "FunctionalRequirement", index * 500, 0),
+  );
   const { positions, frames } = bandedLayout(
-    [{ key: "group:many", label: "多数", members }], placed, [], "TD",
+    [{ key: "group:many", label: "多数", members }],
+    placed,
+    [],
+    "TD",
     { groupMaxWidth: 250 },
   );
   assert.ok(new Set([...positions.values()].map((position) => position.y)).size > 1);
   assert.ok(frames.get("group:many").w <= 250);
-  assert.ok(Math.max(...[...positions.values()].map((position) => position.x)) < 250,
-    "dagre の大きな絶対座標を引き継がない");
+  assert.ok(
+    Math.max(...[...positions.values()].map((position) => position.x)) < 250,
+    "dagre の大きな絶対座標を引き継がない",
+  );
 });
 
 test("bandedLayout は Goal・Need を全 RequirementGroup の横幅へ揃える", () => {
@@ -1338,9 +1368,7 @@ test("bandedLayout は Goal・Need を全 RequirementGroup の横幅へ揃える
   assert.equal(goal.x + goal.w / 2, need.x + need.w / 2);
   const requirementsLeft = requirements.x - requirements.w / 2;
   const requirementsRight = other.x + other.w / 2;
-  const requirementsMiddle = (
-    requirementsLeft + requirementsRight
-  ) / 2;
+  const requirementsMiddle = (requirementsLeft + requirementsRight) / 2;
   assert.equal(goal.x, requirementsMiddle, "全 Requirements の中心へ揃える");
   assert.equal(goal.x - goal.w / 2, requirementsLeft);
   assert.equal(goal.x + goal.w / 2, requirementsRight);
@@ -1348,19 +1376,26 @@ test("bandedLayout は Goal・Need を全 RequirementGroup の横幅へ揃える
 
 test("bandedLayout の枠内折り返しは refines 階層と LR の非重複を保つ", () => {
   const members = ["FR-parent", "FR-child", "FR-peer"];
-  const placed = members.map((id, index) => placedNode(id, "FunctionalRequirement", 0, index * 500));
+  const placed = members.map((id, index) =>
+    placedNode(id, "FunctionalRequirement", 0, index * 500),
+  );
   const edges = [{ source: "FR-child", name: "refines", target: "FR-parent" }];
   const { positions, frames } = bandedLayout(
-    [{ key: "group:tree", members }], placed, edges, "LR",
+    [{ key: "group:tree", members }],
+    placed,
+    edges,
+    "LR",
     { groupMaxWidth: 150 },
   );
   assert.ok(positions.get("FR-parent").x < positions.get("FR-child").x);
   assert.ok(frames.get("group:tree").h <= 150);
   const nodes = members.map((id) => ({ ...positions.get(id), w: 60, h: 30 }));
-  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
-    const a = nodes[i]; const b = nodes[j];
-    assert.ok(Math.abs(a.x - b.x) >= 60 || Math.abs(a.y - b.y) >= 30);
-  }
+  for (let i = 0; i < nodes.length; i++)
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i];
+      const b = nodes[j];
+      assert.ok(Math.abs(a.x - b.x) >= 60 || Math.abs(a.y - b.y) >= 30);
+    }
 });
 
 test("bandedLayout は帯以外のノードの相対位置を保ったまま平行移動する", () => {
@@ -1408,10 +1443,10 @@ test("quadraticPath は端点と制御点から短い曲線を作る", () => {
 });
 
 test("quadraticPoint は描画と同じ曲線上のラベル位置を返す", () => {
-  assert.deepEqual(
-    quadraticPoint({ x: 0, y: 0 }, { x: 50, y: -24 }, { x: 100, y: 0 }),
-    { x: 50, y: -12 },
-  );
+  assert.deepEqual(quadraticPoint({ x: 0, y: 0 }, { x: 50, y: -24 }, { x: 100, y: 0 }), {
+    x: 50,
+    y: -12,
+  });
 });
 
 // --- 選択ノードの追従 -------------------------------------------------------
@@ -1460,9 +1495,7 @@ test("エッジ一覧は相手の id と本文を持つ", () => {
 
   assert.deepEqual(
     out.map((item) => [item.arrow, item.id, item.text]),
-    [
-      ["--satisfies-->", "Need-1", "領収書を撮影するだけで申請したい"],
-    ],
+    [["--satisfies-->", "Need-1", "領収書を撮影するだけで申請したい"]],
   );
   assert.deepEqual(
     incoming.map((item) => [item.arrow, item.id, item.type]),
@@ -1473,7 +1506,7 @@ test("エッジ一覧は相手の id と本文を持つ", () => {
 test("絞り込みで消えたエッジは一覧にも出ない", () => {
   const data = fixture();
   const edges = new Set(data.edge_names);
-    const view = createView(data, { ...allOn(data), edges });
+  const view = createView(data, { ...allOn(data), edges });
 
   assert.deepEqual(
     edgeItems(view, "FR-1").out.map((item) => item.id),
@@ -1609,7 +1642,7 @@ test("URL のハッシュが保存より優先される", () => {
 test("Mermaid は見えているノードとエッジだけを出す", () => {
   const data = fixture();
   const types = new Set(data.types);
-    const text = mermaidText(createView(data, { ...allOn(data), types }));
+  const text = mermaidText(createView(data, { ...allOn(data), types }));
 
   //: 識別子は描く順の連番 (Goal-1, Need-1, FR-1, QR-1 の 4 件)。
   assert.ok(text.startsWith("flowchart TD\n"));
@@ -1618,7 +1651,7 @@ test("Mermaid は見えているノードとエッジだけを出す", () => {
   assert.ok(!text.includes("source"));
   assert.ok(text.includes("    n1 -->|motivates| n2"));
   //: classDef は全型ぶん出す (絞り込みで並びが変わらない)。
-    });
+});
 
 test("Mermaid のラベルは空白を潰して切り詰め、記号を逃がす", () => {
   const data = fixture();

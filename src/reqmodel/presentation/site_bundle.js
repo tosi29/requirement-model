@@ -165,7 +165,10 @@
     graphEl2.style.setProperty("--search-hit", data.meta.search?.hit || pal.fg);
     for (const item of nodeItems2) {
       const typeMeta = data.meta.types[item.type] || {};
-      const statusMeta = data.meta.statuses[item.status] || { border_width: 1.5, border_style: "solid" };
+      const statusMeta = data.meta.statuses[item.status] || {
+        border_width: 1.5,
+        border_style: "solid"
+      };
       const colors = primitives.typeColors(typeMeta, pal);
       item.shapeName = typeMeta.shape || "round-rectangle";
       primitives.updateShape(item.shape, item.shapeName, item);
@@ -176,7 +179,11 @@
         "stroke-width": statusMeta.border_width || 1.5,
         "stroke-dasharray": statusMeta.border_style === "dashed" ? "6 4" : statusMeta.border_style === "dotted" ? "1 3" : ""
       });
-      primitives.setAttrs(item.statusRing, { fill: "none", stroke: colors.stroke, "stroke-width": 1 });
+      primitives.setAttrs(item.statusRing, {
+        fill: "none",
+        stroke: colors.stroke,
+        "stroke-width": 1
+      });
     }
     for (const item of bandItems2) {
       const bandType = item.bandType || "RequirementGroup";
@@ -246,10 +253,14 @@
           drag = null;
           ignoreClick = false;
         });
-        svg2.addEventListener("wheel", (event) => {
-          event.preventDefault();
-          zoomBy2(event.deltaY < 0 ? 1.12 : 1 / 1.12);
-        }, { passive: false });
+        svg2.addEventListener(
+          "wheel",
+          (event) => {
+            event.preventDefault();
+            zoomBy2(event.deltaY < 0 ? 1.12 : 1 / 1.12);
+          },
+          { passive: false }
+        );
       },
       fit,
       reveal(box, margin = 40) {
@@ -274,7 +285,10 @@
         const fits = target.x2 - target.x1 <= inner.x2 - inner.x1 && target.y2 - target.y1 <= inner.y2 - inner.y1;
         const visible = fits ? target.x1 >= inner.x1 && target.x2 <= inner.x2 && target.y1 >= inner.y1 && target.y2 <= inner.y2 : box.x >= extent.x1 && box.x <= extent.x2 && box.y >= extent.y1 && box.y <= extent.y2;
         if (visible) return;
-        pan = { x: graphEl2.clientWidth / 2 - box.x * zoom, y: graphEl2.clientHeight / 2 - box.y * zoom };
+        pan = {
+          x: graphEl2.clientWidth / 2 - box.x * zoom,
+          y: graphEl2.clientHeight / 2 - box.y * zoom
+        };
         transform();
       },
       zoomBy: zoomBy2,
@@ -309,11 +323,15 @@
       for (const [key, value] of Object.entries(attrs)) {
         if (value === void 0 || value === null || value === false) continue;
         if (key === "class") element.className = String(value);
-        else if (key === "checked" && element instanceof HTMLInputElement) element.checked = Boolean(value);
-        else if (key === "value" && "value" in element) element.value = String(value);
+        else if (key === "checked" && element instanceof HTMLInputElement)
+          element.checked = Boolean(value);
+        else if (key === "value" && "value" in element)
+          element.value = String(value);
         else element.setAttribute(key, String(value));
       }
-      element.append(...children.filter((child) => child !== void 0 && child !== null));
+      element.append(
+        ...children.filter((child) => child !== void 0 && child !== null)
+      );
       return element;
     }
     function setAttrs2(element, attrs) {
@@ -351,7 +369,8 @@
     const shapeEl2 = (shape) => {
       if (shape === "ellipse") return svgEl2("ellipse");
       if (shape === "barrel") return svgEl2("path");
-      if (["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape)) return svgEl2("polygon");
+      if (["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape))
+        return svgEl2("polygon");
       return svgEl2("rect");
     };
     const polygonCoords2 = (shape, w, h) => {
@@ -391,19 +410,37 @@
     function updateShape2(element, shape, box) {
       const { w, h } = box;
       if (element.tagName === "ellipse") setAttrs2(element, { cx: 0, cy: 0, rx: w / 2, ry: h / 2 });
-      else if (element.tagName === "polygon") setAttrs2(element, { points: polygonCoords2(shape, w, h).map(({ x, y }) => `${x},${y}`).join(" ") });
+      else if (element.tagName === "polygon")
+        setAttrs2(element, {
+          points: polygonCoords2(shape, w, h).map(({ x, y }) => `${x},${y}`).join(" ")
+        });
       else if (element.tagName === "path") {
         const curve = Math.min(w * 0.12, h * 0.45);
-        setAttrs2(element, { d: `M ${-w / 2 + curve} ${-h / 2} L ${w / 2 - curve} ${-h / 2} C ${w / 2} ${-h / 2} ${w / 2} ${h / 2} ${w / 2 - curve} ${h / 2} L ${-w / 2 + curve} ${h / 2} C ${-w / 2} ${h / 2} ${-w / 2} ${-h / 2} ${-w / 2 + curve} ${-h / 2} Z` });
-      } else setAttrs2(element, {
-        x: -w / 2,
-        y: -h / 2,
-        width: w,
-        height: h,
-        rx: shape === "round-rectangle" ? 8 : Math.min(w, h) * 0.3
-      });
+        setAttrs2(element, {
+          d: `M ${-w / 2 + curve} ${-h / 2} L ${w / 2 - curve} ${-h / 2} C ${w / 2} ${-h / 2} ${w / 2} ${h / 2} ${w / 2 - curve} ${h / 2} L ${-w / 2 + curve} ${h / 2} C ${-w / 2} ${h / 2} ${-w / 2} ${-h / 2} ${-w / 2 + curve} ${-h / 2} Z`
+        });
+      } else
+        setAttrs2(element, {
+          x: -w / 2,
+          y: -h / 2,
+          width: w,
+          height: h,
+          rx: shape === "round-rectangle" ? 8 : Math.min(w, h) * 0.3
+        });
     }
-    return { svgEl: svgEl2, htmlEl: htmlEl2, setAttrs: setAttrs2, classed: classed2, labelMeasurer: labelMeasurer2, renderLabel: renderLabel2, shapeEl: shapeEl2, polygonCoords: polygonCoords2, updateShape: updateShape2, palette: palette2, typeColors };
+    return {
+      svgEl: svgEl2,
+      htmlEl: htmlEl2,
+      setAttrs: setAttrs2,
+      classed: classed2,
+      labelMeasurer: labelMeasurer2,
+      renderLabel: renderLabel2,
+      shapeEl: shapeEl2,
+      polygonCoords: polygonCoords2,
+      updateShape: updateShape2,
+      palette: palette2,
+      typeColors
+    };
   }
 
   // src/reqmodel/presentation/site_graph.ts
@@ -538,7 +575,8 @@
   function focusTrail(view2, shown = focusedNodes(view2)) {
     const { selected, detail, mode } = view2.state;
     const result = { nodes: /* @__PURE__ */ new Set(), edges: /* @__PURE__ */ new Set() };
-    if (mode !== "analysis" || !shown || !selected || !detail || !shown.has(selected) || !shown.has(detail)) return result;
+    if (mode !== "analysis" || !shown || !selected || !detail || !shown.has(selected) || !shown.has(detail))
+      return result;
     const nodes = view2.nodes.filter((node) => shown.has(node.id));
     const edges = view2.edges.filter((edge) => shown.has(edge.source) && shown.has(edge.target));
     const scoped = { ...view2, nodes, edges, adjacency: buildAdjacency(nodes, edges) };
@@ -558,287 +596,6 @@
   var MISSING_RANK = 10 ** 6;
   var rankOf = (view2, id) => view2.order.has(id) ? view2.order.get(id) : MISSING_RANK;
   var compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
-
-  // src/reqmodel/presentation/site_table.ts
-  var TABLE_COLUMNS = [
-    { key: "id", label: "id" },
-    { key: "type", label: "type" },
-    { key: "text", label: "\u672C\u6587" },
-    { key: "status", label: fieldLabel("status") },
-    { key: "evidence", label: "\u6839\u62E0", numeric: true },
-    { key: "findings", label: "\u6307\u6458", numeric: true }
-  ];
-  var SEVERITY_ORDER = ["error", "severe", "warning", "info"];
-  function matchesQuery(node, query) {
-    const needle = (query || "").trim().toLowerCase();
-    if (!needle) return true;
-    return node.id.toLowerCase().includes(needle) || node.text.toLowerCase().includes(needle);
-  }
-  function searchHits(view2, query) {
-    if (!(query || "").trim()) return [];
-    return view2.nodes.filter((node) => matchesQuery(node, query)).map((node) => node.id);
-  }
-  function stepHit(hits2, current, delta) {
-    if (!hits2.length) return null;
-    const at = hits2.indexOf(current);
-    if (at < 0) return delta > 0 ? hits2[0] : hits2[hits2.length - 1];
-    return hits2[(at + delta + hits2.length) % hits2.length];
-  }
-  function tableRows(view2, query = "") {
-    const counts = /* @__PURE__ */ new Map();
-    const worst = /* @__PURE__ */ new Map();
-    for (const finding of view2.data.findings || []) {
-      if (!finding.node_id) continue;
-      counts.set(finding.node_id, (counts.get(finding.node_id) || 0) + 1);
-      const rank = SEVERITY_ORDER.indexOf(finding.severity);
-      const known = worst.get(finding.node_id);
-      if (rank >= 0 && (known === void 0 || rank < known)) {
-        worst.set(finding.node_id, rank);
-      }
-    }
-    return view2.nodes.filter((node) => matchesQuery(node, query)).map((node) => ({
-      id: node.id,
-      type: node.type,
-      text: node.text,
-      status: node.status,
-      evidence: (node.evidence || []).length,
-      findings: counts.get(node.id) || 0,
-      severity: worst.has(node.id) ? SEVERITY_ORDER[worst.get(node.id)] : null
-    }));
-  }
-  var MISSING_VALUE = Number.POSITIVE_INFINITY;
-  function sortValue(view2, row, key) {
-    switch (key) {
-      case "type":
-        return view2.data.types.indexOf(row.type);
-      case "status": {
-        const rank = (view2.data.status_rank || {})[row.status];
-        return rank === void 0 ? MISSING_VALUE : rank;
-      }
-      default:
-        return row[key];
-    }
-  }
-  function sortRows(view2, rows, sort) {
-    const sign = sort.asc ? 1 : -1;
-    return [...rows].sort((a, b) => {
-      const left = sortValue(view2, a, sort.key);
-      const right = sortValue(view2, b, sort.key);
-      let diff = 0;
-      if (left === MISSING_VALUE && right !== MISSING_VALUE) diff = 1;
-      else if (right === MISSING_VALUE && left !== MISSING_VALUE) diff = -1;
-      else diff = sign * compare(left, right);
-      return diff || rankOf(view2, a.id) - rankOf(view2, b.id);
-    });
-  }
-  function nextSort(sort, key) {
-    const column = TABLE_COLUMNS.find((item) => item.key === key);
-    if (!column) return sort;
-    if (sort.key === key) return { key, asc: !sort.asc };
-    return { key, asc: !column.numeric };
-  }
-  function edgeItems(view2, id) {
-    const item = (edge, direction) => {
-      const other = direction === "out" ? edge.target : edge.source;
-      const node = view2.byId.get(other);
-      return {
-        id: other,
-        name: edge.name,
-        direction,
-        arrow: direction === "out" ? `--${edge.name}-->` : `<--${edge.name}--`,
-        type: node ? node.type : "",
-        text: node ? node.text : ""
-      };
-    };
-    return {
-      out: view2.edges.filter((edge) => edge.source === id).map((edge) => item(edge, "out")),
-      in: view2.edges.filter((edge) => edge.target === id).map((edge) => item(edge, "in"))
-    };
-  }
-  function sourceUrl(data, location2) {
-    const repo = (data || {}).repo;
-    if (!repo || !repo.url || !location2) return null;
-    const match = /^(.+?)(?::(\d+))?$/.exec(String(location2).trim());
-    if (!match) return null;
-    const path = match[1].replace(/\\/g, "/").replace(/^\.\//, "");
-    if (!path || path.startsWith("/") || path.startsWith("../") || /^[A-Za-z]:/.test(path)) {
-      return null;
-    }
-    const base = repo.url.replace(/\/+$/, "");
-    const ref = encodeURIComponent(repo.ref || "main");
-    const url = `${base}/blob/${ref}/${path.split("/").map(encodeURIComponent).join("/")}`;
-    return match[2] ? `${url}#L${match[2]}` : url;
-  }
-  var ALL_SEVERITIES = "all";
-  function severityTabs(findings) {
-    const counts = /* @__PURE__ */ new Map();
-    for (const finding of findings) {
-      counts.set(finding.severity, (counts.get(finding.severity) || 0) + 1);
-    }
-    return [
-      { key: ALL_SEVERITIES, label: "\u3059\u3079\u3066", count: findings.length },
-      ...SEVERITY_ORDER.filter((severity) => counts.get(severity)).map((severity) => ({
-        key: severity,
-        label: severity,
-        count: counts.get(severity)
-      }))
-    ];
-  }
-  function groupFindings(findings, severity = ALL_SEVERITIES) {
-    const groups = /* @__PURE__ */ new Map();
-    for (const finding of findings) {
-      if (severity !== ALL_SEVERITIES && finding.severity !== severity) continue;
-      if (!groups.has(finding.code)) groups.set(finding.code, []);
-      groups.get(finding.code).push(finding);
-    }
-    const severityRank = (finding) => {
-      const at = SEVERITY_ORDER.indexOf(finding.severity);
-      return at < 0 ? SEVERITY_ORDER.length : at;
-    };
-    return [...groups.entries()].map(([code, items]) => ({ code, items, rank: Math.min(...items.map(severityRank)) })).sort((a, b) => a.rank - b.rank || compare(a.code, b.code)).map(({ code, items, rank }) => ({
-      code,
-      items,
-      severity: SEVERITY_ORDER[rank] || items[0].severity
-    }));
-  }
-
-  // src/reqmodel/presentation/site_state.ts
-  var DEFAULT_SORT = { key: "id", asc: true };
-  var SET_FILTERS = [
-    {
-      param: "types",
-      key: "types",
-      all: (data) => data.types,
-      initial: (data) => initialSelection(data, data.types, "types")
-    },
-    {
-      param: "edges",
-      key: "edges",
-      all: (data) => data.edge_names,
-      initial: (data) => initialSelection(data, data.edge_names, "edges")
-    },
-    { param: "status", key: "statuses", all: (data) => statusNames(data) }
-  ];
-  var initialOf = (filter, data) => filter.initial ? filter.initial(data) : filter.all(data);
-  function defaultState(data) {
-    const state2 = {
-      types: /* @__PURE__ */ new Set(),
-      edges: /* @__PURE__ */ new Set(),
-      statuses: /* @__PURE__ */ new Set(),
-      selected: null,
-      direction: "TD",
-      mode: "graph",
-      query: "",
-      //: 分析の向き、または近傍の深さ。0 は全体表示。
-      focus: 0,
-      detail: null,
-      //: 影響範囲の探索の深さ。0 なら無制限 (`req explain` に --depth を渡さない)。
-      depth: 0,
-      //: 影響範囲をエッジの向きを無視して辿るか (`req explain --undirected`)。
-      undirected: false,
-      sort: { ...DEFAULT_SORT }
-    };
-    for (const filter of SET_FILTERS) state2[filter.key] = new Set(initialOf(filter, data));
-    return state2;
-  }
-  function encodeHash(state2, data) {
-    const params = [];
-    const put = (key, value) => params.push(`${key}=${value}`);
-    const list = (selected, all) => all.filter((name) => selected.has(name)).map(encodeURIComponent).join(",");
-    const sort = state2.sort || DEFAULT_SORT;
-    const query = (state2.query || "").trim();
-    if (state2.selected) put("node", encodeURIComponent(state2.selected));
-    for (const filter of SET_FILTERS) {
-      const selected = state2[filter.key];
-      const all = filter.all(data);
-      if (!selected) continue;
-      const initial = initialOf(filter, data);
-      if (selected.size === initial.length && initial.every((name) => selected.has(name))) {
-        continue;
-      }
-      put(filter.param, list(selected, all));
-    }
-    if (state2.direction === "LR") put("dir", "LR");
-    if (state2.mode === "table" || state2.mode === "analysis") put("view", state2.mode);
-    if (parseFocus(String(state2.focus))) put("focus", String(state2.focus));
-    if (state2.mode === "analysis" && state2.selected && state2.detail && state2.detail !== state2.selected) {
-      put("detail", encodeURIComponent(state2.detail));
-    }
-    if (IMPACT_DEPTHS.includes(state2.depth)) put("depth", String(state2.depth));
-    if (state2.undirected) put("undir", "1");
-    if (query) put("q", encodeURIComponent(query));
-    if (sort.key !== DEFAULT_SORT.key || sort.asc !== DEFAULT_SORT.asc) {
-      put("sort", `${sort.key}:${sort.asc ? "asc" : "desc"}`);
-    }
-    return params.length ? `#${params.join("&")}` : "";
-  }
-  function decodeHash(hash, data) {
-    const state2 = defaultState(data);
-    const params = parseHash(hash);
-    const subset = (raw, all) => new Set(raw.split(",").map((name) => name.trim()).filter((name) => all.includes(name)));
-    const node = params.get("node");
-    if (node && data.nodes.some((item) => item.id === node)) state2.selected = node;
-    for (const filter of SET_FILTERS) {
-      if (!params.has(filter.param)) continue;
-      state2[filter.key] = subset(params.get(filter.param), filter.all(data));
-    }
-    if (params.get("dir") === "LR") state2.direction = "LR";
-    if (params.get("view") === "table" || params.get("view") === "analysis") state2.mode = params.get("view");
-    state2.focus = parseFocus(params.get("focus") || "0");
-    const detail = params.get("detail");
-    if (state2.mode === "analysis" && state2.selected && detail !== state2.selected && data.nodes.some((node2) => node2.id === detail)) {
-      state2.detail = detail;
-    }
-    const depth = Number(params.get("depth"));
-    if (IMPACT_DEPTHS.includes(depth)) state2.depth = depth;
-    if (params.get("undir") === "1") state2.undirected = true;
-    if (params.has("q")) state2.query = params.get("q");
-    const sort = parseSort(params.get("sort"));
-    if (sort) state2.sort = sort;
-    return state2;
-  }
-  function parseHash(hash) {
-    const params = /* @__PURE__ */ new Map();
-    for (const part of (hash || "").replace(/^#/, "").split("&")) {
-      if (!part) continue;
-      const at = part.indexOf("=");
-      try {
-        params.set(
-          decodeURIComponent(at < 0 ? part : part.slice(0, at)),
-          at < 0 ? "" : decodeURIComponent(part.slice(at + 1))
-        );
-      } catch {
-      }
-    }
-    return params;
-  }
-  function parseSort(raw) {
-    if (!raw) return null;
-    const [key, order] = raw.split(":");
-    if (!TABLE_COLUMNS.some((column) => column.key === key)) return null;
-    if (order !== "asc" && order !== "desc") return null;
-    return { key, asc: order === "asc" };
-  }
-  var VIEW_STORAGE_KEY = "reqmodel:site:view";
-  var THEME_STORAGE_KEY = "reqmodel:site:theme";
-  function storableHash(state2, data) {
-    return encodeHash({ ...state2, selected: null, detail: null, mode: state2.mode === "analysis" ? "graph" : state2.mode, query: "" }, data);
-  }
-  function initialHash(hash, stored) {
-    return (hash || "").replace(/^#/, "") ? hash : stored || "";
-  }
-  var THEMES = ["auto", "light", "dark"];
-  var THEME_LABELS = { auto: "\u30C6\u30FC\u30DE: \u81EA\u52D5", light: "\u30C6\u30FC\u30DE: \u660E", dark: "\u30C6\u30FC\u30DE: \u6697" };
-  var normalizeTheme = (value) => THEMES.includes(value) ? value : "auto";
-  function nextTheme(theme2) {
-    return THEMES[(THEMES.indexOf(normalizeTheme(theme2)) + 1) % THEMES.length];
-  }
-  function selectNodeState(state2, id) {
-    if (state2.mode === "analysis" && state2.selected) {
-      return { ...state2, detail: id && id !== state2.selected ? id : null };
-    }
-    return { ...state2, selected: state2.selected === id ? null : id, detail: null };
-  }
 
   // src/reqmodel/presentation/site_context.ts
   function describe(view2, id) {
@@ -906,9 +663,7 @@
       block("\u4E0A\u6D41 (\u3053\u306E\u5909\u66F4\u306E\u7406\u7531\u30FB\u6839\u62E0\u306B\u306A\u308B\u30CE\u30FC\u30C9)", upstream);
       block("\u4E0B\u6D41 (\u3053\u306E\u5909\u66F4\u306E\u5F71\u97FF\u3092\u53D7\u3051\u308B\u30CE\u30FC\u30C9)", downstream);
     }
-    const edges = view2.data.edges.filter(
-      (edge) => whole.has(edge.source) && whole.has(edge.target)
-    );
+    const edges = view2.data.edges.filter((edge) => whole.has(edge.source) && whole.has(edge.target));
     if (edges.length) {
       lines.push("", `## \u90E8\u5206\u30B0\u30E9\u30D5\u306E\u30A8\u30C3\u30B8 (${edges.length} \u4EF6)`);
       const sorted = [...edges].sort(
@@ -929,11 +684,7 @@
   }
 
   // src/reqmodel/presentation/site_layout.ts
-  var REQUIREMENT_TYPES = /* @__PURE__ */ new Set([
-    "FunctionalRequirement",
-    "QualityRequirement",
-    "Constraint"
-  ]);
+  var REQUIREMENT_TYPES = /* @__PURE__ */ new Set(["FunctionalRequirement", "QualityRequirement", "Constraint"]);
   function bandDefs(data) {
     const top = ((data.meta || {}).bands || []).filter((band) => data.nodes.some((node) => node.type === band.type)).map((band) => ({ ...band, key: band.type }));
     if (!Object.prototype.hasOwnProperty.call(data, "requirement_groups")) return top;
@@ -1213,10 +964,7 @@ ${text}`;
             const local = group.positions.get(node.id);
             positions.set(
               node.id,
-              at(
-                groupLeft + BAND_FRAME_PAD + local.sec,
-                sectionFrom + BAND_FRAME_PAD + local.pri
-              )
+              at(groupLeft + BAND_FRAME_PAD + local.sec, sectionFrom + BAND_FRAME_PAD + local.pri)
             );
           }
           spans.set(index, {
@@ -1404,19 +1152,316 @@ ${text}`;
       const length = maxPri - minPri + primaryBefore + padding;
       const width = maxSec - minSec + secondaryBefore + padding;
       for (const node of members) {
-        positions.set(node.id, at(
-          cursor2 + primaryBefore + pri(node) - minPri,
-          sec(node) - (minSec + maxSec) / 2 + (vertical ? 0 : labelSpace / 2)
-        ));
+        positions.set(
+          node.id,
+          at(
+            cursor2 + primaryBefore + pri(node) - minPri,
+            sec(node) - (minSec + maxSec) / 2 + (vertical ? 0 : labelSpace / 2)
+          )
+        );
       }
-      if (key !== "root") frames.set(`analysis:${key}`, {
-        ...at(cursor2 + length / 2, 0),
-        w: vertical ? width : length,
-        h: vertical ? length : width
-      });
+      if (key !== "root")
+        frames.set(`analysis:${key}`, {
+          ...at(cursor2 + length / 2, 0),
+          w: vertical ? width : length,
+          h: vertical ? length : width
+        });
       cursor2 += length + 56;
     }
     return { positions, frames };
+  }
+
+  // src/reqmodel/presentation/site_table.ts
+  var TABLE_COLUMNS = [
+    { key: "id", label: "id" },
+    { key: "type", label: "type" },
+    { key: "text", label: "\u672C\u6587" },
+    { key: "status", label: fieldLabel("status") },
+    { key: "evidence", label: "\u6839\u62E0", numeric: true },
+    { key: "findings", label: "\u6307\u6458", numeric: true }
+  ];
+  var SEVERITY_ORDER = ["error", "severe", "warning", "info"];
+  function matchesQuery(node, query) {
+    const needle = (query || "").trim().toLowerCase();
+    if (!needle) return true;
+    return node.id.toLowerCase().includes(needle) || node.text.toLowerCase().includes(needle);
+  }
+  function searchHits(view2, query) {
+    if (!(query || "").trim()) return [];
+    return view2.nodes.filter((node) => matchesQuery(node, query)).map((node) => node.id);
+  }
+  function stepHit(hits2, current, delta) {
+    if (!hits2.length) return null;
+    const at = hits2.indexOf(current);
+    if (at < 0) return delta > 0 ? hits2[0] : hits2[hits2.length - 1];
+    return hits2[(at + delta + hits2.length) % hits2.length];
+  }
+  function tableRows(view2, query = "") {
+    const counts = /* @__PURE__ */ new Map();
+    const worst = /* @__PURE__ */ new Map();
+    for (const finding of view2.data.findings || []) {
+      if (!finding.node_id) continue;
+      counts.set(finding.node_id, (counts.get(finding.node_id) || 0) + 1);
+      const rank = SEVERITY_ORDER.indexOf(finding.severity);
+      const known = worst.get(finding.node_id);
+      if (rank >= 0 && (known === void 0 || rank < known)) {
+        worst.set(finding.node_id, rank);
+      }
+    }
+    return view2.nodes.filter((node) => matchesQuery(node, query)).map((node) => ({
+      id: node.id,
+      type: node.type,
+      text: node.text,
+      status: node.status,
+      evidence: (node.evidence || []).length,
+      findings: counts.get(node.id) || 0,
+      severity: worst.has(node.id) ? SEVERITY_ORDER[worst.get(node.id)] : null
+    }));
+  }
+  var MISSING_VALUE = Number.POSITIVE_INFINITY;
+  function sortValue(view2, row, key) {
+    switch (key) {
+      case "type":
+        return view2.data.types.indexOf(row.type);
+      case "status": {
+        const rank = (view2.data.status_rank || {})[row.status];
+        return rank === void 0 ? MISSING_VALUE : rank;
+      }
+      default:
+        return row[key];
+    }
+  }
+  function sortRows(view2, rows, sort) {
+    const sign = sort.asc ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const left = sortValue(view2, a, sort.key);
+      const right = sortValue(view2, b, sort.key);
+      let diff = 0;
+      if (left === MISSING_VALUE && right !== MISSING_VALUE) diff = 1;
+      else if (right === MISSING_VALUE && left !== MISSING_VALUE) diff = -1;
+      else diff = sign * compare(left, right);
+      return diff || rankOf(view2, a.id) - rankOf(view2, b.id);
+    });
+  }
+  function nextSort(sort, key) {
+    const column = TABLE_COLUMNS.find((item) => item.key === key);
+    if (!column) return sort;
+    if (sort.key === key) return { key, asc: !sort.asc };
+    return { key, asc: !column.numeric };
+  }
+  function edgeItems(view2, id) {
+    const item = (edge, direction) => {
+      const other = direction === "out" ? edge.target : edge.source;
+      const node = view2.byId.get(other);
+      return {
+        id: other,
+        name: edge.name,
+        direction,
+        arrow: direction === "out" ? `--${edge.name}-->` : `<--${edge.name}--`,
+        type: node ? node.type : "",
+        text: node ? node.text : ""
+      };
+    };
+    return {
+      out: view2.edges.filter((edge) => edge.source === id).map((edge) => item(edge, "out")),
+      in: view2.edges.filter((edge) => edge.target === id).map((edge) => item(edge, "in"))
+    };
+  }
+  function sourceUrl(data, location2) {
+    const repo = (data || {}).repo;
+    if (!repo || !repo.url || !location2) return null;
+    const match = /^(.+?)(?::(\d+))?$/.exec(String(location2).trim());
+    if (!match) return null;
+    const path = match[1].replace(/\\/g, "/").replace(/^\.\//, "");
+    if (!path || path.startsWith("/") || path.startsWith("../") || /^[A-Za-z]:/.test(path)) {
+      return null;
+    }
+    const base = repo.url.replace(/\/+$/, "");
+    const ref = encodeURIComponent(repo.ref || "main");
+    const url = `${base}/blob/${ref}/${path.split("/").map(encodeURIComponent).join("/")}`;
+    return match[2] ? `${url}#L${match[2]}` : url;
+  }
+  var ALL_SEVERITIES = "all";
+  function severityTabs(findings) {
+    const counts = /* @__PURE__ */ new Map();
+    for (const finding of findings) {
+      counts.set(finding.severity, (counts.get(finding.severity) || 0) + 1);
+    }
+    return [
+      { key: ALL_SEVERITIES, label: "\u3059\u3079\u3066", count: findings.length },
+      ...SEVERITY_ORDER.filter((severity) => counts.get(severity)).map((severity) => ({
+        key: severity,
+        label: severity,
+        count: counts.get(severity)
+      }))
+    ];
+  }
+  function groupFindings(findings, severity = ALL_SEVERITIES) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const finding of findings) {
+      if (severity !== ALL_SEVERITIES && finding.severity !== severity) continue;
+      if (!groups.has(finding.code)) groups.set(finding.code, []);
+      groups.get(finding.code).push(finding);
+    }
+    const severityRank = (finding) => {
+      const at = SEVERITY_ORDER.indexOf(finding.severity);
+      return at < 0 ? SEVERITY_ORDER.length : at;
+    };
+    return [...groups.entries()].map(([code, items]) => ({ code, items, rank: Math.min(...items.map(severityRank)) })).sort((a, b) => a.rank - b.rank || compare(a.code, b.code)).map(({ code, items, rank }) => ({
+      code,
+      items,
+      severity: SEVERITY_ORDER[rank] || items[0].severity
+    }));
+  }
+
+  // src/reqmodel/presentation/site_state.ts
+  var DEFAULT_SORT = { key: "id", asc: true };
+  var SET_FILTERS = [
+    {
+      param: "types",
+      key: "types",
+      all: (data) => data.types,
+      initial: (data) => initialSelection(data, data.types, "types")
+    },
+    {
+      param: "edges",
+      key: "edges",
+      all: (data) => data.edge_names,
+      initial: (data) => initialSelection(data, data.edge_names, "edges")
+    },
+    { param: "status", key: "statuses", all: (data) => statusNames(data) }
+  ];
+  var initialOf = (filter, data) => filter.initial ? filter.initial(data) : filter.all(data);
+  function defaultState(data) {
+    const state2 = {
+      types: /* @__PURE__ */ new Set(),
+      edges: /* @__PURE__ */ new Set(),
+      statuses: /* @__PURE__ */ new Set(),
+      selected: null,
+      direction: "TD",
+      mode: "graph",
+      query: "",
+      //: 分析の向き、または近傍の深さ。0 は全体表示。
+      focus: 0,
+      detail: null,
+      //: 影響範囲の探索の深さ。0 なら無制限 (`req explain` に --depth を渡さない)。
+      depth: 0,
+      //: 影響範囲をエッジの向きを無視して辿るか (`req explain --undirected`)。
+      undirected: false,
+      sort: { ...DEFAULT_SORT }
+    };
+    for (const filter of SET_FILTERS) state2[filter.key] = new Set(initialOf(filter, data));
+    return state2;
+  }
+  function encodeHash(state2, data) {
+    const params = [];
+    const put = (key, value) => params.push(`${key}=${value}`);
+    const list = (selected, all) => all.filter((name) => selected.has(name)).map(encodeURIComponent).join(",");
+    const sort = state2.sort || DEFAULT_SORT;
+    const query = (state2.query || "").trim();
+    if (state2.selected) put("node", encodeURIComponent(state2.selected));
+    for (const filter of SET_FILTERS) {
+      const selected = state2[filter.key];
+      const all = filter.all(data);
+      if (!selected) continue;
+      const initial = initialOf(filter, data);
+      if (selected.size === initial.length && initial.every((name) => selected.has(name))) {
+        continue;
+      }
+      put(filter.param, list(selected, all));
+    }
+    if (state2.direction === "LR") put("dir", "LR");
+    if (state2.mode === "table" || state2.mode === "analysis") put("view", state2.mode);
+    if (parseFocus(String(state2.focus))) put("focus", String(state2.focus));
+    if (state2.mode === "analysis" && state2.selected && state2.detail && state2.detail !== state2.selected) {
+      put("detail", encodeURIComponent(state2.detail));
+    }
+    if (IMPACT_DEPTHS.includes(state2.depth)) put("depth", String(state2.depth));
+    if (state2.undirected) put("undir", "1");
+    if (query) put("q", encodeURIComponent(query));
+    if (sort.key !== DEFAULT_SORT.key || sort.asc !== DEFAULT_SORT.asc) {
+      put("sort", `${sort.key}:${sort.asc ? "asc" : "desc"}`);
+    }
+    return params.length ? `#${params.join("&")}` : "";
+  }
+  function decodeHash(hash, data) {
+    const state2 = defaultState(data);
+    const params = parseHash(hash);
+    const subset = (raw, all) => new Set(
+      raw.split(",").map((name) => name.trim()).filter((name) => all.includes(name))
+    );
+    const node = params.get("node");
+    if (node && data.nodes.some((item) => item.id === node)) state2.selected = node;
+    for (const filter of SET_FILTERS) {
+      if (!params.has(filter.param)) continue;
+      state2[filter.key] = subset(params.get(filter.param), filter.all(data));
+    }
+    if (params.get("dir") === "LR") state2.direction = "LR";
+    if (params.get("view") === "table" || params.get("view") === "analysis")
+      state2.mode = params.get("view");
+    state2.focus = parseFocus(params.get("focus") || "0");
+    const detail = params.get("detail");
+    if (state2.mode === "analysis" && state2.selected && detail !== state2.selected && data.nodes.some((node2) => node2.id === detail)) {
+      state2.detail = detail;
+    }
+    const depth = Number(params.get("depth"));
+    if (IMPACT_DEPTHS.includes(depth)) state2.depth = depth;
+    if (params.get("undir") === "1") state2.undirected = true;
+    if (params.has("q")) state2.query = params.get("q");
+    const sort = parseSort(params.get("sort"));
+    if (sort) state2.sort = sort;
+    return state2;
+  }
+  function parseHash(hash) {
+    const params = /* @__PURE__ */ new Map();
+    for (const part of (hash || "").replace(/^#/, "").split("&")) {
+      if (!part) continue;
+      const at = part.indexOf("=");
+      try {
+        params.set(
+          decodeURIComponent(at < 0 ? part : part.slice(0, at)),
+          at < 0 ? "" : decodeURIComponent(part.slice(at + 1))
+        );
+      } catch {
+      }
+    }
+    return params;
+  }
+  function parseSort(raw) {
+    if (!raw) return null;
+    const [key, order] = raw.split(":");
+    if (!TABLE_COLUMNS.some((column) => column.key === key)) return null;
+    if (order !== "asc" && order !== "desc") return null;
+    return { key, asc: order === "asc" };
+  }
+  var VIEW_STORAGE_KEY = "reqmodel:site:view";
+  var THEME_STORAGE_KEY = "reqmodel:site:theme";
+  function storableHash(state2, data) {
+    return encodeHash(
+      {
+        ...state2,
+        selected: null,
+        detail: null,
+        mode: state2.mode === "analysis" ? "graph" : state2.mode,
+        query: ""
+      },
+      data
+    );
+  }
+  function initialHash(hash, stored) {
+    return (hash || "").replace(/^#/, "") ? hash : stored || "";
+  }
+  var THEMES = ["auto", "light", "dark"];
+  var THEME_LABELS = { auto: "\u30C6\u30FC\u30DE: \u81EA\u52D5", light: "\u30C6\u30FC\u30DE: \u660E", dark: "\u30C6\u30FC\u30DE: \u6697" };
+  var normalizeTheme = (value) => THEMES.includes(value) ? value : "auto";
+  function nextTheme(theme2) {
+    return THEMES[(THEMES.indexOf(normalizeTheme(theme2)) + 1) % THEMES.length];
+  }
+  function selectNodeState(state2, id) {
+    if (state2.mode === "analysis" && state2.selected) {
+      return { ...state2, detail: id && id !== state2.selected ? id : null };
+    }
+    return { ...state2, selected: state2.selected === id ? null : id, detail: null };
   }
 
   // src/reqmodel/presentation/site_app.ts
@@ -1444,7 +1489,18 @@ ${text}`;
   var state = decodeHash(initialHash(location.hash, readStore(VIEW_STORAGE_KEY)), DATA);
   var view = createView(DATA, state);
   var graphPrimitives = createGraphViewPrimitives();
-  var { svgEl, htmlEl, setAttrs, classed, labelMeasurer, renderLabel, shapeEl, polygonCoords, updateShape, palette } = graphPrimitives;
+  var {
+    svgEl,
+    htmlEl,
+    setAttrs,
+    classed,
+    labelMeasurer,
+    renderLabel,
+    shapeEl,
+    polygonCoords,
+    updateShape,
+    palette
+  } = graphPrimitives;
   var graphEl = getElement("graph");
   var svg = null;
   var viewport = null;
@@ -1457,22 +1513,30 @@ ${text}`;
   var bandItems = /* @__PURE__ */ new Map();
   function initGraph() {
     if (!dagre) {
-      graphEl.replaceChildren(htmlEl(
-        "p",
-        { class: "empty" },
-        "\u63CF\u753B\u30E9\u30A4\u30D6\u30E9\u30EA (dagre) \u3092\u8AAD\u307F\u8FBC\u3081\u306A\u304B\u3063\u305F\u3002\u56F3\u306E\u5143\u30C7\u30FC\u30BF\u306F ",
-        htmlEl("a", { href: "graph.mmd" }, "graph.mmd"),
-        " / ",
-        htmlEl("a", { href: "graph.dot" }, "graph.dot"),
-        " \u306B\u3042\u308B\u3002"
-      ));
+      graphEl.replaceChildren(
+        htmlEl(
+          "p",
+          { class: "empty" },
+          "\u63CF\u753B\u30E9\u30A4\u30D6\u30E9\u30EA (dagre) \u3092\u8AAD\u307F\u8FBC\u3081\u306A\u304B\u3063\u305F\u3002\u56F3\u306E\u5143\u30C7\u30FC\u30BF\u306F ",
+          htmlEl("a", { href: "graph.mmd" }, "graph.mmd"),
+          " / ",
+          htmlEl("a", { href: "graph.dot" }, "graph.dot"),
+          " \u306B\u3042\u308B\u3002"
+        )
+      );
       return;
     }
     graph = graphElements(DATA, labelMeasurer());
     graphEl.replaceChildren();
     svg = svgEl("svg", { class: "req-graph", tabindex: 0, role: "img", "aria-label": DATA.title });
     defs = svgEl("defs");
-    viewport = svgEl("rect", { class: "graph-bg", x: -1e5, y: -1e5, width: 2e5, height: 2e5 });
+    viewport = svgEl("rect", {
+      class: "graph-bg",
+      x: -1e5,
+      y: -1e5,
+      width: 2e5,
+      height: 2e5
+    });
     graphLayer = svgEl("g", { class: "graph-layer" });
     panZoom = createPanZoom(graphEl, graphLayer);
     svg.append(defs, viewport, graphLayer);
@@ -1485,7 +1549,15 @@ ${text}`;
   }
   function buildGraphDom() {
     const pal = palette();
-    const arrow = svgEl("marker", { id: "req-arrow", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: "auto" });
+    const arrow = svgEl("marker", {
+      id: "req-arrow",
+      viewBox: "0 0 10 10",
+      refX: 9,
+      refY: 5,
+      markerWidth: 6,
+      markerHeight: 6,
+      orient: "auto"
+    });
     arrow.append(svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "context-stroke" }));
     defs.replaceChildren(arrow);
     const edgeLayer = svgEl("g", { class: "edges" });
@@ -1505,7 +1577,13 @@ ${text}`;
       });
       group.append(path, label);
       edgeLayer.append(group);
-      edgeItemsByKey.set(item.data.id, { ...item.data, group, path, label, points: [] });
+      edgeItemsByKey.set(item.data.id, {
+        ...item.data,
+        group,
+        path,
+        label,
+        points: []
+      });
     }
     const types = DATA.meta.types || {};
     const statuses = DATA.meta.statuses || {};
@@ -1518,8 +1596,15 @@ ${text}`;
     const analysisFrames = Object.entries(ANALYSIS_BANDS).map(([key, label]) => ({
       data: { id: bandId(`analysis:${key}`), bandKey: `analysis:${key}`, label }
     }));
-    for (const item of [...graph.filter((element) => element.classes === "band"), ...analysisFrames]) {
-      const group = svgEl("g", { class: "node band", "data-id": item.data.id, "data-band-key": item.data.bandKey });
+    for (const item of [
+      ...graph.filter((element) => element.classes === "band"),
+      ...analysisFrames
+    ]) {
+      const group = svgEl("g", {
+        class: "node band",
+        "data-id": item.data.id,
+        "data-band-key": item.data.bandKey
+      });
       const shape = svgEl("rect", { class: "node-shape", rx: 8 });
       const label = svgEl("text", { class: "node-label band-label" });
       renderLabel(label, item.data.label, 0, -11, 11, "bold");
@@ -1550,7 +1635,16 @@ ${text}`;
         chooseNode(item.data.id);
       });
       nodeLayer.append(group);
-      nodeItems.set(item.data.id, { ...item.data, shapeName: typeMeta.shape, x: 0, y: 0, group, shape, statusRing, label });
+      nodeItems.set(item.data.id, {
+        ...item.data,
+        shapeName: typeMeta.shape,
+        x: 0,
+        y: 0,
+        group,
+        shape,
+        statusRing,
+        label
+      });
     }
     restyleGraph();
   }
@@ -1558,7 +1652,14 @@ ${text}`;
     return focusedNodes(view);
   }
   var laidOutFocus = "";
-  var focusKey = () => state.mode === "analysis" ? JSON.stringify(["analysis", state.selected, state.depth, [...state.types], [...state.statuses], [...state.edges]]) : focusedIds() ? `${state.focus}:${state.selected}` : "";
+  var focusKey = () => state.mode === "analysis" ? JSON.stringify([
+    "analysis",
+    state.selected,
+    state.depth,
+    [...state.types],
+    [...state.statuses],
+    [...state.edges]
+  ]) : focusedIds() ? `${state.focus}:${state.selected}` : "";
   function analysisIds() {
     return state.mode === "analysis" ? focusedIds() : null;
   }
@@ -1691,7 +1792,12 @@ ${text}`;
     const startedAt = Date.now();
     const g = new dagre.graphlib.Graph({ multigraph: true });
     const opts = layoutOptions(state.direction);
-    g.setGraph({ rankdir: opts.rankDir, nodesep: opts.nodeSep, ranksep: opts.rankSep, edgesep: opts.edgeSep });
+    g.setGraph({
+      rankdir: opts.rankDir,
+      nodesep: opts.nodeSep,
+      ranksep: opts.rankSep,
+      edgesep: opts.edgeSep
+    });
     g.setDefaultEdgeLabel(() => ({}));
     const nodes = new Set(shownNodeItems().map((item) => item.id));
     for (const item of shownNodeItems()) g.setNode(item.id, { width: item.w, height: item.h });
@@ -1699,7 +1805,12 @@ ${text}`;
     for (const item of shownEdgeItems()) {
       const edge = DATA.edges[item.index];
       if (!nodes.has(edge.source) || !nodes.has(edge.target)) continue;
-      g.setEdge(edge.source, edge.target, { width: estimateTextWidth(edge.name), height: 12 }, item.id);
+      g.setEdge(
+        edge.source,
+        edge.target,
+        { width: estimateTextWidth(edge.name), height: 12 },
+        item.id
+      );
       const key = [edge.source, edge.target].sort().join("\0");
       const siblings = parallel.get(key) || [];
       siblings.push(item);
@@ -1733,17 +1844,38 @@ ${text}`;
     const focused = focusedIds();
     const shown = focused ? view.nodes.filter((node) => focused.has(node.id)) : view.nodes;
     const nodes = new Set(shown.map((node) => node.id));
-    const edges = new Set(view.edges.filter((edge) => nodes.has(edge.source) && nodes.has(edge.target)));
-    const visibleBands = state.mode === "analysis" ? new Set(analysisBandLayout(view, [...nodeItems.values()].filter((item) => nodes.has(item.id)), state.direction).frames.keys()) : visibleBandKeys(DATA, shown);
+    const edges = new Set(
+      view.edges.filter((edge) => nodes.has(edge.source) && nodes.has(edge.target))
+    );
+    const visibleBands = state.mode === "analysis" ? new Set(
+      analysisBandLayout(
+        view,
+        [...nodeItems.values()].filter((item) => nodes.has(item.id)),
+        state.direction
+      ).frames.keys()
+    ) : visibleBandKeys(DATA, shown);
     for (const item of nodeItems.values()) classed(item.group, "hidden", !nodes.has(item.id));
-    for (const item of bandItems.values()) classed(item.group, "hidden", !visibleBands.has(item.bandKey));
-    for (const item of edgeItemsByKey.values()) classed(item.group, "hidden", !edges.has(DATA.edges[item.index]));
+    for (const item of bandItems.values())
+      classed(item.group, "hidden", !visibleBands.has(item.bandKey));
+    for (const item of edgeItemsByKey.values())
+      classed(item.group, "hidden", !edges.has(DATA.edges[item.index]));
     METRICS.filters.push({ ms: Date.now() - startedAt, nodes: nodes.size, edges: edges.size });
     svg.dataset.filterMs = String(METRICS.filters.at(-1).ms);
   }
   function applyHighlight() {
     if (!svg) return;
-    for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()]) item.group.classList.remove("sel", "up", "down", "rel", "dim", "on-path", "detail-target", "detail-path", "trail-muted");
+    for (const item of [...nodeItems.values(), ...edgeItemsByKey.values()])
+      item.group.classList.remove(
+        "sel",
+        "up",
+        "down",
+        "rel",
+        "dim",
+        "on-path",
+        "detail-target",
+        "detail-path",
+        "trail-muted"
+      );
     if (!state.selected || !view.byId.has(state.selected)) return;
     const { upstream, downstream, whole, undirected } = impactSets(view, state.selected);
     for (const item of nodeItems.values()) {
@@ -1768,7 +1900,11 @@ ${text}`;
       for (const item of edgeItemsByKey.values()) {
         classed(item.group, "detail-path", trail.edges.has(DATA.edges[item.index]));
         if (trail.edges.has(DATA.edges[item.index])) item.group.classList.remove("dim");
-        classed(item.group, "trail-muted", trail.nodes.size && !trail.edges.has(DATA.edges[item.index]));
+        classed(
+          item.group,
+          "trail-muted",
+          trail.nodes.size && !trail.edges.has(DATA.edges[item.index])
+        );
       }
     }
   }
@@ -1829,7 +1965,10 @@ ${text}`;
       const item = htmlEl("li", {}, htmlEl("span", { class: "id" }, reference.title || "(untitled)"));
       const href = safeHref(reference.url);
       if (href) {
-        item.append(" ", htmlEl("a", { href, target: "_blank", rel: "noopener noreferrer" }, reference.url));
+        item.append(
+          " ",
+          htmlEl("a", { href, target: "_blank", rel: "noopener noreferrer" }, reference.url)
+        );
       } else if (reference.url) {
         item.append(" ", reference.url);
       }
@@ -1846,7 +1985,13 @@ ${text}`;
     panel.replaceChildren();
     const detailId = state.mode === "analysis" && state.detail ? state.detail : state.selected;
     if (!detailId || !view.byId.has(detailId)) {
-      panel.append(htmlEl("p", { class: "empty" }, "\u30B0\u30E9\u30D5\u306E\u30CE\u30FC\u30C9\u3092\u30AF\u30EA\u30C3\u30AF\u3059\u308B\u3068\u3001\u672C\u6587\u30FB\u6839\u62E0\u30FB\u5F71\u97FF\u7BC4\u56F2\u3092\u8868\u793A\u3059\u308B\u3002"));
+      panel.append(
+        htmlEl(
+          "p",
+          { class: "empty" },
+          "\u30B0\u30E9\u30D5\u306E\u30CE\u30FC\u30C9\u3092\u30AF\u30EA\u30C3\u30AF\u3059\u308B\u3068\u3001\u672C\u6587\u30FB\u6839\u62E0\u30FB\u5F71\u97FF\u7BC4\u56F2\u3092\u8868\u793A\u3059\u308B\u3002"
+        )
+      );
       return;
     }
     const node = view.byId.get(detailId);
@@ -1870,11 +2015,21 @@ ${text}`;
     appendReferenceSection(panel, fieldLabel("evidence"), node.evidence);
     if ((node.acceptance_criteria || []).length) {
       panel.append(htmlEl("h2", {}, "\u53D7\u3051\u5165\u308C\u57FA\u6E96"));
-      panel.append(htmlEl("ul", {}, ...node.acceptance_criteria.map((criterion) => htmlEl("li", {}, criterion))));
+      panel.append(
+        htmlEl("ul", {}, ...node.acceptance_criteria.map((criterion) => htmlEl("li", {}, criterion)))
+      );
     }
     if ((node.suppress || []).length) {
       panel.append(htmlEl("h2", {}, "\u6291\u5236\u4E2D\u306E\u6307\u6458"));
-      panel.append(htmlEl("ul", {}, ...node.suppress.map(([code, reason]) => htmlEl("li", {}, htmlEl("code", {}, code), `: ${reason}`))));
+      panel.append(
+        htmlEl(
+          "ul",
+          {},
+          ...node.suppress.map(
+            ([code, reason]) => htmlEl("li", {}, htmlEl("code", {}, code), `: ${reason}`)
+          )
+        )
+      );
     }
     const appendEdges = (title, items) => {
       if (!items.length) return;
@@ -1929,55 +2084,82 @@ ${text}`;
   }
   function locationElement(location2) {
     const href = safeHref(sourceUrl(DATA, location2));
-    return href ? htmlEl("a", { href, target: "_blank", rel: "noopener", title: "GitHub \u3067\u3053\u306E\u5B9A\u7FA9\u3092\u958B\u304F" }, `${location2} \u2197`) : document.createTextNode(location2);
+    return href ? htmlEl(
+      "a",
+      { href, target: "_blank", rel: "noopener", title: "GitHub \u3067\u3053\u306E\u5B9A\u7FA9\u3092\u958B\u304F" },
+      `${location2} \u2197`
+    ) : document.createTextNode(location2);
   }
   function findingElement(finding, interactive = true) {
     const where = finding.node_id ? ` (${finding.node_id})` : "";
     const content = [
-      htmlEl("div", { class: "code" }, `${finding.severity.toUpperCase()} \xB7 L${finding.layer} \xB7 ${finding.code}${where}`),
+      htmlEl(
+        "div",
+        { class: "code" },
+        `${finding.severity.toUpperCase()} \xB7 L${finding.layer} \xB7 ${finding.code}${where}`
+      ),
       htmlEl("div", {}, finding.message)
     ];
     if (interactive && finding.node_id) {
       if (finding.location) content.push(htmlEl("div", { class: "loc" }, finding.location));
-      return htmlEl("button", {
-        type: "button",
-        class: `finding ${finding.severity}`,
-        "data-id": finding.node_id
-      }, ...content);
+      return htmlEl(
+        "button",
+        {
+          type: "button",
+          class: `finding ${finding.severity}`,
+          "data-id": finding.node_id
+        },
+        ...content
+      );
     }
-    if (finding.location) content.push(htmlEl("div", { class: "loc" }, locationElement(finding.location)));
+    if (finding.location)
+      content.push(htmlEl("div", { class: "loc" }, locationElement(finding.location)));
     return htmlEl("div", { class: `finding ${finding.severity}` }, ...content);
   }
   function renderNodeList() {
     const list = getElement("node-list");
     const matched = view.nodes.filter((node) => matchesQuery(node, state.query));
-    list.replaceChildren(...matched.map((node) => {
-      const marks = [node.id === state.selected ? "active" : "", node.id === cursor ? "cursor" : ""].filter(Boolean).join(" ");
-      return htmlEl("li", {}, htmlEl(
-        "button",
-        {
-          class: `node-btn ${marks}`.trim(),
-          "data-id": node.id
-        },
-        htmlEl("span", { class: "id" }, node.id),
-        " ",
-        htmlEl("span", { class: "type" }, node.type),
-        htmlEl("br"),
-        truncate(node.text, 34)
-      ));
-    }));
+    list.replaceChildren(
+      ...matched.map((node) => {
+        const marks = [node.id === state.selected ? "active" : "", node.id === cursor ? "cursor" : ""].filter(Boolean).join(" ");
+        return htmlEl(
+          "li",
+          {},
+          htmlEl(
+            "button",
+            {
+              class: `node-btn ${marks}`.trim(),
+              "data-id": node.id
+            },
+            htmlEl("span", { class: "id" }, node.id),
+            " ",
+            htmlEl("span", { class: "type" }, node.type),
+            htmlEl("br"),
+            truncate(node.text, 34)
+          )
+        );
+      })
+    );
     list.querySelectorAll("button[data-id]").forEach((button) => {
       button.addEventListener("click", () => selectRoot(button.dataset.id));
     });
   }
   function renderToggles(containerId, attribute, items, set) {
-    getElement(containerId).replaceChildren(...items.map((item) => htmlEl(
-      "label",
-      { class: "toggle" },
-      htmlEl("input", { type: "checkbox", [`data-${attribute}`]: item.key, checked: set.has(item.key) }),
-      ` ${item.label}`,
-      htmlEl("span", { class: "count" }, String(item.count))
-    )));
+    getElement(containerId).replaceChildren(
+      ...items.map(
+        (item) => htmlEl(
+          "label",
+          { class: "toggle" },
+          htmlEl("input", {
+            type: "checkbox",
+            [`data-${attribute}`]: item.key,
+            checked: set.has(item.key)
+          }),
+          ` ${item.label}`,
+          htmlEl("span", { class: "count" }, String(item.count))
+        )
+      )
+    );
   }
   function bindToggles(attribute, key) {
     queryElements(`input[data-${attribute}]`).forEach((input) => {
@@ -2070,12 +2252,14 @@ ${text}`;
       htmlEl("span", { class: "chip" }, `${DATA.stats.edges} \u30A8\u30C3\u30B8`)
     ];
     for (const severity of ["error", "severe", "warning", "info"]) {
-      if (counts[severity]) chips.push(htmlEl("span", { class: `chip ${severity}` }, `${severity} ${counts[severity]}`));
+      if (counts[severity])
+        chips.push(htmlEl("span", { class: `chip ${severity}` }, `${severity} ${counts[severity]}`));
     }
     if (!counts.error && !counts.severe && !counts.warning && !counts.info) {
       chips.push(htmlEl("span", { class: "chip" }, "\u6307\u6458\u306A\u3057"));
     }
-    if (DATA.stats.suppressed) chips.push(htmlEl("span", { class: "chip" }, `\u6291\u5236 ${DATA.stats.suppressed} \u4EF6`));
+    if (DATA.stats.suppressed)
+      chips.push(htmlEl("span", { class: "chip" }, `\u6291\u5236 ${DATA.stats.suppressed} \u4EF6`));
     getElement("stats").replaceChildren(...chips);
     getElement("sources").textContent = DATA.generated_from.join(", ");
     renderLegend();
@@ -2107,15 +2291,24 @@ ${text}`;
     if (!tabs.some((tab) => tab.key === findingSeverity)) findingSeverity = ALL_SEVERITIES;
     const tabBar = getElement("finding-tabs");
     const refocus = tabBar.contains(document.activeElement);
-    tabBar.replaceChildren(...tabs.map((tab) => htmlEl("button", {
-      type: "button",
-      role: "tab",
-      "aria-controls": "findings",
-      "data-severity": tab.key,
-      class: tab.key === findingSeverity ? "active" : "",
-      "aria-selected": tab.key === findingSeverity,
-      tabindex: tab.key === findingSeverity ? 0 : -1
-    }, tab.label, htmlEl("span", { class: "count" }, String(tab.count)))));
+    tabBar.replaceChildren(
+      ...tabs.map(
+        (tab) => htmlEl(
+          "button",
+          {
+            type: "button",
+            role: "tab",
+            "aria-controls": "findings",
+            "data-severity": tab.key,
+            class: tab.key === findingSeverity ? "active" : "",
+            "aria-selected": tab.key === findingSeverity,
+            tabindex: tab.key === findingSeverity ? 0 : -1
+          },
+          tab.label,
+          htmlEl("span", { class: "count" }, String(tab.count))
+        )
+      )
+    );
     tabBar.querySelectorAll("button[data-severity]").forEach((button) => {
       button.addEventListener("click", () => showSeverity(button));
     });
@@ -2127,12 +2320,14 @@ ${text}`;
     else {
       const children = [];
       for (const group of groups) {
-        children.push(htmlEl(
-          "div",
-          { class: "code-head" },
-          htmlEl("span", {}, group.code),
-          htmlEl("span", {}, `${group.items.length} \u4EF6`)
-        ));
+        children.push(
+          htmlEl(
+            "div",
+            { class: "code-head" },
+            htmlEl("span", {}, group.code),
+            htmlEl("span", {}, `${group.items.length} \u4EF6`)
+          )
+        );
         children.push(...group.items.map((finding) => findingElement(finding)));
       }
       panel.replaceChildren(...children);
@@ -2149,25 +2344,35 @@ ${text}`;
       const active = state.sort.key === column.key;
       const order = active ? state.sort.asc ? "ascending" : "descending" : "none";
       const arrow = active ? state.sort.asc ? "\u25B2" : "\u25BC" : "";
-      headRow.append(htmlEl(
-        "th",
-        { class: column.numeric ? "num" : "", "aria-sort": order },
+      headRow.append(
         htmlEl(
-          "button",
-          { "data-key": column.key, title: "\u3053\u306E\u5217\u3067\u4E26\u3079\u66FF\u3048\u308B" },
-          column.label,
-          htmlEl("span", { class: "arrow" }, arrow)
+          "th",
+          { class: column.numeric ? "num" : "", "aria-sort": order },
+          htmlEl(
+            "button",
+            { "data-key": column.key, title: "\u3053\u306E\u5217\u3067\u4E26\u3079\u66FF\u3048\u308B" },
+            column.label,
+            htmlEl("span", { class: "arrow" }, arrow)
+          )
         )
-      ));
+      );
     }
     const cell = (row, key) => {
       if (key === "text") return htmlEl("td", { class: "text" }, row.text);
       if (key === "findings") {
-        return row.findings ? htmlEl("td", { class: "num" }, htmlEl("button", {
-          class: `finding-count ${row.severity || ""}`.trim(),
-          "data-findings": row.id,
-          title: "\u3053\u306E\u30CE\u30FC\u30C9\u3078\u306E\u6307\u6458\u3092\u898B\u308B"
-        }, String(row.findings))) : htmlEl("td", { class: "num dash" }, "\u2014");
+        return row.findings ? htmlEl(
+          "td",
+          { class: "num" },
+          htmlEl(
+            "button",
+            {
+              class: `finding-count ${row.severity || ""}`.trim(),
+              "data-findings": row.id,
+              title: "\u3053\u306E\u30CE\u30FC\u30C9\u3078\u306E\u6307\u6458\u3092\u898B\u308B"
+            },
+            String(row.findings)
+          )
+        ) : htmlEl("td", { class: "num dash" }, "\u2014");
       }
       if (key === "evidence") {
         return row.evidence ? htmlEl("td", { class: "num" }, String(row.evidence)) : htmlEl("td", { class: "num dash" }, "\u2014");
@@ -2177,17 +2382,33 @@ ${text}`;
     const body = htmlEl("tbody");
     if (rows.length) {
       for (const row of rows) {
-        body.append(htmlEl("tr", {
-          "data-id": row.id,
-          tabindex: 0,
-          class: row.id === state.selected ? "sel" : ""
-        }, ...TABLE_COLUMNS.map((column) => cell(row, column.key))));
+        body.append(
+          htmlEl(
+            "tr",
+            {
+              "data-id": row.id,
+              tabindex: 0,
+              class: row.id === state.selected ? "sel" : ""
+            },
+            ...TABLE_COLUMNS.map((column) => cell(row, column.key))
+          )
+        );
       }
     } else {
-      body.append(htmlEl("tr", {}, htmlEl("td", {
-        class: "empty",
-        colspan: TABLE_COLUMNS.length
-      }, "\u6761\u4EF6\u306B\u5408\u3046\u30CE\u30FC\u30C9\u306F\u7121\u3044\u3002")));
+      body.append(
+        htmlEl(
+          "tr",
+          {},
+          htmlEl(
+            "td",
+            {
+              class: "empty",
+              colspan: TABLE_COLUMNS.length
+            },
+            "\u6761\u4EF6\u306B\u5408\u3046\u30CE\u30FC\u30C9\u306F\u7121\u3044\u3002"
+          )
+        )
+      );
     }
     const table = getElement("node-table");
     table.replaceChildren(htmlEl("thead", {}, headRow), body);
@@ -2222,7 +2443,9 @@ ${text}`;
   function bindTabKeys(container, activate) {
     const keys = { ArrowLeft: -1, ArrowRight: 1 };
     container.onkeydown = (event) => {
-      const buttons = [...container.querySelectorAll('[role="tab"]')].filter((button) => !button.hasAttribute("disabled"));
+      const buttons = [...container.querySelectorAll('[role="tab"]')].filter(
+        (button) => !button.hasAttribute("disabled")
+      );
       const at = buttons.indexOf(event.target);
       if (at < 0) return;
       let next = null;
@@ -2244,7 +2467,10 @@ ${text}`;
     if (mode !== state.mode) state.detail = null;
     state.mode = mode;
     getElement("graph-frame").hidden = mode === "table";
-    getElement("graph-frame").setAttribute("aria-label", mode === "analysis" ? "\u30D5\u30A9\u30FC\u30AB\u30B9\u5206\u6790" : "\u30B0\u30E9\u30D5");
+    getElement("graph-frame").setAttribute(
+      "aria-label",
+      mode === "analysis" ? "\u30D5\u30A9\u30FC\u30AB\u30B9\u5206\u6790" : "\u30B0\u30E9\u30D5"
+    );
     getElement("table-frame").hidden = mode !== "table";
     for (const element of queryElements(".graph-only")) {
       element.hidden = mode === "table";
@@ -2313,7 +2539,8 @@ ${text}`;
   }
   function refresh() {
     view = createView(DATA, state);
-    if (state.mode === "analysis" && state.detail && !analysisIds()?.has(state.detail)) state.detail = null;
+    if (state.mode === "analysis" && state.detail && !analysisIds()?.has(state.detail))
+      state.detail = null;
     syncGraphControlLabels();
     renderLegend();
     renderFindings();
@@ -2466,13 +2693,14 @@ ${text}`;
     copy.querySelector(".graph-layer")?.removeAttribute("transform");
     const pal = palette();
     const background = copy.querySelector(".graph-bg");
-    if (background) setAttrs(background, {
-      x: box.x1 - padding,
-      y: box.y1 - padding,
-      width,
-      height,
-      fill: pal.bg
-    });
+    if (background)
+      setAttrs(background, {
+        x: box.x1 - padding,
+        y: box.y1 - padding,
+        width,
+        height,
+        fill: pal.bg
+      });
     const impact = impactColors();
     const style = svgEl("style");
     style.textContent = `

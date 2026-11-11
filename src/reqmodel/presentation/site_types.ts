@@ -6,7 +6,11 @@ export type Theme = "auto" | "light" | "dark";
 export type Severity = "error" | "severe" | "warning" | "info";
 
 export type SourceLocation = string;
-export interface ExternalReference { title: string; url?: string | null; note?: string | null }
+export interface ExternalReference {
+  title: string;
+  url?: string | null;
+  note?: string | null;
+}
 
 export interface NormalizedNode {
   id: NodeId;
@@ -23,8 +27,17 @@ export interface NormalizedNode {
   [field: string]: unknown;
 }
 
-export interface NormalizedEdge { source: NodeId; target: NodeId; name: string }
-export interface RequirementGroup { id: string; label: string; order: number; members: readonly NodeId[] }
+export interface NormalizedEdge {
+  source: NodeId;
+  target: NodeId;
+  name: string;
+}
+export interface RequirementGroup {
+  id: string;
+  label: string;
+  order: number;
+  members: readonly NodeId[];
+}
 export interface Finding {
   code: string;
   severity: Severity;
@@ -43,7 +56,10 @@ export interface RenderTypeMetadata {
   fit?: { wmul: number; wpad: number; hmul: number; hpad: number };
   mermaid?: { open: string; close: string };
 }
-export interface RenderStatusMetadata { border_style: string; border_width: number }
+export interface RenderStatusMetadata {
+  border_style: string;
+  border_width: number;
+}
 export interface RenderMetadata {
   types: Readonly<Record<string, RenderTypeMetadata>>;
   statuses: Readonly<Record<string, RenderStatusMetadata>>;
@@ -54,7 +70,9 @@ export interface RenderMetadata {
   search?: { hit?: string };
 }
 
-export type ImpactColors = Readonly<Record<"selected" | "upstream" | "downstream" | "related", string>>;
+export type ImpactColors = Readonly<
+  Record<"selected" | "upstream" | "downstream" | "related", string>
+>;
 
 export interface SiteStats {
   nodes: number;
@@ -80,7 +98,10 @@ export interface SiteData {
   meta: RenderMetadata;
 }
 
-export interface SortState { key: string; asc: boolean }
+export interface SortState {
+  key: string;
+  asc: boolean;
+}
 export interface ViewState {
   types: Set<string>;
   edges: Set<string>;
@@ -96,7 +117,10 @@ export interface ViewState {
   sort: SortState;
 }
 
-export interface Adjacency { out: NodeId[]; in: NodeId[] }
+export interface Adjacency {
+  out: NodeId[];
+  in: NodeId[];
+}
 export interface GraphViewModel {
   data: SiteData;
   state: ViewState;
@@ -107,11 +131,25 @@ export interface GraphViewModel {
   adjacency: Map<NodeId, Adjacency>;
 }
 
-export interface Point { x: number; y: number }
-export interface Size { w: number; h: number }
+export interface Point {
+  x: number;
+  y: number;
+}
+export interface Size {
+  w: number;
+  h: number;
+}
 export interface Box extends Point, Size {}
-export interface Extent { x1: number; y1: number; x2: number; y2: number }
-export interface LayoutResult { positions: Map<NodeId, Point>; frames: Map<string, Box> }
+export interface Extent {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+export interface LayoutResult {
+  positions: Map<NodeId, Point>;
+  frames: Map<string, Box>;
+}
 
 export interface GraphNodeElement extends Box {
   id: NodeId;
@@ -174,7 +212,12 @@ export interface DagreGraph {
   setGraph(options: Record<string, unknown>): void;
   setDefaultEdgeLabel(factory: () => Record<string, unknown>): void;
   setNode(id: string, value: { width: number; height: number }): void;
-  setEdge(source: string, target: string, value: { width: number; height: number }, name: string): void;
+  setEdge(
+    source: string,
+    target: string,
+    value: { width: number; height: number },
+    name: string,
+  ): void;
   nodes(): string[];
   node(id: string): Point;
 }

@@ -10,7 +10,13 @@
  * 実装を直したときに「速くなったつもり」で終わらせないための、唯一の物差し。
  */
 
-import { createView, focusSet, focusedNodes, focusTrail, reach } from "../../src/reqmodel/presentation/site_logic.ts";
+import {
+  createView,
+  focusedNodes,
+  focusSet,
+  focusTrail,
+  reach,
+} from "../../src/reqmodel/presentation/site_logic.ts";
 import { allOn, largeFixture } from "./fixture.mjs";
 
 /** 隣接マップを使わない、書き換え前の reach()。比較対象として残してある。 */
@@ -70,12 +76,24 @@ console.log(`  全エッジ走査 (旧): ${ms(scan)}`);
 console.log(`  隣接マップ (現) : ${ms(adjacency)}  (${(scan / adjacency).toFixed(1)} 倍)`);
 
 for (const depth of [1, 2, 3]) {
-  console.log(`focusSet(深さ ${depth}) 全ノード: ${ms(measure((id) => focusSet(view, id, depth)))}`);
+  console.log(
+    `focusSet(深さ ${depth}) 全ノード: ${ms(measure((id) => focusSet(view, id, depth)))}`,
+  );
 }
 
-const analysis = createView(data, { ...state, mode: "analysis", selected: "FR-40", detail: null, depth: 0 });
+const analysis = createView(data, {
+  ...state,
+  mode: "analysis",
+  selected: "FR-40",
+  detail: null,
+  depth: 0,
+});
 const shown = focusedNodes(analysis);
-console.log(`固定フォーカスの経路選択 全ノード: ${ms(measure((id) => {
-  analysis.state.detail = id;
-  focusTrail(analysis, shown);
-}))}`);
+console.log(
+  `固定フォーカスの経路選択 全ノード: ${ms(
+    measure((id) => {
+      analysis.state.detail = id;
+      focusTrail(analysis, shown);
+    }),
+  )}`,
+);

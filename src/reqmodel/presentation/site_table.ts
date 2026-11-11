@@ -1,5 +1,5 @@
-import { truncate } from "./site_text.ts";
 import { compare, fieldLabel, rankOf, reach } from "./site_graph.ts";
+import { truncate } from "./site_text.ts";
 import type { Finding, GraphViewModel, NormalizedNode, SiteData, SortState } from "./site_types.ts";
 // --- テーブル --------------------------------------------------------------
 //
@@ -23,10 +23,7 @@ const SEVERITY_ORDER = ["error", "severe", "warning", "info"];
 export function matchesQuery(node: NormalizedNode, query: string): boolean {
   const needle = (query || "").trim().toLowerCase();
   if (!needle) return true;
-  return (
-    node.id.toLowerCase().includes(needle) ||
-    node.text.toLowerCase().includes(needle)
-  );
+  return node.id.toLowerCase().includes(needle) || node.text.toLowerCase().includes(needle);
 }
 
 /**
@@ -43,7 +40,11 @@ export function searchHits(view: GraphViewModel, query: string): string[] {
  * ↑↓ で候補を送ったときの次の id。delta は +1 (下) か -1 (上)。
  * 端では巻き戻す。候補が無ければ null、現在位置が候補に無ければ端から始める。
  */
-export function stepHit(hits: readonly string[], current: string | null, delta: number): string | null {
+export function stepHit(
+  hits: readonly string[],
+  current: string | null,
+  delta: number,
+): string | null {
   if (!hits.length) return null;
   const at = hits.indexOf(current);
   if (at < 0) return delta > 0 ? hits[0] : hits[hits.length - 1];
@@ -103,7 +104,11 @@ function sortValue(view, row, key) {
  * 行の並び替え。同値のときは正規化 JSON の並び (型順 → id 順) で決めるので、
  * 何度押しても結果が揺れない。
  */
-export function sortRows(view: GraphViewModel, rows: ReturnType<typeof tableRows>, sort: SortState) {
+export function sortRows(
+  view: GraphViewModel,
+  rows: ReturnType<typeof tableRows>,
+  sort: SortState,
+) {
   const sign = sort.asc ? 1 : -1;
   return [...rows].sort((a, b) => {
     const left = sortValue(view, a, sort.key);

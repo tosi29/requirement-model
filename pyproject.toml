@@ -11,7 +11,10 @@ requires-python = ">=3.14"
 dependencies = ["pydantic>=2.6"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "mypy>=1.8"]
+dev = [
+    "pytest>=8",
+    "ruff>=0.17.4",
+]
 
 [project.scripts]
 req = "reqmodel.cli:main"
@@ -22,10 +25,22 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-[tool.mypy]
-python_version = "3.14"
-plugins = ["pydantic.mypy"]
-files = ["src", "examples", "requirements.py"]
+[tool.pyright]
+# 本体は npm (package-lock.json) で固定し、型解決には uv の .venv を使う。
+include = ["src", "examples", "requirements.py"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.14"
+typeCheckingMode = "standard"
+
+[tool.ruff]
+# target-version は requires-python から導出される。
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+# 行長は formatter に任せる。日本語の文字列とコメントは折り返せないため検査しない。
+ignore = ["E501"]
 
 [tool.setuptools.package-data]
 "reqmodel.presentation" = ["site_template.html", "site_bundle.js"]

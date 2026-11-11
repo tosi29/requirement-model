@@ -74,8 +74,14 @@ jobs:
       - name: テスト
         run: uv run --locked pytest -q
 
+      - name: lint と整形
+        run: |
+          uv run --locked ruff check
+          uv run --locked ruff format --check
+
+      # pyright は npm で固定し、型の解決には上で作った .venv を使う。
       - name: 型検査
-        run: uv run --locked mypy
+        run: npm run typecheck
 
       # それぞれ別のグラフなので 1 回にまとめない (id が衝突する)。
       # requirements.py はこのリポジトリ自身の要求モデル (dogfooding)。

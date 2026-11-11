@@ -7,13 +7,13 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from conftest import build, fr, goal, need, qr, source
+
 from reqmodel.application.explain import explain_text, impact_set
 from reqmodel.application.loader import load_paths
 from reqmodel.application.plan import diff_graphs, format_plan, load_revision
-from reqmodel.presentation.render import render_dot, render_mermaid
 from reqmodel.presentation.plan import render_plan_markdown
+from reqmodel.presentation.render import render_dot, render_mermaid
 
 HEADER = "from reqmodel import Goal, Need, FunctionalRequirement, Reference\n"
 

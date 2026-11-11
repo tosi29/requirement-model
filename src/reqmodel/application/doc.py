@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Iterable, Sequence
 
 from ..core.graph import RequirementGraph
 from ..definition import (

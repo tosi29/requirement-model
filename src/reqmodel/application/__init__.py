@@ -2,9 +2,9 @@
 
 from .doc import (
     CSV_HEADER,
-    DOC_FORMATS,
     DEFAULT_MATRIX_TITLE,
     DEFAULT_SPEC_TITLE,
+    DOC_FORMATS,
     MATRICES,
     Matrix,
     MatrixSpec,
@@ -15,7 +15,14 @@ from .doc import (
 )
 from .explain import explain_text, impact_set, subgraph_edges, traversed_edges
 from .loader import DEFAULT_PATHS, LoadResult, discover_paths, load_paths, load_sources
-from .plan import FieldChange, GraphDiff, diff_graphs, format_plan, impacted_nodes, load_revision
+from .plan import (
+    FieldChange,
+    GraphDiff,
+    diff_graphs,
+    format_plan,
+    impacted_nodes,
+    load_revision,
+)
 from .stats import (
     DEFAULT_STATS_TITLE,
     Ambiguity,

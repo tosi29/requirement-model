@@ -9,11 +9,11 @@ import pytest
 from conftest import build, codes, fr, goal, need, source
 from pydantic import ValidationError
 
-from reqmodel.codes import CHECK_CODES, SUPPRESSIBLE_CODES
-from reqmodel.findings import Finding, FindingList
-from reqmodel.definition import Need
 from reqmodel.application.validate import validate_semantics_lexical, validate_structure
 from reqmodel.application.waivers import apply_waivers
+from reqmodel.codes import CHECK_CODES, SUPPRESSIBLE_CODES
+from reqmodel.definition import Need
+from reqmodel.findings import Finding, FindingList
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "reqmodel"
 

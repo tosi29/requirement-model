@@ -8,19 +8,18 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from ..findings import Finding, FindingList
 from ..core.graph import RequirementGraph
-from ..lexicon import find_ambiguous_terms
 from ..core.metamodel import edge_specs_for
-from ..definition.nodes import STATUS_RANK
 from ..definition import (
-    Constraint,
     FunctionalRequirement,
     Goal,
     Need,
     QualityRequirement,
     Reference,
 )
+from ..definition.nodes import STATUS_RANK
+from ..findings import Finding, FindingList
+from ..lexicon import find_ambiguous_terms
 
 __all__ = ["validate_structure", "validate_semantics_lexical", "attach_locations"]
 
@@ -325,27 +324,23 @@ def _check_status_consistency(graph: RequirementGraph, findings: FindingList) ->
 # ---------------------------------------------------------------------------
 
 
+def _reference_texts(reference: Reference) -> list[str]:
+    # Reference.url は、実在する URL が無い情報では省略できる。
+    return [text for text in (reference.title, reference.url, reference.note) if text]
+
+
 def validate_semantics_lexical(graph: RequirementGraph) -> FindingList:
     findings = FindingList()
     for node in graph.ordered_nodes():
         texts = [node.text]
-
-        def add_reference_text(reference: Reference) -> None:
-            # Reference.url は、実在する URL が無い情報では省略できる。
-            texts.append(reference.title)
-            if reference.url:
-                texts.append(reference.url)
-            if reference.note:
-                texts.append(reference.note)
-
         #: 事前の基準と事後の根拠も本文と同じ辞書にかける。「十分高速だった」の類は
         #: 根拠の側にこそ出るため、evidence を対象から外すと検査の穴になる。
         for reference in getattr(node, "source", []) or []:
-            add_reference_text(reference)
+            texts.extend(_reference_texts(reference))
         for reference in getattr(node, "realized_by", []) or []:
-            add_reference_text(reference)
+            texts.extend(_reference_texts(reference))
         for reference in getattr(node, "evidence", []) or []:
-            add_reference_text(reference)
+            texts.extend(_reference_texts(reference))
         texts.extend(getattr(node, "acceptance_criteria", []) or [])
         reported: set[str] = set()
         for text in texts:

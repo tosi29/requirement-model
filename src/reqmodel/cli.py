@@ -15,8 +15,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from .application.doc import (
     DEFAULT_MATRIX_TITLE,
@@ -27,12 +27,15 @@ from .application.doc import (
     render_spec,
 )
 from .application.explain import explain_text, impact_set
-from .findings import FindingList
-from .core.graph import RequirementGraph
 from .application.loader import LoadResult, discover_paths, load_paths
-from .core.metamodel import EDGE_NAMES
 from .application.plan import diff_graphs, format_plan, impacted_nodes, load_revision
+from .application.stats import collect_stats, render_stats
+from .application.validate import validate_semantics_lexical, validate_structure
+from .application.waivers import WaiverResult, apply_waivers
+from .core.graph import RequirementGraph
+from .core.metamodel import EDGE_NAMES
 from .definition.nodes import STATUS_RANK
+from .findings import FindingList
 from .presentation.plan import render_plan_markdown
 from .presentation.render import FORMATS, render
 from .presentation.sarif import render_sarif
@@ -44,9 +47,6 @@ from .presentation.site import (
     asset_srcs,
     build_site,
 )
-from .application.stats import collect_stats, render_stats
-from .application.validate import validate_semantics_lexical, validate_structure
-from .application.waivers import WaiverResult, apply_waivers
 
 __all__ = ["main", "build_parser"]
 

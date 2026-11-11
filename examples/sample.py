@@ -13,8 +13,8 @@ from reqmodel import (
     Goal,
     Need,
     QualityRequirement,
-    RequirementGroup,
     Reference,
+    RequirementGroup,
 )
 
 # --- 源泉 -------------------------------------------------------------------

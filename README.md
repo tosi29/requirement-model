@@ -142,7 +142,7 @@ FR_OCR = FunctionalRequirement(
 
 参照はただの変数参照なので、参照されるノードを先に書く。前方参照したいときは
 変数の代わりに id 文字列 (`satisfies=["Need-1"]`) を書いてもよい。
-import 文は実行されないが、mypy と IDE 補完のために必ず書く。
+import 文は実行されないが、型検査器と IDE 補完のために必ず書く。
 
 ### 表示用の要求グループ
 
@@ -280,7 +280,7 @@ FR / QR には検証に関わる 2 つの欄が加わる。
 | `constrains` | Constraint→{FR, QR} | 制約 |
 
 エッジは Pydantic のフィールドとして `satisfies: list[Ref[Need]]` の形で宣言してある。
-**型規則はフィールド型そのもの**であり、mypy と IDE 補完が記述時点から効く。
+**型規則はフィールド型そのもの**であり、型検査器と IDE 補完が記述時点から効く。
 実行時の検査 (層2) もこの注釈から機械的に導出するので、規則が二重管理にならない。
 
 ## 検証 (3層)
@@ -923,9 +923,15 @@ Source を **GitHub Actions** にする。これは API やワークフローか
 
 ```console
 $ uv sync --locked --extra dev
+$ npm ci
 $ uv run --locked pytest
-$ uv run --locked mypy
+$ uv run --locked ruff check
+$ uv run --locked ruff format --check
+$ npm run typecheck
 ```
+
+lint と整形は ruff、型検査は pyright が担う。pyright の本体は Node 製なので npm 側
+(`package-lock.json`) で固定し、型の解決には `uv sync` が作る `.venv` を使う。
 
 静的サイトの TypeScript だけを回すなら Node (18 以上) で、`npm install` 後に次を叩く。
 

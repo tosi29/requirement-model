@@ -22,9 +22,9 @@ from pathlib import Path
 import pytest
 
 from reqmodel.application.explain import explain_text
-from reqmodel.findings import FindingList
 from reqmodel.application.loader import load_paths
 from reqmodel.core.metamodel import EDGE_NAMES
+from reqmodel.findings import FindingList
 from reqmodel.presentation.render import render_mermaid
 from reqmodel.presentation.site import SITE_SCRIPTS, site_data
 
@@ -95,7 +95,7 @@ def test_node_context_matches_req_explain():
     actual = node_contexts(data, [{"id": node_id} for node_id in node_ids])
 
     assert len(actual) == len(node_ids)
-    for node_id, text in zip(node_ids, actual):
+    for node_id, text in zip(node_ids, actual, strict=True):
         assert text == explain_text(graph, [node_id]), node_id
 
 
@@ -110,7 +110,7 @@ def test_node_context_matches_req_explain_with_edge_filter():
         data, [{"id": node_id, "edges": selected} for node_id in node_ids]
     )
 
-    for node_id, text in zip(node_ids, actual):
+    for node_id, text in zip(node_ids, actual, strict=True):
         assert text == explain_text(graph, [node_id], edge_names=selected), node_id
 
 
@@ -125,7 +125,7 @@ def test_node_context_matches_req_explain_with_depth(depth: int):
         data, [{"id": node_id, "depth": depth} for node_id in node_ids]
     )
 
-    for node_id, text in zip(node_ids, actual):
+    for node_id, text in zip(node_ids, actual, strict=True):
         assert text == explain_text(graph, [node_id], depth=depth), node_id
 
 
@@ -144,7 +144,7 @@ def test_node_context_matches_req_explain_undirected(depth: int | None):
         ],
     )
 
-    for node_id, text in zip(node_ids, actual):
+    for node_id, text in zip(node_ids, actual, strict=True):
         expected = explain_text(graph, [node_id], depth=depth, undirected=True)
         assert text == expected, node_id
 

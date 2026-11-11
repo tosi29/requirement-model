@@ -6,17 +6,17 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Sequence
 
 from pydantic import ValidationError
 
 from ..astcheck import ExtractResult, RawNode, extract_file, extract_source
-from ..findings import Finding, FindingList
 from ..core.graph import RequirementGraph
 from ..core.metamodel import NODE_TYPES
 from ..definition import Node, RequirementGroup
+from ..findings import Finding, FindingList
 
 __all__ = ["LoadResult", "load_paths", "load_sources", "discover_paths", "DEFAULT_PATHS"]
 

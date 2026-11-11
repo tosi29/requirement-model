@@ -18,8 +18,8 @@ from reqmodel import (
     Goal,
     Need,
     QualityRequirement,
-    RequirementGroup,
     Reference,
+    RequirementGroup,
 )
 
 # --- 源泉 -------------------------------------------------------------------
@@ -391,7 +391,7 @@ EVIDENCE_BENCH = Reference(
 EVIDENCE_CI = Reference(
     title=".github/workflows/ci.yml",
     url="https://github.com/tosi29/requirement-model/blob/main/.github/workflows/ci.yml",
-    note="テスト・型検査・SARIF upload を実行する CI。",
+    note="テスト・lint・型検査・SARIF upload を実行する CI。",
 )
 EVIDENCE_SITE_CLI_PARITY = Reference(
     title="サイトと CLI の Mermaid 一致テスト",

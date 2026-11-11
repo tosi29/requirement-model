@@ -2,9 +2,20 @@
 
 from .groups import RequirementGroup
 from .nodes import (
-    FR, QR, Constraint, FunctionalRequirement, Goal, Need, Node,
-    DecisionStatus, QualityRequirement, Ref, Reference, Requirement,
-    RequirementStatus, Waiver,
+    FR,
+    QR,
+    Constraint,
+    DecisionStatus,
+    FunctionalRequirement,
+    Goal,
+    Need,
+    Node,
+    QualityRequirement,
+    Ref,
+    Reference,
+    Requirement,
+    RequirementStatus,
+    Waiver,
 )
 
 __all__ = [

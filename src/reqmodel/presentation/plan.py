@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from ..application.plan import GraphDiff, impacted_nodes
 from ..core.graph import RequirementGraph

@@ -7,18 +7,21 @@
 
     from reqmodel import Goal, Need, FunctionalRequirement, Reference
 
-なお本ツールは定義ファイルを実行しない。import 文は mypy と IDE 補完のために書く。
+なお本ツールは定義ファイルを実行しない。import 文は型検査器と IDE 補完のために書く。
 """
 
 from __future__ import annotations
 
-from .findings import Finding, FindingList, Severity
-from .core.graph import Edge, RequirementGraph
 from .application.loader import LoadResult, load_paths, load_sources
+from .application.stats import Ambiguity, Ratio, Stats, collect_stats
+from .application.validate import validate_semantics_lexical, validate_structure
+from .application.waivers import WaiverResult, apply_waivers
+from .core.graph import Edge, RequirementGraph
 from .definition import (
     FR,
     QR,
     Constraint,
+    DecisionStatus,
     FunctionalRequirement,
     Goal,
     Need,
@@ -26,15 +29,12 @@ from .definition import (
     QualityRequirement,
     Ref,
     Reference,
-    RequirementGroup,
     Requirement,
-    DecisionStatus,
+    RequirementGroup,
     RequirementStatus,
     Waiver,
 )
-from .application.stats import Ambiguity, Ratio, Stats, collect_stats
-from .application.validate import validate_semantics_lexical, validate_structure
-from .application.waivers import WaiverResult, apply_waivers
+from .findings import Finding, FindingList, Severity
 
 __version__ = "0.1.0"
 

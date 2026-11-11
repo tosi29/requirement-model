@@ -13,6 +13,7 @@ from conftest import (
     qr,
     source,
 )
+
 from reqmodel.application.loader import load_sources
 from reqmodel.application.validate import validate_semantics_lexical, validate_structure
 

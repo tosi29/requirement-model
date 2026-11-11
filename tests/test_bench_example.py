@@ -16,9 +16,9 @@ from types import ModuleType
 
 import pytest
 
-from reqmodel.findings import FindingList
 from reqmodel.application.loader import load_paths
 from reqmodel.application.validate import validate_semantics_lexical, validate_structure
+from reqmodel.findings import FindingList
 
 ROOT = Path(__file__).resolve().parents[1]
 BENCH = ROOT / "examples" / "bench.py"

@@ -17,8 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ..codes import WAIVER_STALE
-from ..findings import Finding, FindingList
 from ..core.graph import RequirementGraph
+from ..findings import Finding, FindingList
 from .validate import attach_locations
 
 __all__ = ["Suppressed", "WaiverResult", "apply_waivers"]

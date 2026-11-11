@@ -7,22 +7,22 @@ import re
 from pathlib import Path
 
 from conftest import build, fr, goal, need, qr, source
+
+from reqmodel.application.validate import validate_structure
+from reqmodel.application.waivers import apply_waivers
 from reqmodel.cli import main
-from reqmodel.findings import FindingList
 from reqmodel.definition.nodes import STATUS_RANK
+from reqmodel.findings import FindingList
 from reqmodel.presentation.render import render_meta
 from reqmodel.presentation.site import (
     DEFAULT_REF,
     SITE_ASSETS,
-    SITE_SCRIPTS,
     RepoLink,
     app_js,
     asset_srcs,
     build_site,
     site_data,
 )
-from reqmodel.application.validate import validate_structure
-from reqmodel.application.waivers import apply_waivers
 
 SAMPLE = str(Path(__file__).resolve().parents[1] / "examples" / "sample.py")
 

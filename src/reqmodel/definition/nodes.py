@@ -5,7 +5,7 @@
 - 構造 (型・エッジ) だけを Pydantic のフィールド型として形式化する。
 - 外部情報へのトレースは ``Reference`` 値としてノードに直接保持する。
 - 要求間のエッジは ``list[Ref[T]]`` の形で宣言し、型規則をフィールド型そのもので表現する。
-  これにより mypy と IDE 補完が記述時点から効く。
+  これにより型検査器と IDE 補完が記述時点から効く。
 """
 
 from __future__ import annotations
@@ -15,7 +15,6 @@ from typing import (
     Any,
     Literal,
     TypeVar,
-    Union,
 )
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, field_validator
@@ -115,7 +114,7 @@ def _to_id(value: Any) -> Any:
 T = TypeVar("T")
 
 #: 他ノードへの参照。定義ファイルではノード変数そのものを書け、内部では id 文字列になる。
-Ref = Annotated[Union[T, str], BeforeValidator(_to_id), RefMarker()]
+Ref = Annotated[T | str, BeforeValidator(_to_id), RefMarker()]
 
 
 def _strip_terminator(text: str) -> str:
@@ -214,17 +213,17 @@ class Goal(Node):
     """事業・ステークホルダーの意図 (なぜ)。"""
 
     #: Goal は合意の状態だけを持つ。実現・検証される対象ではない。
-    status: DecisionStatus = "proposed"
+    status: DecisionStatus = "proposed"  # pyright: ignore[reportIncompatibleVariableOverride]
     #: 自分がどの親 Goal を詳細化しているか (子 → 親)。
-    refines: list[Ref["Goal"]] = []
-    motivates: list[Ref["Need"]] = []
+    refines: list[Ref[Goal]] = []
+    motivates: list[Ref[Need]] = []
 
 
 class Need(Node):
     """何が満たされたいか。語尾は願望形「〜たい」。"""
 
     #: Need は合意の状態だけを持つ。実現・検証される対象ではない。
-    status: DecisionStatus = "proposed"
+    status: DecisionStatus = "proposed"  # pyright: ignore[reportIncompatibleVariableOverride]
     @field_validator("text")
     @classmethod
     def _check_suffix(cls, value: str) -> str:
@@ -237,7 +236,7 @@ class FunctionalRequirement(Requirement):
     """システムが提供すべき機能。語尾は「〜すること」。"""
 
     satisfies: list[Ref[Need]] = []
-    refines: list[Ref["FunctionalRequirement"]] = []
+    refines: list[Ref[FunctionalRequirement]] = []
 
     @field_validator("text")
     @classmethod
@@ -252,15 +251,15 @@ class FunctionalRequirement(Requirement):
 class QualityRequirement(Requirement):
     """品質要求。qualifies を出せるのは QR だけ。"""
 
-    qualifies: list[Ref["FunctionalRequirement"]] = []
+    qualifies: list[Ref[FunctionalRequirement]] = []
 
 
 class Constraint(Node):
     """解決策の自由度を制限する条件。要求ではない。"""
 
     #: Constraint は合意の状態だけを持つ。実現・検証される対象ではない。
-    status: DecisionStatus = "proposed"
-    constrains: list[Ref[Union["FunctionalRequirement", "QualityRequirement"]]] = []
+    status: DecisionStatus = "proposed"  # pyright: ignore[reportIncompatibleVariableOverride]
+    constrains: list[Ref[FunctionalRequirement | QualityRequirement]] = []
 
 
 #: 短縮名 (指示書中の FR / QR 表記に対応)。

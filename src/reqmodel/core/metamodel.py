@@ -6,7 +6,12 @@ from dataclasses import dataclass
 from typing import Annotated, Any, Union, get_args, get_origin, get_type_hints
 
 from ..definition.nodes import (
-    Constraint, FunctionalRequirement, Goal, Need, Node, QualityRequirement,
+    Constraint,
+    FunctionalRequirement,
+    Goal,
+    Need,
+    Node,
+    QualityRequirement,
     RefMarker,
 )
 

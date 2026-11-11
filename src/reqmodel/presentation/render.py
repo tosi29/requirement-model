@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
 
 from ..core.graph import Edge, RequirementGraph
-from ..core.metamodel import TYPE_ORDER
 from ..definition import (
     Constraint,
     FunctionalRequirement,
@@ -13,22 +12,19 @@ from ..definition import (
     Need,
     Node,
     QualityRequirement,
+    RequirementGroup,
 )
-from ..definition.nodes import STATUS_RANK
-
-__all__ = ["render_mermaid", "render_dot", "render_meta", "FORMATS"]
-
-FORMATS = ("mermaid", "dot")
-
 from .styles import (
     _DOT_SHAPE,
     _EDGE_STYLE_MERMAID,
     _MERMAID_CLASSDEF,
     _MERMAID_SHAPE,
-    _mermaid_shape_of_type,
     render_meta,
 )
-from ..definition import RequirementGroup
+
+__all__ = ["render_mermaid", "render_dot", "render_meta", "FORMATS"]
+
+FORMATS = ("mermaid", "dot")
 
 
 def _truncate(text: str, limit: int) -> str:

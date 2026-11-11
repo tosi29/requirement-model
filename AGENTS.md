@@ -77,8 +77,11 @@ definition
 
 ```console
 uv sync --locked --extra dev
+npm ci
 uv run --locked pytest -q
-uv run --locked mypy
+uv run --locked ruff check
+uv run --locked ruff format --check
+npm run typecheck
 
 uv run --locked req validate --strict requirements.py
 uv run --locked req validate --strict examples/sample.py

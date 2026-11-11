@@ -1,0 +1,7 @@
+# git blame で無視する、機能変更を含まない一括整形のコミット。
+# GitHub の blame 表示はこのファイルを自動で読む。手元では次で有効にする:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# このリポジトリはマージコミットで取り込むため、ブランチ上のハッシュがそのまま main に残る。
+
+# Biome の整形と import 整列を適用する (#181)
+f8dd72cce7b4d8383f0626cea5ee28307983291c

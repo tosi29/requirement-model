@@ -333,3 +333,23 @@ def test_dot_gives_every_node_its_own_identifier():
     )
     assert len(declared) == 4
     assert len(set(declared)) == 4
+
+
+def test_markdown_plan_escapes_table_breaking_characters_inside_list_values():
+    """リスト値 (受け入れ基準など) の中の | と改行でも、表の列がずれない。"""
+    before = build(fr("FR-1", acceptance_criteria=["A"]))
+    after = build(fr("FR-1", acceptance_criteria=["A | B", "C\nD"]))
+
+    text = render_plan_markdown(before, after, diff_graphs(before, after), "HEAD")
+
+    row = next(line for line in text.splitlines() if "`acceptance_criteria`" in line)
+    assert row.endswith("| A | A \\| B, C D |")
+
+
+def test_markdown_plan_escapes_node_text_in_the_mermaid_label():
+    before = build(fr("FR-1"))
+    after = build(fr("FR-1", text='"<b>太字</b>" を表示すること'))
+
+    text = render_plan_markdown(before, after, diff_graphs(before, after), "HEAD")
+
+    assert "FR-1<br/>#quot;#lt;b#gt;太字#lt;/b#gt;#quot; を表示すること" in text

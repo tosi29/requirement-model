@@ -6,7 +6,12 @@
  */
 
 import type { PanZoomController } from "./site_graph_view.ts";
-import { applyGraphTheme, createGraphViewPrimitives, createPanZoom } from "./site_graph_view.ts";
+import {
+  applyGraphTheme,
+  createGraphViewPrimitives,
+  createPanZoom,
+  POLYGON_SHAPES,
+} from "./site_graph_view.ts";
 import type { TableRow } from "./site_table.ts";
 import type {
   Direction,
@@ -116,12 +121,9 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 
 // 要素の textContent は null にならない (null は Document などの Node だけ)。
 const DATA: SiteData = JSON.parse(getElement("model-data").textContent ?? "");
-const METRICS: {
-  startedAt: number;
-  initialRenderMs: number | null;
-  layouts: { ms: number; nodes: number; edges: number; direction: string }[];
-  filters: { ms: number; nodes: number; edges: number }[];
-} = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
+//: 初期描画・レイアウト・絞り込みの所要時間は SVG の data-* 属性に残す
+//: (docs/design/site.md の実測値はここから読んだもの)。
+const STARTED_AT = Date.now();
 // 影響範囲の色は背景に対する明度差で読ませるので、ノードの配色と同じくテーマ別に持つ。
 const impactColors = () =>
   (palette().dark ? DATA.meta.dark_impact_colors : null) ??
@@ -253,13 +255,12 @@ function buildGraphDom(defs: SVGDefsElement, graphLayer: SVGGElement) {
   const nodeLayer = svgEl("g", { class: "nodes" });
   graphLayer.replaceChildren(bandLayer, edgeLayer, nodeLayer);
 
-  const dashedEdges = new Set(DATA.meta.dashed_edges || []);
   for (const item of graph.filter(isEdgeElement)) {
     const path = svgEl("path", { class: "edge-line", "marker-end": "url(#req-arrow)" });
     const label = svgEl("text", { class: "edge-label", "text-anchor": "middle" });
     label.textContent = item.data.name;
     const group = svgEl("g", {
-      class: `edge ${dashedEdges.has(item.data.name) ? "dashed" : ""}`.trim(),
+      class: "edge",
       "data-id": item.data.id,
       "data-source": item.data.source,
       "data-target": item.data.target,
@@ -452,7 +453,7 @@ function polygonEndpoint(from: GraphNodeElement, shape: string, to: Point): Poin
 function edgeEndpoint(from: GraphNodeElement, to: Point): Point {
   const shape = from.shapeName;
   if (shape === "ellipse") return ellipseEndpoint(from, to);
-  if (shape && ["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape)) {
+  if (shape && POLYGON_SHAPES.includes(shape)) {
     return polygonEndpoint(from, shape, to);
   }
   return rectangleEndpoint(from, to);
@@ -500,7 +501,7 @@ function applyBanding() {
   const { positions, frames } =
     state.mode === "analysis"
       ? analysisBandLayout(view, placed, state.direction)
-      : bandedLayout(bands, placed, view.edges, state.direction, { groupMaxWidth: 600 });
+      : bandedLayout(bands, placed, view.edges, state.direction);
   for (const item of bandItems.values()) classed(item.group, "hidden", !frames.has(item.bandKey));
   for (const [id, position] of positions) {
     const item = nodeItems.get(id);
@@ -571,14 +572,7 @@ function runLayout() {
   }
   applyBanding();
   fitInitial();
-  const ms = Date.now() - startedAt;
-  METRICS.layouts.push({
-    ms,
-    nodes: shownNodeItems().length,
-    edges: shownEdgeItems().length,
-    direction: state.direction,
-  });
-  svg.dataset.layoutMs = String(ms);
+  svg.dataset.layoutMs = String(Date.now() - startedAt);
 }
 
 /** 絞り込みの反映。再レイアウトはせず、表示・非表示だけを切り替える。 */
@@ -606,9 +600,7 @@ function applyVisibility() {
     classed(item.group, "hidden", !visibleBands.has(item.bandKey));
   for (const item of edgeItemsByKey.values())
     classed(item.group, "hidden", !edges.has(DATA.edges[item.index]));
-  const ms = Date.now() - startedAt;
-  METRICS.filters.push({ ms, nodes: nodes.size, edges: edges.size });
-  svg.dataset.filterMs = String(ms);
+  svg.dataset.filterMs = String(Date.now() - startedAt);
 }
 
 function applyHighlight() {
@@ -680,10 +672,6 @@ function moveCursor(delta: number) {
   revealNode(cursor);
   const active = document.querySelector("#node-list .node-btn.cursor");
   if (active) active.scrollIntoView({ block: "nearest" });
-}
-
-function relayout() {
-  runLayout();
 }
 
 function graphBox() {
@@ -1417,7 +1405,7 @@ function applyHash() {
   state = next;
   syncControls();
   setMode(state.mode);
-  if (turned) relayout();
+  if (turned) runLayout();
   // 手で書かれた URL はここで正しい形に直す。履歴は増やさない。
   writeHash(false);
 }
@@ -1462,8 +1450,6 @@ function refresh() {
   if (state.mode === "analysis" && state.detail && !analysisIds()?.has(state.detail))
     state.detail = null;
   syncGraphControlLabels();
-  renderLegend();
-  renderFindings();
   //: 絞り込みや検索語の変更で候補から外れた位置は捨てる。
   if (cursor !== null && !hits().includes(cursor)) cursor = null;
   renderNodeList();
@@ -1532,7 +1518,7 @@ getElement("undirected").addEventListener("change", (event) => {
 getElement("direction").addEventListener("click", () => {
   state.direction = state.direction === "LR" ? "TD" : "LR";
   syncGraphControlLabels();
-  relayout();
+  runLayout();
   writeHash();
 });
 getElement("focus").addEventListener("change", (event) => {
@@ -1547,7 +1533,7 @@ function exitFocus() {
   setMode("graph");
   writeHash();
 }
-getElement("relayout").addEventListener("click", relayout);
+getElement("relayout").addEventListener("click", runLayout);
 getElement("zoom-in").addEventListener("click", () => zoomBy(1.2));
 getElement("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
 getElement("zoom-reset").addEventListener("click", () => {
@@ -1572,11 +1558,11 @@ function applyTheme() {
   restyleGraph();
 }
 
-/** テーマ依存の色を SVG に入れ直す。 */
+/** テーマ依存の色を凡例と SVG に入れ直す。凡例は図を組めなかったときも出ている。 */
 function restyleGraph() {
+  renderLegend();
   if (!svg || !defs) return;
   applyGraphTheme(graphEl, DATA, nodeItems.values(), bandItems.values(), graphPrimitives);
-  renderLegend();
 }
 
 themeButton.addEventListener("click", () => {
@@ -1673,7 +1659,6 @@ function currentSvg() {
     .band-label, .edge-label { fill: ${pal.muted}; }
     .edge-label { stroke: ${pal.bg}; stroke-width: 3; paint-order: stroke; font-size: 9px; }
     .edge-line { fill: none; stroke: ${pal.border}; stroke-width: 1.2; }
-    .dashed .edge-line { stroke-dasharray: 6 4; }
     .node-status-ring { display: none; fill: none; transform: scale(.92); transform-box: fill-box; transform-origin: center; }
     .status-verified .node-status-ring { display: block; }
     .dim { opacity: .28; }
@@ -1768,5 +1753,4 @@ renderStats();
 setMode(state.mode);
 // 解釈できない項目を落とした後の正しい URL に直す (履歴は増やさない)。
 writeHash(false);
-METRICS.initialRenderMs = Date.now() - METRICS.startedAt;
-if (drawn) drawn.dataset.initialRenderMs = String(METRICS.initialRenderMs);
+if (drawn) drawn.dataset.initialRenderMs = String(Date.now() - STARTED_AT);

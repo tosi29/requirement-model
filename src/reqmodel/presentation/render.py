@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from ..core.graph import Edge, RequirementGraph
+from ..core.graph import RequirementGraph
 from ..definition import (
     Constraint,
     FunctionalRequirement,
@@ -16,7 +16,6 @@ from ..definition import (
 )
 from .styles import (
     _DOT_SHAPE,
-    _EDGE_STYLE_MERMAID,
     _MERMAID_CLASSDEF,
     _MERMAID_SHAPE,
     render_meta,
@@ -50,11 +49,6 @@ def _ids(nodes: Iterable[Node]) -> dict[str, str]:
     は常に同じ識別子が出る。
     """
     return {node.id: f"n{index}" for index, node in enumerate(nodes, 1)}
-
-
-def _drawn(graph: RequirementGraph) -> tuple[list[Node], list[Edge]]:
-    """図に出すノードとエッジ。"""
-    return graph.ordered_nodes(), list(graph.edges)
 
 
 def _mermaid_shape(node: Node) -> tuple[str, str]:
@@ -119,7 +113,7 @@ def render_mermaid(
 ) -> str:
     lines = ["flowchart TD"]
     highlighted = set(highlight or ())
-    nodes, drawn_edges = _drawn(graph)
+    nodes = graph.ordered_nodes()
     ids = _ids(nodes)
 
     node_lines: dict[str, str] = {}
@@ -183,11 +177,10 @@ def render_mermaid(
             lines.append(f"    {node_lines[node.id]}")
 
     lines.append("")
-    for edge in drawn_edges:
+    for edge in graph.edges:
         if edge.source not in ids or edge.target not in ids:
             continue
-        arrow = _EDGE_STYLE_MERMAID.get(edge.name, "-->")
-        lines.append(f"    {ids[edge.source]} {arrow}|{edge.name}| {ids[edge.target]}")
+        lines.append(f"    {ids[edge.source]} -->|{edge.name}| {ids[edge.target]}")
 
     lines.append("")
     for type_name, style in _MERMAID_CLASSDEF.items():
@@ -221,7 +214,7 @@ def render_dot(
         '    node [fontname="sans-serif", style=filled, fillcolor=white];',
         '    edge [fontname="sans-serif", fontsize=10];',
     ]
-    nodes, drawn_edges = _drawn(graph)
+    nodes = graph.ordered_nodes()
     ids = _ids(nodes)
     node_lines: dict[str, str] = {}
     for node in nodes:
@@ -282,12 +275,11 @@ def render_dot(
         ):
             lines.append(f"    {node_lines[node.id]}")
 
-    for edge in drawn_edges:
+    for edge in graph.edges:
         if edge.source not in ids or edge.target not in ids:
             continue
-        edge_attrs = [f'label="{edge.name}"']
         lines.append(
-            f"    {ids[edge.source]} -> {ids[edge.target]} [{', '.join(edge_attrs)}];"
+            f'    {ids[edge.source]} -> {ids[edge.target]} [label="{edge.name}"];'
         )
     lines.append("}")
     return "\n".join(lines) + "\n"

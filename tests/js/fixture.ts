@@ -44,12 +44,6 @@ const NO_FINDINGS = { error: 0, severe: 0, warning: 0, info: 0 };
 
 export const TYPES = ["Goal", "Need", "FunctionalRequirement", "QualityRequirement", "Constraint"];
 
-//: 図に既定で描かないもの (`site_data()` の hidden_by_default と同じ形)。
-export const HIDDEN_BY_DEFAULT: SiteData["hidden_by_default"] = {
-  types: [],
-  edges: [],
-};
-
 /**
  * Goal-1 --motivates--> Need-1 <--satisfies-- FR-1 <--qualifies-- QR-1
  * 外部参照は source / evidence の Reference 値としてノードに直接持つ。
@@ -132,7 +126,6 @@ export function fixture(overrides: Partial<SiteData> = {}): SiteData {
     schema_version: 4,
     types: TYPES,
     edge_names: EDGE_NAMES,
-    hidden_by_default: HIDDEN_BY_DEFAULT,
     edge_names_by_type: EDGE_NAMES_BY_TYPE,
     status_rank: STATUS_RANK,
     requirement_groups: [],
@@ -231,7 +224,6 @@ export function largeFixture({ goals = 12, needs = 24, frs = 200, qrs = 60 } = {
     schema_version: 4,
     types: TYPES,
     edge_names: EDGE_NAMES,
-    hidden_by_default: HIDDEN_BY_DEFAULT,
     edge_names_by_type: EDGE_NAMES_BY_TYPE,
     status_rank: STATUS_RANK,
     requirement_groups: [],
@@ -268,7 +260,6 @@ export const META: RenderMetadata = {
     { type: "Goal", label: "Goal (最上位)" },
     { type: "Need", label: "Need (上位)" },
   ],
-  dashed_edges: [],
   impact_colors: {
     selected: "#d93025",
     upstream: "#1a73e8",

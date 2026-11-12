@@ -31,16 +31,21 @@ GitHub Issue に対応する Pull Request を作成するときは、Issue と�
 ```text
 presentation
      ↓
+application
+     ↓
     core
      ↓
 definition
 ```
 
 - `definition`: 利用者が直接使う公開型
-- `core`: グラフ、正規化、検証、分析、探索
-- `presentation`: Mermaid、DOT、静的サイト、色、形状、UI
+- `core`: メタモデル、正規化グラフ、探索
+- `application`: 読み込み、検証、変更分析、説明・文書・統計の生成
+- `presentation`: Mermaid、DOT、SARIF、静的サイト、色、形状、UI
 
-`definition` から `core` や `presentation` へ依存させない。
+上の層は下の層を利用できる。`definition` から `core` より上へ、`core` から `application` より上へ、
+`application` から `presentation` へ依存させない (`presentation` と `definition` の境界は
+`tests/test_model.py` が検査する)。
 表示上の都合だけで公開ノード型へフィールドを追加しない。
 
 ## 互換性

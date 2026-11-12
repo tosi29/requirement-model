@@ -7,6 +7,7 @@ from typing import Any
 
 from ..application.plan import GraphDiff, impacted_nodes
 from ..core.graph import RequirementGraph
+from .render import _mermaid_escape
 
 __all__ = ["render_plan_markdown"]
 
@@ -15,13 +16,13 @@ def _cell(value: Any) -> str:
     if value is None:
         return "なし"
     if isinstance(value, (list, tuple)):
-        return ", ".join(str(item) for item in value) or "なし"
+        return ", ".join(_cell(item) for item in value) or "なし"
     return str(value).replace("|", "\\|").replace("\n", " ")
 
 
 def _node_label(before: RequirementGraph, after: RequirementGraph, node_id: str) -> str:
     node = after.nodes.get(node_id) or before.nodes[node_id]
-    return f"{node.id}<br/>{node.text}".replace('"', "#quot;")
+    return f"{_mermaid_escape(node.id)}<br/>{_mermaid_escape(node.text)}"
 
 
 def _mermaid(

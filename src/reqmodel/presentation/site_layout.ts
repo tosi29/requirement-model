@@ -21,6 +21,7 @@ import type {
   NormalizedNode,
   Point,
   RenderMetadata,
+  RequirementGroup,
   SiteData,
 } from "./site_types.ts";
 
@@ -48,6 +49,37 @@ export interface PlacedNode extends Box {
   type: string;
 }
 
+/**
+ * 要求ノードの主所属。`render.py` の `_requirement_group_members()` と同じ規則。
+ *
+ * グループは `order` → `id` の順に見て、同じノードが複数のグループに書かれていても
+ * 最初のグループにだけ入れる。メンバーが 1 つも残らないグループは返さない。
+ * どのグループにも入らなかった要求ノードは `unclassified` に nodes の並びで返す。
+ */
+function assignGroups(nodes: readonly NormalizedNode[], groups: readonly RequirementGroup[]) {
+  const ordered = [...groups].sort(
+    (a, b) => (a.order || 0) - (b.order || 0) || compare(a.id, b.id),
+  );
+  const assigned = new Set<NodeId>();
+  const requirementIds = new Set(
+    nodes.filter((node) => REQUIREMENT_TYPES.has(node.type)).map((node) => node.id),
+  );
+  const assignedGroups: { id: string; label: string; members: NodeId[] }[] = [];
+  for (const group of ordered) {
+    const members: NodeId[] = [];
+    for (const id of group.members || []) {
+      if (!requirementIds.has(id) || assigned.has(id)) continue;
+      assigned.add(id);
+      members.push(id);
+    }
+    if (members.length) assignedGroups.push({ id: group.id, label: group.label, members });
+  }
+  return {
+    groups: assignedGroups,
+    unclassified: [...requirementIds].filter((id) => !assigned.has(id)),
+  };
+}
+
 /** 帯 (枠) の定義。Goal / Need は型ごと、Requirements は表示用グループごとに作る。 */
 export function bandDefs(data: SiteData): BandDef[] {
   const top = (data.meta?.bands || [])
@@ -56,31 +88,13 @@ export function bandDefs(data: SiteData): BandDef[] {
 
   if (!Object.hasOwn(data, "requirement_groups")) return top;
 
-  const groups = [...(data.requirement_groups || [])].sort(
-    (a, b) => (a.order || 0) - (b.order || 0) || compare(a.id, b.id),
-  );
-  const assigned = new Set<NodeId>();
-  const requirementIds = new Set(
-    data.nodes.filter((node) => REQUIREMENT_TYPES.has(node.type)).map((node) => node.id),
-  );
-  const requirementBands: BandDef[] = [];
-  for (const group of groups) {
-    const members: string[] = [];
-    for (const id of group.members || []) {
-      if (!requirementIds.has(id) || assigned.has(id)) continue;
-      assigned.add(id);
-      members.push(id);
-    }
-    if (members.length) {
-      requirementBands.push({
-        key: `group:${group.id}`,
-        label: group.label,
-        groupId: group.id,
-        members,
-      });
-    }
-  }
-  const unclassified = [...requirementIds].filter((id) => !assigned.has(id));
+  const { groups, unclassified } = assignGroups(data.nodes, data.requirement_groups || []);
+  const requirementBands: BandDef[] = groups.map((group) => ({
+    key: `group:${group.id}`,
+    label: group.label,
+    groupId: group.id,
+    members: group.members,
+  }));
   if (unclassified.length) {
     requirementBands.push({
       key: "group:__unclassified__",
@@ -115,15 +129,14 @@ export const bandId = (key: string) => `band:${key}`;
 /**
  * 図の要素定義。ノードとエッジの全件を一度だけ作る。
  *
- * status をデータに載せておくと、スタイル側は属性セレクタ
- * (`node[status = "..."]`) で拾える。絞り込みで作り直す必要が無い。
+ * 絞り込みは表示・非表示の切り替えだけで行うので、作り直す必要が無い。
  *
- * meta.bands に挙がった型 (Goal / Need) には帯枠を 1 つずつ足す。グループ化ノードは使わない。枠はただの背面描画で、位置と大きさは
- * `bandedLayout()` の結果 (frames) から与える。
+ * meta.bands に挙がった型 (Goal / Need) と RequirementGroup には帯枠を 1 つずつ足す。
+ * 枠はただの背面描画で、位置と大きさは `bandedLayout()` の結果 (frames) から与える。
  *
- * ノードの外形 (w / h) もここで決める。ラベルの外接矩形をそのまま使うと
- * ラベルの外接矩形になり、六角形や菱形では文字が図形の外に出る。measure は
- * ラベル 1 行の幅 (px) を返す関数で、省略すると概算 (`estimateTextWidth`) を使う。
+ * ノードの外形 (w / h) もここで決める。ラベルの外接矩形をそのまま外形にすると、
+ * 六角形や楕円では文字が図形の外に出る。measure はラベル 1 行の幅 (px) を返す
+ * 関数で、省略すると概算 (`estimateTextWidth`) を使う。
  */
 export function graphElements(
   data: SiteData,
@@ -170,9 +183,6 @@ export function graphElements(
           w: 10,
           h: 10,
         },
-        classes: "band",
-        selectable: false,
-        grabbable: false,
       }),
     ),
   ];
@@ -181,7 +191,7 @@ export function graphElements(
 export const isEdgeElement = (element: GraphElementDefinition): element is GraphEdgeDefinition =>
   "source" in element.data;
 export const isBandElement = (element: GraphElementDefinition): element is GraphBandDefinition =>
-  "classes" in element && element.classes === "band";
+  "band" in element.data;
 export const isNodeElement = (element: GraphElementDefinition): element is GraphNodeDefinition =>
   !isEdgeElement(element) && !isBandElement(element);
 
@@ -284,14 +294,10 @@ export function quadraticPoint(start: Point, control: Point, end: Point, t = 0.5
 /** dagre のレイアウト設定。direction は "TD" か "LR"。 */
 export function layoutOptions(direction: Direction) {
   return {
-    name: "dagre",
     rankDir: direction === "LR" ? "LR" : "TB",
     nodeSep: 24,
     rankSep: 56,
     edgeSep: 12,
-    animate: false,
-    fit: true,
-    padding: 18,
   };
 }
 
@@ -646,35 +652,80 @@ function mermaidEscape(text: string): string {
     .replace(/>/g, "#gt;");
 }
 
+//: 型ごとの帯にまとめる型 (`render_mermaid()` の bands と同じ並び)。
+const EXPORT_BAND_TYPES = ["Goal", "Need"];
+
 /**
  * いま見えているグラフの Mermaid。`render_mermaid()` と同じ書式。
  *
- * 形状は `meta.types[].mermaid`、配色は `meta.types[].fill / stroke`、破線に
- * するエッジ種別は `meta.dashed_edges` から取る (どれも `render.py` が出典)。
+ * 形状は `meta.types[].mermaid`、配色は `meta.types[].fill / stroke` から取る
+ * (どちらも `styles.py` が出典)。RequirementGroup が宣言されていれば、
+ * `render_mermaid()` と同じく Goal / Need の帯と Requirements 段のグループ枠を
+ * subgraph として出す。枠に入るのは見えているノードだけである。
  * classDef は全型ぶん出す (絞り込みで消えている型も含む) ので、絞り込みの
  * 有無で classDef の並びは変わらない。
  */
 export function mermaidText(view: GraphViewModel, maxLabel = EXPORT_LABEL_LIMIT) {
-  const meta = view.data.meta;
-  const types = meta.types || {};
-  const dashed = new Set(meta.dashed_edges || []);
+  const types = view.data.meta.types || {};
   const ids = exportIds(view.nodes);
   const lines = ["flowchart TD"];
 
+  const nodeLines = new Map<NodeId, string>();
   for (const node of view.nodes) {
     const shape = types[node.type]?.mermaid || { open: "[", close: "]" };
     const label = [
       `<b>${node.id}</b> [${node.type}]`,
       mermaidEscape(collapse(node.text, maxLabel)),
     ].join("<br/>");
-    lines.push(`    ${ids.get(node.id)}${shape.open}"${label}"${shape.close}`);
+    nodeLines.set(node.id, `${ids.get(node.id)}${shape.open}"${label}"${shape.close}`);
   }
+  const pushNodes = (indent: string, nodeIds: readonly NodeId[]) => {
+    for (const id of nodeIds) lines.push(`${indent}${nodeLines.get(id)}`);
+  };
+
+  const declared = view.data.requirement_groups || [];
+  if (declared.length) {
+    for (const type of EXPORT_BAND_TYPES) {
+      const members = view.nodes.filter((node) => node.type === type).map((node) => node.id);
+      if (!members.length) continue;
+      lines.push(`    subgraph band_${type}[${type}]`, "        direction LR");
+      pushNodes("        ", members);
+      lines.push("    end");
+    }
+    const { groups, unclassified } = assignGroups(view.nodes, declared);
+    lines.push("    subgraph band_Requirements[Requirements]", "        direction LR");
+    //: 識別子は `exportIds()` と同じ理由で連番にする (グループ id は記号を含められる)。
+    groups.forEach((group, index) => {
+      lines.push(
+        `        subgraph group_g${index + 1}[${mermaidEscape(group.label)}]`,
+        "            direction TB",
+      );
+      pushNodes("            ", group.members);
+      lines.push("        end");
+    });
+    if (unclassified.length) {
+      lines.push("        subgraph group___unclassified__[未分類]", "            direction TB");
+      pushNodes("            ", [...unclassified].sort(compare));
+      lines.push("        end");
+    }
+    lines.push("    end");
+  }
+  //: 枠に入らなかったノード。グループ宣言が無ければ全ノードがここに並ぶ。
+  pushNodes(
+    "    ",
+    view.nodes
+      .filter(
+        (node) =>
+          !declared.length ||
+          !(REQUIREMENT_TYPES.has(node.type) || EXPORT_BAND_TYPES.includes(node.type)),
+      )
+      .map((node) => node.id),
+  );
 
   lines.push("");
   for (const edge of view.edges) {
     if (!ids.has(edge.source) || !ids.has(edge.target)) continue;
-    const arrow = dashed.has(edge.name) ? "-.->" : "-->";
-    lines.push(`    ${ids.get(edge.source)} ${arrow}|${edge.name}| ${ids.get(edge.target)}`);
+    lines.push(`    ${ids.get(edge.source)} -->|${edge.name}| ${ids.get(edge.target)}`);
   }
 
   lines.push("");

@@ -92,48 +92,17 @@ export function statusFilters(data: SiteData) {
   }));
 }
 
-/** 図に既定で描かないもの (`site_data()` の `hidden_by_default`)。 */
-export function hiddenByDefault(data: SiteData, key: "types" | "edges"): readonly string[] {
-  return data?.hidden_by_default?.[key] || [];
-}
-
-/** ある軸の既定の選択。全体から「既定で隠すもの」を引いたもの。 */
-export function initialSelection(
-  data: SiteData,
-  all: readonly string[],
-  key: "types" | "edges",
-): string[] {
-  const hidden = new Set(hiddenByDefault(data, key));
-  return all.filter((name) => !hidden.has(name));
-}
-
 /**
- * 選択中のエッジ種別が `req explain` のどの呼び方に当たるか。
+ * 選択中のエッジ種別。`req explain --edges` に渡す値で、全種別を選んでいて
+ * 渡さなくてよいなら null。
  *
- * - `"default"` … 既定のまま → 引数なし
- * - `"all"`     … 全エッジ選択。外部参照はエッジではないので CLI 引数は不要
- * - 配列        … それ以外 → `--edges a,b,c`
- *
- * CLI 側 (`explain.traversed_edges()`) と対応が崩れると、ページが配る
- * コンテキストとコマンドの出力が食い違う。
- */
-export function edgeSelection(view: GraphViewModel): "default" | "all" | string[] {
-  const all = view.data.edge_names;
-  const selected = all.filter((name) => view.state.edges.has(name));
-  if (selected.length === all.length) return "all";
-  const initial = initialSelection(view.data, all, "edges");
-  if (selected.length === initial.length && initial.every((name) => view.state.edges.has(name))) {
-    return "default";
-  }
-  return selected;
-}
-
-/**
- * 選択中のエッジ種別。`--edges` に渡す値で、渡さなくてよいなら null。
+ * CLI 側 (`explain.impact_set()`) と対応が崩れると、ページが配るコンテキストと
+ * コマンドの出力が食い違う。
  */
 export function activeEdgeNames(view: GraphViewModel): string[] | null {
-  const selection = edgeSelection(view);
-  return Array.isArray(selection) ? selection : null;
+  const all = view.data.edge_names;
+  const selected = all.filter((name) => view.state.edges.has(name));
+  return selected.length === all.length ? null : selected;
 }
 
 /**

@@ -114,3 +114,27 @@ def test_syntax_error_is_reported_as_violation():
 def test_docstring_and_pass_are_allowed():
     result = extract_source('"""説明."""\npass\n')
     assert result.violations == []
+
+
+def test_standalone_reference_statement_is_rejected():
+    """どのノードにも渡らない Reference は、黙って捨てずに違反にする。"""
+    result = extract_source(HEADER + 'Reference(title="規程")\n')
+
+    assert [v.message for v in result.violations] == [
+        "Reference は単独の宣言としては書けない "
+        "(変数へ代入するか、ノードの属性に渡すこと)"
+    ]
+    assert result.violations[0].lineno == 2
+
+
+def test_reference_assigned_to_a_variable_is_accepted():
+    result = extract_source(
+        HEADER
+        + 'SRC = Reference(title="規程")\n'
+        + 'Need(id="Need-1", text="早く精算したい", source=[SRC])\n'
+    )
+
+    assert not result.violations
+    assert result.nodes[0].kwargs["source"] == [
+        {"title": "規程", "url": None, "note": None}
+    ]

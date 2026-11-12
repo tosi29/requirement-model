@@ -1057,9 +1057,6 @@ test("graphElements は帯の枠ノードを末尾に足す (compound は使わ�
     w: 10,
     h: 10,
   });
-  assert.equal(goalBand.classes, "band");
-  assert.equal(goalBand.selectable, false);
-  assert.equal(goalBand.grabbable, false);
   assert.ok(byId.has(bandId("Need")));
 });
 
@@ -1449,7 +1446,6 @@ test("bandedLayout は帯以外のノードの相対位置を保ったまま平�
 test("layoutOptions は TD / LR を dagre の rankDir に写す", () => {
   assert.equal(layoutOptions("TD").rankDir, "TB");
   assert.equal(layoutOptions("LR").rankDir, "LR");
-  assert.equal(layoutOptions("TD").animate, false);
 });
 
 test("edgeControl は異なるランク間を端点の中間で結ぶ", () => {

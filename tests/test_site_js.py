@@ -72,6 +72,17 @@ def sample_graph():
     return loaded.graph
 
 
+def site_data_of(path: Path) -> tuple[dict, str]:
+    """`req site` が埋め込むデータと、同じ生成で出力先に置かれる graph.mmd。"""
+    loaded = load_paths([path])
+    assert loaded.ok
+    groups = loaded.requirement_groups
+    data = site_data(
+        loaded.graph, FindingList(), "題名", [str(path)], requirement_groups=groups
+    )
+    return data, render_mermaid(loaded.graph, requirement_groups=groups)
+
+
 def test_ts_modules_typecheck_on_their_own():
     """切り出した TypeScript は、bundle しなくても型検査できる。"""
     assert SITE_SCRIPTS
@@ -166,6 +177,21 @@ def test_mermaid_export_matches_req_graph():
     assert mermaid_export(data) == render_mermaid(graph)
 
 
+@pytest.mark.parametrize(
+    "path", [SAMPLE, ROOT / "requirements.py"], ids=lambda p: p.name
+)
+def test_mermaid_export_matches_graph_mmd_with_requirement_groups(path: Path):
+    """RequirementGroup を宣言したモデルでも、書き出しは graph.mmd と同じ。
+
+    `req site` はグループを渡して graph.mmd を作るので、突き合わせも同じ入力で
+    行う。グループを渡さない比較だけでは、枠 (subgraph) の食い違いを見逃す。
+    """
+    data, graph_mmd = site_data_of(path)
+
+    assert "subgraph group_g1[" in graph_mmd
+    assert mermaid_export(data) == graph_mmd
+
+
 def test_mermaid_export_drops_filtered_out_nodes():
     """種別を外すと、そのノードと端点を持つエッジが書き出しからも消える。"""
     graph = sample_graph()
@@ -182,3 +208,17 @@ def test_mermaid_export_drops_filtered_out_nodes():
         if line.startswith("    class n") and line.endswith(" Goal")
     ]
     assert "motivates" not in text
+
+
+def test_mermaid_export_keeps_group_frames_for_the_remaining_nodes():
+    """絞り込むと、枠ごと消えるのは中身が 1 つも残らない枠だけ。"""
+    data, graph_mmd = site_data_of(SAMPLE)
+    types = [name for name in data["types"] if name != "Goal"]
+
+    text = mermaid_export(data, types=types)
+
+    assert "subgraph band_Goal[" in graph_mmd
+    assert "subgraph band_Goal[" not in text
+    assert "subgraph band_Need[Need]" in text
+    assert "subgraph band_Requirements[Requirements]" in text
+    assert "subgraph group_g1[" in text

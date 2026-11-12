@@ -167,12 +167,6 @@ class _Extractor:
             ):
                 return  # docstring
             if isinstance(stmt.value, ast.Call):
-                if (
-                    isinstance(stmt.value.func, ast.Name)
-                    and stmt.value.func.id in VALUE_TYPES
-                ):
-                    self._eval(stmt.value)
-                    return
                 self._visit_instantiation(stmt.value, var_name=None)
                 return
             self._violation("式文はノード型のインスタンス化のみ許される", stmt)
@@ -262,7 +256,11 @@ class _Extractor:
 
         type_name = call.func.id
         if type_name in VALUE_TYPES:
-            self._violation(f"{type_name} は単独の宣言としては書けない", call)
+            self._violation(
+                f"{type_name} は単独の宣言としては書けない "
+                "(変数へ代入するか、ノードの属性に渡すこと)",
+                call,
+            )
             return None
         if type_name not in DECLARATION_TYPES:
             self._violation(f"未知の型 {type_name} は呼び出せない", call)

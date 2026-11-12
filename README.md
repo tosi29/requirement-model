@@ -288,8 +288,8 @@ FR / QR には検証に関わる 2 つの欄が加わる。
 | 層 | 内容 | 実装 |
 |---|---|---|
 | 層0 | 宣言性 (AST 検査) | `astcheck.py` |
-| 層1 | 構文 (語尾規則・ID 重複・必須属性) | Pydantic validator + `loader.py` |
-| 層2 | 構造 (本丸) | `validate.py` |
+| 層1 | 構文 (語尾規則・ID 重複・必須属性) | Pydantic validator + `application/loader.py` |
+| 層2 | 構造 (本丸) | `application/validate.py` |
 | 層3 | 意味 | 曖昧語辞書のみ先行実装 (`lexicon.py`)。LLM 連携は後続 |
 
 指摘の重大度は `error` / `severe` (重大警告) / `warning` / `info` の 4 段階。
@@ -402,71 +402,78 @@ $ uv run --locked req doc examples/sample.py --matrix -o trace.csv   # 同上 (C
 ### 仕様書 (`req doc`)
 
 Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`status`・
-根拠・受け入れ基準・トレースリンク・定義位置を出す。`examples/sample.py` からの抜粋:
+トレースリンク・外部参照・受け入れ基準・定義位置を出す。`examples/sample.py` からの抜粋:
 
 ```markdown
 ##### FR-1 領収書画像から金額と日付を抽出し、申請フォームの初期値として表示すること
 
-- 種別: FunctionalRequirement / 状態: approved
+- 種別: FunctionalRequirement / 状態: proposed
 - 充足するニーズ: Need-1
-- Source: 申請者となる一般社員 <https://example.com/interviews/employee>
 - 付与されている品質要求: QR-1
 - 受けている制約: Constraint-1
+- Source:
+    - **申請者となる一般社員**: 組織内の利用背景であり、公開 URL はない。
 - 受け入れ基準:
     - 社内で収集した領収書画像 200 枚に対し、金額の抽出正解率が 95% 以上である
     - 抽出に失敗した項目は空欄で表示され、申請者が手入力で上書きできる
-- 定義: examples/sample.py:128
+- 定義: examples/sample.py:108
 ```
 
-`verified` の要求では、根拠が受け入れ基準より先に出る (事後の事実が主で、事前の
-基準が従):
+外部参照 (`Source` / `Realized by` / `Evidence`) は受け入れ基準より先に出る
+(事後の事実が主で、事前の基準が従):
 
 ```markdown
 ###### QR-1 領収書画像の送信から抽出結果の表示までを、95 パーセンタイルで 5 秒以内とすること
 
-- 種別: QualityRequirement / 状態: verified
-- 根拠:
-    - 本番同等環境で 100 回計測し (2026-02-20)、95 パーセンタイル値は 4.2 秒だった
+- 種別: QualityRequirement / 状態: proposed
+- 品質を付与する対象: FR-1
+- 受けている制約: Constraint-1
+- Source:
+    - **申請者となる一般社員**: 組織内の利用背景であり、公開 URL はない。
+- Evidence:
+    - **OCR 応答時間の計測結果**: 2026-02-20 に本番同等環境で 100 回計測し、95 パーセンタイル値は 4.2 秒だった
+      URL: https://example.com/tests/performance/ocr-latency
 - 受け入れ基準:
     - 本番同等環境で 100 回計測し、95 パーセンタイル値が 5.0 秒以下である
+- 定義: examples/sample.py:173
 ```
 
 上位の Goal / Need も同じ形式で、トレースリンクの項目名だけが型ごとに変わる
 (`動機づけるニーズ`、`これを充足する機能要求` など)。全文は
 `req doc examples/sample.py` を叩けば出る。
 
-節の構成は次の 5 つで固定する (該当が無ければ「該当なし。」と出る)。
+節の構成は次の 3 つで固定する (該当が無ければ「該当なし。」と出る)。
+外部参照は独立した節にせず、各ノードの属性として出す。
 
 | 節 | 内容 |
 |---|---|
 | 1. 要求階層 | Goal → Need → FR → QR。Goal の詳細化は DFS の並び順で表す |
 | 2. 制約 | Constraint と、その制約対象 |
-| 3. 外部参照 | 各ノードの source / realized_by / evidence |
-| 4. 上記に現れなかったノード | どの節にも入らなかったもの (ゴール未接続の Need 等) |
+| 3. 上記に現れなかったノード | どの節にも入らなかったもの (ゴール未接続の Need 等) |
 
 見出しの深さは Goal=h3 / Need=h4 / FR=h5 / QR=h6 に固定する。Goal の詳細化は
 何段でも書けるため、深さをそのまま見出しレベルに写すと h6 を超えてしまうため。
 同じノードが複数の親にぶら下がるとき (1 つの FR が 2 つの Need を満たす等) は、
 最初の 1 か所だけ本文を出し、以降は `- (前掲) FR-1 …` として参照だけを置く。
-**4 節があるので、どのノードも必ずどこかに現れる**。文書から要求が落ちない。
+**3 節があるので、どのノードも必ずどこかに現れる**。文書から要求が落ちない。
 
 ### トレーサビリティ表 (`req doc --matrix`)
 
 エッジ型ごとに 1 枚、行を上流・列を下流に置いた表を出す。`✓` がトレースリンク。
 
 ```markdown
-| Need × FR | FR-1 | FR-2 | FR-3 | FR-4 | FR-5 |
-|---|---|---|---|---|---|
-| Need-1 申請者は、領収書を撮影するだけで経費を申請したい | ✓ | ✓ |  |  |  |
-| Need-2 経理担当者は、規程に反する申請を差し戻す前に検知したい |  |  | ✓ |  |  |
-| Need-3 承認者は、自分が承認すべき申請にその日のうちに気づきたい |  |  |  | ✓ | ✓ |
+| Need × FR | FR-1 | FR-2 | FR-3 | FR-4 | FR-5 | FR-6 |
+|---|---|---|---|---|---|---|
+| Need-1 申請者は、領収書を撮影するだけで経費を申請したい | ✓ | ✓ |  |  |  | ✓ |
+| Need-2 経理担当者は、規程に反する申請を差し戻す前に検知したい |  |  | ✓ |  |  | ✓ |
+| Need-3 承認者は、自分が承認すべき申請にその日のうちに気づきたい |  |  |  | ✓ | ✓ |  |
 
 - トレースの無い行: なし
 - トレースの無い列: なし
 ```
 
 出る表は 4 枚 (`Goal × Need` / `Need × FR` / `FR × QR` / `Constraint × 制約対象`)。表ごとに「トレースの無い行 / 列」を添えるので、
-どこが未カバーかがそのまま読める。表の定義は `src/reqmodel/doc.py` の `MATRICES`。
+どこが未カバーかがそのまま読める。表の定義は `src/reqmodel/application/doc.py` の `MATRICES`。
 
 CSV は「1 行 = 1 トレースリンク」の縦持ちにする。4 枚の格子を 1 ファイルに並べる
 わけにいかないためで、表計算ソフトのピボットで格子に戻せる。トレース先の無い行は
@@ -498,7 +505,7 @@ $ uv run --locked req stats examples/sample.py
 
 - Need の充足率 (satisfies されている): 100.0% (3/3)
 - FR の根拠保有率 (evidence を持つ): 16.7% (1/6) 未達: FR-1, FR-3, FR-4, FR-5, FR-6
-- QR の根拠保有率 (evidence を持つ): 50.0% (1/2) 未達: QR-2
+- QR の根拠保有率 (evidence を持つ): 100.0% (1/1)
 - 外部参照率 (source を持つノード): 100.0% (14/14)
 ```
 
@@ -553,9 +560,9 @@ $ uv run --locked req stats examples/sample.py --json
 
 ```
 - [FunctionalRequirement] FR-3: 申請内容を経費精算規程の各ルールに照合し、…
-    (status=approved)
-    Source: 1万円を超える支出には領収書の添付を要する <https://example.com/policy#article-12-3>
-      note: 経費精算規程 第4版 第12条第3項
+    (status=proposed)
+    Source: 1万円を超える支出には領収書の添付を要する
+      note: 組織内規程のため、公開 URL はない。外部参照の補足。
 ```
 
 静的サイトでは右ペインに外部参照の title / note / URL が出る。集約して見たい場合は、
@@ -599,7 +606,7 @@ Mermaid / DOT のノード識別子は `n1`, `n2`, … の連番で、`ordered_n
 - **SVG のノードを含むすべての操作要素をキーボードだけで辿れる**。グラフ領域内のアイコン操作も
   フォーカスの位置は `:focus-visible` の輪郭で常に見える (マウス操作では出ない)
 - モデル由来の値は HTML 文字列へ変換せず DOM API で表示する。外部参照リンクは
-  `https:` / `http:` / `about:` だけを許可し、`javascript:` などはテキストとして表示する
+  `https:` / `http:` だけを許可し、`javascript:` などはテキストとして表示する
 
 出力ディレクトリには `index.html` のほか、`model.json` (正規化 JSON) と
 `graph.mmd` / `graph.dot` も置かれる。`model.json` の各ノードには
@@ -705,9 +712,8 @@ index.html#node=FR-3&types=Goal,Need&dir=LR&view=table&q=領収書&sort=findings
 | `sort` | テーブルの並び順 (`status:asc` / `findings:desc`) | `id:asc` |
 
 **既定値は書かない**ので、載っている項目がそのまま「既定と違うところ」の一覧になる。
-戻る/進むで表示状態を辿れる。ツールバーの**コピーアイコン**で、いまの表示状態の
-URL をクリップボードへ。`#node=FR-3` だけを PR コメントや指摘一覧に貼れば、
-そのノードへの**ディープリンク**になる。
+戻る/進むで表示状態を辿れる。共有するときはアドレスバーの URL をそのまま渡す。
+`#node=FR-3` だけを PR コメントや指摘一覧に貼れば、そのノードへの**ディープリンク**になる。
 
 なお**絞り込みと表示は `localStorage` にも残り、次に自分が開いたときに戻る**
 (起点・detail の対象・検索語は持ち越さない)。渡された URL のハッシュが最優先なので、
@@ -723,7 +729,7 @@ URL をクリップボードへ。`#node=FR-3` だけを PR コメントや指�
 | `/` | ノード検索の入力欄へ移る (文字を打ち込める場所にいるときを除く) |
 | `↑` `↓` | 検索欄で候補を送る (図の上でも強調が動き、画面外ならそこまでパンする) |
 | `Enter` / `Space` | SVG ノードを選ぶ。`Enter` は検索候補・一覧・表・指摘も開く |
-| `←` `→` `Home` `End` | タブ (グラフ / テーブル、指摘の重大度) を移る |
+| `←` `→` `Home` `End` | タブ (グラフ / フォーカス分析 / テーブル、指摘の重大度) を移る |
 | `Esc` | フォーカス分析からグラフへ戻る → 選択を解除する → 検索語を消す → 入力欄から手を離す (この順) |
 
 一覧・指摘・表の行はいずれも操作子 (`button` / `tabindex`) として出しているので、
@@ -811,7 +817,7 @@ Mermaid と SVG の書き出しも
 
 要求管理ツールでありながら自分の要求だけが要求管理されていない、という状態を避けるため、
 **このツール自身の要求をルートの `requirements.py` に置いてある**。実装済みの機能と、
-開いている issue の両方が対象である (54 ノード / 116 エッジ)。
+開いている issue の両方が対象である (47 ノード / 55 エッジ)。
 
 `loader.DEFAULT_PATHS` がルートの `requirements.py` を見るので、リポジトリ内では
 引数なしでそのままこのモデルを読む。CI (`.github/workflows/ci.yml`) も
@@ -823,7 +829,7 @@ $ uv run --locked req doc -o spec.md
 $ uv run --locked req site -o site && uv run --locked python -m http.server -d site
 ```
 
-自分に `--strict` を課すと、`verified` と書いた要求がすべて根拠を持ち、全要求が源泉を持ち、全 Need が satisfy され、
+自分に `--strict` を課すと、`verified` と書いた要求がすべて根拠を持ち、全 Need が satisfy され、
 全 QR が張り先を持ち、全 Goal が要求群まで分解されている必要がある。**この制約を自分で
 食らうことがモデル化の目的**で、実際に次のことが分かった。
 
@@ -859,8 +865,9 @@ $ uv run --locked req site -o site && uv run --locked python -m http.server -d s
 Pull Request の差分上へ指摘を表示できる。抑制された指摘は出力しない。
 
 次は、検証の成否を保ったまま SARIF をアップロードする最小の Actions 例である。
-リポジトリの workflow permissions で `security-events: write` が必要になる。このリポジトリでも
-`.github/workflows/ci.yml` の専用 job で同じ構成を使い、権限をその job だけに限定している。
+リポジトリの workflow permissions で `security-events: write` が必要になる。このリポジトリでは
+`.github/workflows/ci.yml` の専用 job がアップロードだけを担い、権限をその job だけに限定している
+(検証の成否は別 job の `req validate --strict` が決めるので、専用 job には `--strict` と最後の `exit 1` が無い)。
 
 ```yaml
 permissions:
@@ -954,12 +961,12 @@ skip されるので、CI では `.github/workflows/ci.yml` が node を明示�
 `reqmodel` は責務ごとに一方向の依存関係を持つサブパッケージへ分割している。
 
 - `reqmodel.definition`: 定義ファイルの利用者が使うノード型・補助型・表示グループ宣言
-- `reqmodel.core`: メタモデル、正規化グラフ、既定の投影ポリシー
+- `reqmodel.core`: メタモデル、正規化グラフ
 - `reqmodel.application`: 読み込み、検証、変更分析、説明・文書・統計生成のユースケース
 - `reqmodel.presentation`: Mermaid / DOT、描画スタイル、静的サイト
 
 CLI は引数解析と入出力を担当し、`application → core → definition` の向きでユースケースを
-Python API として再利用できる。`presentation` も `core` を利用する。各責務の API は
+Python API として再利用できる。`presentation` は `application` と `core` を利用する。各責務の API は
 これらの正規サブパッケージから import する。要求定義向けの
 `from reqmodel import Goal, Need, FR, QR` はトップレベルの公開 API である。
 
@@ -978,7 +985,7 @@ Python API として再利用できる。`presentation` も `core` を利用す�
 RDB / 外部ストレージを持たないこと、LLM API を直接呼ばず文脈生成に留めること、
 定義ファイルを実行しないこと、実行時の依存を pydantic だけに保つこと、公開サイトを
 外部への通信なしで表示できるようにすること — いずれも `req doc -o spec.md` の
-「3. 制約」に一覧で出る。ここに散文で書き写すと二重管理になるので置かない。
+「2. 制約」に一覧で出る。ここに散文で書き写すと二重管理になるので置かない。
 
 モデルに載せていない非スコープは次の 3 つ。
 

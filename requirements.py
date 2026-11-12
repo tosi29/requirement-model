@@ -504,10 +504,7 @@ FR_SYNTAX = FunctionalRequirement(
 )
 FR_EDGE_RULES = FunctionalRequirement(
     id="FR-3",
-    text=(
-        "型規則に違反するエッジ・参照切れ・階層エッジ (refines / part_of) の閉路を"
-        "error として報告すること"
-    ),
+    text="型規則に違反するエッジ・参照切れ・refines の閉路を error として報告すること",
     satisfies=[NEED_NO_DANGLING],
     source=[SRC_SPEC, SRC_IREB],
     status="implemented",
@@ -516,7 +513,7 @@ FR_EDGE_RULES = FunctionalRequirement(
     acceptance_criteria=[
         "Constraint から Goal へ張ったエッジは structure.edge_type として報告される",
         "存在しない id への参照は structure.dangling_ref として報告される",
-        "refines と part_of の閉路は、それぞれ専用のコードで error として報告される",
+        "refines の閉路は structure.refines_cycle として報告される",
     ],
 )
 FR_ORPHAN = FunctionalRequirement(
@@ -646,7 +643,7 @@ FR_DOC = FunctionalRequirement(
     realized_by=[PR_INITIAL, PR_DOC],
     evidence=[EVIDENCE_DOC],
     acceptance_criteria=[
-        "仕様書は 5 節構成で、どのノードも必ずいずれかの節に現れる",
+        "仕様書は 3 節構成で、どのノードも必ずいずれかの節に現れる",
         "トレーサビリティ表はエッジ型ごとに 1 枚出て、トレースの無い行と列を併記する",
         "表は Markdown と CSV の両方で出せる",
     ],
@@ -768,7 +765,7 @@ FR_SITE_DOM_SAFETY = FunctionalRequirement(
     evidence=[EVIDENCE_SITE],
     acceptance_criteria=[
         "動的なUI生成はDOM APIとtextContentを用い、innerHTMLへモデル値を渡さない",
-        "外部参照と出所のリンクはhttps、http、about schemeだけを許可する",
+        "外部参照と出所のリンクはhttpsとhttp schemeだけを許可する",
         "HTMLタグを含むnode id、本文、外部参照、指摘は文字列として表示される",
     ],
 )

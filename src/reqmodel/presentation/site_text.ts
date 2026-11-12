@@ -3,7 +3,7 @@
  *
  * DOM にも描画 API にも一切触れない純関数だけを置く。ここに置いたものは
  * Node からそのまま import してテストできる (`tests/js/`)。ページに載せるときは
- * `site.py` が `site_app.ts` と一緒に 1 枚の HTML へインライン化する。
+ * esbuild が `site_app.ts` と一緒に bundle し、`site.py` がそれを HTML へ埋め込む。
  *
  * `nodeContext()` の出力は CLI の `req explain` (`explain.py`) と一致させる。
  * ここを崩すと「サイトからコピーしたコンテキスト」と「CLI が出すコンテキスト」が

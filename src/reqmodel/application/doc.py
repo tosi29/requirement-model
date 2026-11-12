@@ -104,9 +104,8 @@ def _ref(graph: RequirementGraph, node_id: str, with_text: bool = False) -> str:
     return node_id
 
 
-def _attr_line(graph: RequirementGraph, node: Node) -> str:
-    parts = [f"種別: {type(node).__name__}", f"状態: {node.status}"]
-    return "- " + " / ".join(parts)
+def _attr_line(node: Node) -> str:
+    return f"- 種別: {type(node).__name__} / 状態: {node.status}"
 
 
 def _relation_lines(graph: RequirementGraph, node: Node) -> list[str]:
@@ -162,7 +161,7 @@ def _criteria_lines(node: Node) -> list[str]:
 
 def _node_block(graph: RequirementGraph, node: Node, level: int) -> list[str]:
     lines = ["", f"{'#' * level} {node.id} {_inline(node.text)}", ""]
-    lines.append(_attr_line(graph, node))
+    lines.append(_attr_line(node))
     lines.extend(_relation_lines(graph, node))
     lines.extend(_criteria_lines(node))
     where = graph.location_of(node.id)

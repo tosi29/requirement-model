@@ -1,4 +1,4 @@
-import { IMPACT_DEPTHS, initialSelection, parseFocus, statusNames } from "./site_graph.ts";
+import { IMPACT_DEPTHS, parseFocus, statusNames } from "./site_graph.ts";
 import { TABLE_COLUMNS } from "./site_table.ts";
 import type { SiteData, SortState, Theme, ViewState } from "./site_types.ts";
 
@@ -19,36 +19,20 @@ const DEFAULT_SORT: SortState = { key: "id", asc: true };
  * 1 か所で対応付ける。軸を足すときはここに 1 行足せば、既定値・URL への
  * 書き出し・復元の 3 つが揃って増える。
  *
- * `initial` は初期状態で選ばれているもの。`all` と違う値は
- * `site_data()` の `hidden_by_default` で定義する。
- * 「既定と違うところだけ URL に載せる」という規則はこの `initial` が基準になる。
+ * 初期状態はどの軸も全選択で、「既定と違うところだけ URL に載せる」という規則は
+ * この全選択が基準になる。
  */
 interface SetFilter {
   param: string;
   key: "types" | "edges" | "statuses";
   all: (data: SiteData) => readonly string[];
-  initial?: (data: SiteData) => readonly string[];
 }
 
 const SET_FILTERS: readonly SetFilter[] = [
-  {
-    param: "types",
-    key: "types",
-    all: (data) => data.types,
-    initial: (data) => initialSelection(data, data.types, "types"),
-  },
-  {
-    param: "edges",
-    key: "edges",
-    all: (data) => data.edge_names,
-    initial: (data) => initialSelection(data, data.edge_names, "edges"),
-  },
+  { param: "types", key: "types", all: (data) => data.types },
+  { param: "edges", key: "edges", all: (data) => data.edge_names },
   { param: "status", key: "statuses", all: (data) => statusNames(data) },
 ];
-
-/** 軸の初期選択。`initial` を持たない軸は全選択。 */
-const initialOf = (filter: SetFilter, data: SiteData) =>
-  filter.initial ? filter.initial(data) : filter.all(data);
 
 /** ハッシュが無いときの状態。ページの初期 state でもある。 */
 export function defaultState(data: SiteData): ViewState {
@@ -60,7 +44,7 @@ export function defaultState(data: SiteData): ViewState {
     direction: "TD",
     mode: "graph",
     query: "",
-    //: 分析の向き、または近傍の深さ。0 は全体表示。
+    //: 通常グラフの近傍表示の深さ。0 は全体表示。
     focus: 0,
     detail: null,
     //: 影響範囲の探索の深さ。0 なら無制限 (`req explain` に --depth を渡さない)。
@@ -69,7 +53,7 @@ export function defaultState(data: SiteData): ViewState {
     undirected: false,
     sort: { ...DEFAULT_SORT },
   };
-  for (const filter of SET_FILTERS) state[filter.key] = new Set(initialOf(filter, data));
+  for (const filter of SET_FILTERS) state[filter.key] = new Set(filter.all(data));
   return state;
 }
 
@@ -90,11 +74,8 @@ export function encodeHash(state: ViewState, data: SiteData): string {
   for (const filter of SET_FILTERS) {
     const selected = state[filter.key];
     const all = filter.all(data);
-    // 既定と同じなら書かない。基準は「全選択」ではなく初期選択。
-    const initial = initialOf(filter, data);
-    if (selected.size === initial.length && initial.every((name) => selected.has(name))) {
-      continue;
-    }
+    // 既定 (全選択) と同じなら書かない。
+    if (selected.size === all.length && all.every((name) => selected.has(name))) continue;
     put(filter.param, list(selected, all));
   }
   if (state.direction === "LR") put("dir", "LR");

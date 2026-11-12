@@ -54,7 +54,6 @@ def test_site_data_contains_graph_findings_and_render_meta():
     assert data["stats"]["nodes"] == 3
     assert data["meta"]["types"]["Goal"]["shape"] == "hexagon"
     assert data["meta"]["types"]["Goal"]["fill"].startswith("#")
-    assert data["meta"]["dashed_edges"] == []
     assert set(data["meta"]["impact_colors"]) == {
         "selected",
         "upstream",
@@ -168,8 +167,6 @@ def test_acceptance_criteria_match_the_detail_pane_text_size(tmp_path: Path):
 #: ellipse だけは多角形ではないので別に見る。
 _SHAPE_POINTS: dict[str, list[tuple[float, float]]] = {
     "hexagon": [(-0.5, -1), (-1, 0), (-0.5, 1), (0.5, 1), (1, 0), (0.5, -1)],
-    "tag": [(-1, -1), (0.25, -1), (1, 0), (0.25, 1), (-1, 1)],
-    "diamond": [(0, 1), (1, 0), (0, -1), (-1, 0)],
 }
 
 
@@ -187,8 +184,7 @@ def _inside(polygon: list[tuple[float, float]], point: tuple[float, float]) -> b
 def test_shape_fit_keeps_the_label_inside_every_shape():
     """外形の係数は、ラベルが図形からはみ出さないことを幾何で保証する。
 
-    ``width: "label"`` (ラベルの外接矩形) のままだと、六角形・菱形・平行四辺形では
-    文字が図形の外に出る。係数は「中央に置いたテキスト矩形の、外形に対する比」の
+    外形をラベルの外接矩形に合わせると、六角形や楕円では文字が図形の外に出る。係数は「中央に置いたテキスト矩形の、外形に対する比」の
     上限を決めるもの。余白 (pad) は比を更に小さくするだけなので、余白 0 の極限
     (= 比の上限そのもの) で内側に入るなら、どんな長さのラベルでも内側に入る。
     """
@@ -205,9 +201,9 @@ def test_shape_fit_keeps_the_label_inside_every_shape():
         elif shape == "ellipse":
             assert half_w**2 + half_h**2 <= 1, shape
         else:
-            # 矩形系 (round-rectangle / cut-rectangle / barrel)。隅の落ちや丸みは
-            # 比ではなく実寸 (8px / 高さの 5%) なので、余白で吸収する。
-            assert shape in ("round-rectangle", "cut-rectangle", "barrel"), shape
+            # 矩形系 (round-rectangle / cut-rectangle)。隅の落ちや丸みは
+            # 比ではなく実寸なので、余白で吸収する。
+            assert shape in ("round-rectangle", "cut-rectangle"), shape
             assert (half_w, half_h) == (1.0, 1.0), shape
             assert fit["wpad"] >= 20 and fit["hpad"] >= 14, shape
 
@@ -355,12 +351,11 @@ def test_svg_preserves_four_distinct_status_patterns(tmp_path: Path):
     assert ".status-verified .node-status-ring { display: block; }" in html
 
 
-def test_svg_edges_keep_labels_line_types_and_use_final_node_positions(tmp_path: Path):
+def test_svg_edges_keep_labels_and_use_final_node_positions(tmp_path: Path):
     html = build_site(chain(), FindingList(), tmp_path).read_text(encoding="utf-8")
 
     assert 'const label = svgEl("text", { class: "edge-label"' in html
     assert 'fill: "context-stroke"' in html
-    assert "#graph .dashed .edge-line { stroke-dasharray: 6 4; }" in html
     assert "edgeControl(source, target, state.direction, offset)" in html
     assert "setAttrs(edge.path, { d: quadraticPath(from, control, to) })" in html
     assert "quadraticPoint(from, control, to)" in html

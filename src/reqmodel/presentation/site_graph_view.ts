@@ -9,6 +9,8 @@ import type {
 } from "./site_types.ts";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+/** 多角形で描く形状 (`styles.py` の `_SVG_SHAPE` が使うもの)。それ以外は楕円か矩形。 */
+export const POLYGON_SHAPES: readonly string[] = ["hexagon", "cut-rectangle"];
 type Attrs = Record<string, unknown>;
 interface Palette {
   fg: string;
@@ -293,43 +295,36 @@ export function createGraphViewPrimitives() {
   }
   const shapeEl = (shape: string): SVGGraphicsElement => {
     if (shape === "ellipse") return svgEl("ellipse");
-    if (shape === "barrel") return svgEl("path");
-    if (["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape))
-      return svgEl("polygon");
+    if (POLYGON_SHAPES.includes(shape)) return svgEl("polygon");
     return svgEl("rect");
   };
   const polygonCoords = (shape: string, w: number, h: number): Point[] => {
+    //: hexagon 以外の多角形は cut-rectangle (隅を落とした矩形)。
     const points =
-      (
-        {
-          hexagon: [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1],
-          rhomboid: [-1, -1, 0.333, -1, 1, 1, -0.333, 1],
-          diamond: [0, -1, 1, 0, 0, 1, -1, 0],
-          tag: [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1],
-        } as Record<string, number[]>
-      )[shape] ??
-      (() => {
-        const x = (Math.min(w, h) * 0.16) / (w / 2);
-        const y = (Math.min(w, h) * 0.16) / (h / 2);
-        return [
-          -1 + x,
-          -1,
-          1 - x,
-          -1,
-          1,
-          -1 + y,
-          1,
-          1 - y,
-          1 - x,
-          1,
-          -1 + x,
-          1,
-          -1,
-          1 - y,
-          -1,
-          -1 + y,
-        ];
-      })();
+      shape === "hexagon"
+        ? [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1]
+        : (() => {
+            const x = (Math.min(w, h) * 0.16) / (w / 2);
+            const y = (Math.min(w, h) * 0.16) / (h / 2);
+            return [
+              -1 + x,
+              -1,
+              1 - x,
+              -1,
+              1,
+              -1 + y,
+              1,
+              1 - y,
+              1 - x,
+              1,
+              -1 + x,
+              1,
+              -1,
+              1 - y,
+              -1,
+              -1 + y,
+            ];
+          })();
     const scaled: Point[] = [];
     for (let index = 0; index < points.length; index += 2) {
       scaled.push({ x: (points[index] * w) / 2, y: (points[index + 1] * h) / 2 });
@@ -349,12 +344,7 @@ export function createGraphViewPrimitives() {
           .map(({ x, y }) => `${x},${y}`)
           .join(" "),
       });
-    else if (element.tagName === "path") {
-      const curve = Math.min(w * 0.12, h * 0.45);
-      setAttrs(element, {
-        d: `M ${-w / 2 + curve} ${-h / 2} L ${w / 2 - curve} ${-h / 2} C ${w / 2} ${-h / 2} ${w / 2} ${h / 2} ${w / 2 - curve} ${h / 2} L ${-w / 2 + curve} ${h / 2} C ${-w / 2} ${h / 2} ${-w / 2} ${-h / 2} ${-w / 2 + curve} ${-h / 2} Z`,
-      });
-    } else
+    else
       setAttrs(element, {
         x: -w / 2,
         y: -h / 2,

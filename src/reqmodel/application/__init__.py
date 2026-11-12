@@ -13,7 +13,7 @@ from .doc import (
     render_matrices_markdown,
     render_spec,
 )
-from .explain import explain_text, impact_set, subgraph_edges, traversed_edges
+from .explain import explain_text, impact_set, subgraph_edges
 from .loader import DEFAULT_PATHS, LoadResult, discover_paths, load_paths, load_sources
 from .plan import (
     FieldChange,
@@ -70,7 +70,6 @@ __all__ = [
     "render_spec",
     "render_stats",
     "subgraph_edges",
-    "traversed_edges",
     "validate_semantics_lexical",
     "validate_structure",
 ]

@@ -6,17 +6,9 @@ from collections.abc import Iterable, Sequence
 
 from ..core.graph import RequirementGraph
 from ..core.metamodel import edge_specs_for
-from ..core.projection import DEFAULT_GRAPH_EDGE_NAMES
 from ..definition import Reference
 
-__all__ = ["impact_set", "explain_text", "subgraph_edges", "traversed_edges"]
-
-
-def traversed_edges(edge_names: Iterable[str] | None) -> list[str] | None:
-    """実際に辿るエッジ種別。``None`` は「全種別」。"""
-    if edge_names is not None:
-        return list(edge_names)
-    return list(DEFAULT_GRAPH_EDGE_NAMES)
+__all__ = ["impact_set", "explain_text", "subgraph_edges"]
 
 
 def impact_set(
@@ -27,7 +19,8 @@ def impact_set(
     undirected: bool = False,
 ) -> tuple[set[str], set[str], set[str]]:
     """(上流, 下流, 全体) を返す。全体には対象ノード自身を含む。"""
-    names = traversed_edges(edge_names)
+    #: 何度も辿るので、一度きりのイテレータを渡されても使い回せる形にする。
+    names = list(edge_names) if edge_names is not None else None
     known = set(targets) & set(graph.nodes)
 
     if undirected:

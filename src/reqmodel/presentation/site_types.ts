@@ -63,7 +63,6 @@ export interface RenderMetadata {
   types: Readonly<Record<string, RenderTypeMetadata>>;
   statuses: Readonly<Record<string, RenderStatusMetadata>>;
   bands?: readonly { type: string; label: string }[];
-  dashed_edges?: readonly string[];
   impact_colors?: ImpactColors;
   dark_impact_colors?: ImpactColors;
   search?: { hit?: string };
@@ -86,7 +85,6 @@ export interface SiteData {
   schema_version: number;
   types: readonly string[];
   edge_names: readonly string[];
-  hidden_by_default: { types: readonly string[]; edges: readonly string[] };
   status_rank: Readonly<Record<string, number>>;
   edge_names_by_type: Readonly<Record<string, readonly string[]>>;
   requirement_groups: readonly RequirementGroup[];
@@ -202,9 +200,6 @@ export interface GraphBandDefinition {
     w: number;
     h: number;
   };
-  classes: "band";
-  selectable: false;
-  grabbable: false;
 }
 /** 描画要素。種類ごとに持つ項目が決まっているので、種類を確かめてから読む。 */
 export type GraphElementDefinition =

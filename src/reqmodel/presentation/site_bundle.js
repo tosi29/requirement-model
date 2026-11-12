@@ -150,6 +150,7 @@
 
   // src/reqmodel/presentation/site_graph_view.ts
   var SVG_NS = "http://www.w3.org/2000/svg";
+  var POLYGON_SHAPES = ["hexagon", "cut-rectangle"];
   function applyGraphTheme(graphEl2, data, nodeItems2, bandItems2, primitives) {
     const pal = primitives.palette();
     graphEl2.style.setProperty("--graph-fg", pal.fg);
@@ -368,18 +369,11 @@
     }
     const shapeEl2 = (shape) => {
       if (shape === "ellipse") return svgEl2("ellipse");
-      if (shape === "barrel") return svgEl2("path");
-      if (["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape))
-        return svgEl2("polygon");
+      if (POLYGON_SHAPES.includes(shape)) return svgEl2("polygon");
       return svgEl2("rect");
     };
     const polygonCoords2 = (shape, w, h) => {
-      const points = {
-        hexagon: [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1],
-        rhomboid: [-1, -1, 0.333, -1, 1, 1, -0.333, 1],
-        diamond: [0, -1, 1, 0, 0, 1, -1, 0],
-        tag: [-1, -1, 0.25, -1, 1, 0, 0.25, 1, -1, 1]
-      }[shape] ?? (() => {
+      const points = shape === "hexagon" ? [-1, 0, -0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1] : (() => {
         const x = Math.min(w, h) * 0.16 / (w / 2);
         const y = Math.min(w, h) * 0.16 / (h / 2);
         return [
@@ -414,12 +408,7 @@
         setAttrs2(element, {
           points: polygonCoords2(shape, w, h).map(({ x, y }) => `${x},${y}`).join(" ")
         });
-      else if (element.tagName === "path") {
-        const curve = Math.min(w * 0.12, h * 0.45);
-        setAttrs2(element, {
-          d: `M ${-w / 2 + curve} ${-h / 2} L ${w / 2 - curve} ${-h / 2} C ${w / 2} ${-h / 2} ${w / 2} ${h / 2} ${w / 2 - curve} ${h / 2} L ${-w / 2 + curve} ${h / 2} C ${-w / 2} ${h / 2} ${-w / 2} ${-h / 2} ${-w / 2 + curve} ${-h / 2} Z`
-        });
-      } else
+      else
         setAttrs2(element, {
           x: -w / 2,
           y: -h / 2,
@@ -491,22 +480,10 @@
       count: counts.get(status) || 0
     }));
   }
-  function hiddenByDefault(data, key) {
-    return data?.hidden_by_default?.[key] || [];
-  }
-  function initialSelection(data, all, key) {
-    const hidden = new Set(hiddenByDefault(data, key));
-    return all.filter((name) => !hidden.has(name));
-  }
-  function edgeSelection(view2) {
+  function activeEdgeNames(view2) {
     const all = view2.data.edge_names;
     const selected = all.filter((name) => view2.state.edges.has(name));
-    if (selected.length === all.length) return "all";
-    const initial = initialSelection(view2.data, all, "edges");
-    if (selected.length === initial.length && initial.every((name) => view2.state.edges.has(name))) {
-      return "default";
-    }
-    return selected;
+    return selected.length === all.length ? null : selected;
   }
   function walk(view2, start, direction, depth = null) {
     const seen = /* @__PURE__ */ new Set();
@@ -632,17 +609,16 @@
   }
   function explainCommand(view2, id, scope = null) {
     const { depth, undirected } = scope || impactScope(view2.state);
-    const selection = edgeSelection(view2);
+    const edgeFilter = activeEdgeNames(view2);
     const parts = [`req explain ${id}`];
-    if (Array.isArray(selection)) parts.push(`--edges ${selection.join(",")}`);
+    if (edgeFilter) parts.push(`--edges ${edgeFilter.join(",")}`);
     if (depth !== null) parts.push(`--depth ${depth}`);
     if (undirected) parts.push("--undirected");
     return parts.join(" ");
   }
   function nodeContext(view2, id, scope = null) {
     const settings = scope || impactScope(view2.state);
-    const selection = edgeSelection(view2);
-    const edgeFilter = Array.isArray(selection) ? selection : null;
+    const edgeFilter = activeEdgeNames(view2);
     const { upstream, downstream, whole, undirected } = impactSets(view2, id, settings);
     const lines = [`# \u5F71\u97FF\u90E8\u5206\u30B0\u30E9\u30D5: ${id}`, ""];
     if (undirected) {
@@ -680,9 +656,8 @@
         lines.push(`- ${edge.source} --${edge.name}--> ${edge.target}`);
       }
     }
-    const hidden = new Set(edgeFilter ? [] : hiddenByDefault(view2.data, "edges"));
     const unused = allEdgeNames(view2.data).filter(
-      (name) => !hidden.has(name) && !edges.some((edge) => edge.name === name)
+      (name) => !edges.some((edge) => edge.name === name)
     );
     if (unused.length) {
       lines.push("", `(\u90E8\u5206\u30B0\u30E9\u30D5\u306B\u73FE\u308C\u306A\u304B\u3063\u305F\u30A8\u30C3\u30B8\u7A2E\u5225: ${unused.join(", ")})`);
@@ -693,34 +668,39 @@
 
   // src/reqmodel/presentation/site_layout.ts
   var REQUIREMENT_TYPES = /* @__PURE__ */ new Set(["FunctionalRequirement", "QualityRequirement", "Constraint"]);
-  function bandDefs(data) {
-    const top = (data.meta?.bands || []).filter((band) => data.nodes.some((node) => node.type === band.type)).map((band) => ({ ...band, key: band.type }));
-    if (!Object.hasOwn(data, "requirement_groups")) return top;
-    const groups = [...data.requirement_groups || []].sort(
+  function assignGroups(nodes, groups) {
+    const ordered = [...groups].sort(
       (a, b) => (a.order || 0) - (b.order || 0) || compare(a.id, b.id)
     );
     const assigned = /* @__PURE__ */ new Set();
     const requirementIds = new Set(
-      data.nodes.filter((node) => REQUIREMENT_TYPES.has(node.type)).map((node) => node.id)
+      nodes.filter((node) => REQUIREMENT_TYPES.has(node.type)).map((node) => node.id)
     );
-    const requirementBands = [];
-    for (const group of groups) {
+    const assignedGroups = [];
+    for (const group of ordered) {
       const members = [];
       for (const id of group.members || []) {
         if (!requirementIds.has(id) || assigned.has(id)) continue;
         assigned.add(id);
         members.push(id);
       }
-      if (members.length) {
-        requirementBands.push({
-          key: `group:${group.id}`,
-          label: group.label,
-          groupId: group.id,
-          members
-        });
-      }
+      if (members.length) assignedGroups.push({ id: group.id, label: group.label, members });
     }
-    const unclassified = [...requirementIds].filter((id) => !assigned.has(id));
+    return {
+      groups: assignedGroups,
+      unclassified: [...requirementIds].filter((id) => !assigned.has(id))
+    };
+  }
+  function bandDefs(data) {
+    const top = (data.meta?.bands || []).filter((band) => data.nodes.some((node) => node.type === band.type)).map((band) => ({ ...band, key: band.type }));
+    if (!Object.hasOwn(data, "requirement_groups")) return top;
+    const { groups, unclassified } = assignGroups(data.nodes, data.requirement_groups || []);
+    const requirementBands = groups.map((group) => ({
+      key: `group:${group.id}`,
+      label: group.label,
+      groupId: group.id,
+      members: group.members
+    }));
     if (unclassified.length) {
       requirementBands.push({
         key: "group:__unclassified__",
@@ -784,16 +764,13 @@ ${text}`;
             label: band.label,
             w: 10,
             h: 10
-          },
-          classes: "band",
-          selectable: false,
-          grabbable: false
+          }
         })
       )
     ];
   }
   var isEdgeElement = (element) => "source" in element.data;
-  var isBandElement = (element) => "classes" in element && element.classes === "band";
+  var isBandElement = (element) => "band" in element.data;
   var isNodeElement = (element) => !isEdgeElement(element) && !isBandElement(element);
   var LEGEND_MAX_BORDER = 3;
   function legendGroups(meta, colorScheme = "light") {
@@ -858,14 +835,10 @@ ${text}`;
   }
   function layoutOptions(direction) {
     return {
-      name: "dagre",
       rankDir: direction === "LR" ? "LR" : "TB",
       nodeSep: 24,
       rankSep: 56,
-      edgeSep: 12,
-      animate: false,
-      fit: true,
-      padding: 18
+      edgeSep: 12
     };
   }
   var BAND_ROW_GAP = 30;
@@ -1118,25 +1091,59 @@ ${text}`;
   function mermaidEscape(text) {
     return text.replace(/\\/g, "\uFF3C").replace(/"/g, "#quot;").replace(/</g, "#lt;").replace(/>/g, "#gt;");
   }
+  var EXPORT_BAND_TYPES = ["Goal", "Need"];
   function mermaidText(view2, maxLabel = EXPORT_LABEL_LIMIT) {
-    const meta = view2.data.meta;
-    const types = meta.types || {};
-    const dashed = new Set(meta.dashed_edges || []);
+    const types = view2.data.meta.types || {};
     const ids = exportIds(view2.nodes);
     const lines = ["flowchart TD"];
+    const nodeLines = /* @__PURE__ */ new Map();
     for (const node of view2.nodes) {
       const shape = types[node.type]?.mermaid || { open: "[", close: "]" };
       const label = [
         `<b>${node.id}</b> [${node.type}]`,
         mermaidEscape(collapse(node.text, maxLabel))
       ].join("<br/>");
-      lines.push(`    ${ids.get(node.id)}${shape.open}"${label}"${shape.close}`);
+      nodeLines.set(node.id, `${ids.get(node.id)}${shape.open}"${label}"${shape.close}`);
     }
+    const pushNodes = (indent, nodeIds) => {
+      for (const id of nodeIds) lines.push(`${indent}${nodeLines.get(id)}`);
+    };
+    const declared = view2.data.requirement_groups || [];
+    if (declared.length) {
+      for (const type of EXPORT_BAND_TYPES) {
+        const members = view2.nodes.filter((node) => node.type === type).map((node) => node.id);
+        if (!members.length) continue;
+        lines.push(`    subgraph band_${type}[${type}]`, "        direction LR");
+        pushNodes("        ", members);
+        lines.push("    end");
+      }
+      const { groups, unclassified } = assignGroups(view2.nodes, declared);
+      lines.push("    subgraph band_Requirements[Requirements]", "        direction LR");
+      groups.forEach((group, index) => {
+        lines.push(
+          `        subgraph group_g${index + 1}[${mermaidEscape(group.label)}]`,
+          "            direction TB"
+        );
+        pushNodes("            ", group.members);
+        lines.push("        end");
+      });
+      if (unclassified.length) {
+        lines.push("        subgraph group___unclassified__[\u672A\u5206\u985E]", "            direction TB");
+        pushNodes("            ", [...unclassified].sort(compare));
+        lines.push("        end");
+      }
+      lines.push("    end");
+    }
+    pushNodes(
+      "    ",
+      view2.nodes.filter(
+        (node) => !declared.length || !(REQUIREMENT_TYPES.has(node.type) || EXPORT_BAND_TYPES.includes(node.type))
+      ).map((node) => node.id)
+    );
     lines.push("");
     for (const edge of view2.edges) {
       if (!ids.has(edge.source) || !ids.has(edge.target)) continue;
-      const arrow = dashed.has(edge.name) ? "-.->" : "-->";
-      lines.push(`    ${ids.get(edge.source)} ${arrow}|${edge.name}| ${ids.get(edge.target)}`);
+      lines.push(`    ${ids.get(edge.source)} -->|${edge.name}| ${ids.get(edge.target)}`);
     }
     lines.push("");
     for (const [type, typeMeta] of Object.entries(types)) {
@@ -1356,21 +1363,10 @@ ${text}`;
   // src/reqmodel/presentation/site_state.ts
   var DEFAULT_SORT = { key: "id", asc: true };
   var SET_FILTERS = [
-    {
-      param: "types",
-      key: "types",
-      all: (data) => data.types,
-      initial: (data) => initialSelection(data, data.types, "types")
-    },
-    {
-      param: "edges",
-      key: "edges",
-      all: (data) => data.edge_names,
-      initial: (data) => initialSelection(data, data.edge_names, "edges")
-    },
+    { param: "types", key: "types", all: (data) => data.types },
+    { param: "edges", key: "edges", all: (data) => data.edge_names },
     { param: "status", key: "statuses", all: (data) => statusNames(data) }
   ];
-  var initialOf = (filter, data) => filter.initial ? filter.initial(data) : filter.all(data);
   function defaultState(data) {
     const state2 = {
       types: /* @__PURE__ */ new Set(),
@@ -1380,7 +1376,7 @@ ${text}`;
       direction: "TD",
       mode: "graph",
       query: "",
-      //: 分析の向き、または近傍の深さ。0 は全体表示。
+      //: 通常グラフの近傍表示の深さ。0 は全体表示。
       focus: 0,
       detail: null,
       //: 影響範囲の探索の深さ。0 なら無制限 (`req explain` に --depth を渡さない)。
@@ -1389,7 +1385,7 @@ ${text}`;
       undirected: false,
       sort: { ...DEFAULT_SORT }
     };
-    for (const filter of SET_FILTERS) state2[filter.key] = new Set(initialOf(filter, data));
+    for (const filter of SET_FILTERS) state2[filter.key] = new Set(filter.all(data));
     return state2;
   }
   function encodeHash(state2, data) {
@@ -1402,10 +1398,7 @@ ${text}`;
     for (const filter of SET_FILTERS) {
       const selected = state2[filter.key];
       const all = filter.all(data);
-      const initial = initialOf(filter, data);
-      if (selected.size === initial.length && initial.every((name) => selected.has(name))) {
-        continue;
-      }
+      if (selected.size === all.length && all.every((name) => selected.has(name))) continue;
       put(filter.param, list(selected, all));
     }
     if (state2.direction === "LR") put("dir", "LR");
@@ -1524,7 +1517,7 @@ ${text}`;
   var dagre = window.dagre;
   var SVG_NS2 = "http://www.w3.org/2000/svg";
   var DATA = JSON.parse(getElement("model-data").textContent ?? "");
-  var METRICS = { startedAt: Date.now(), initialRenderMs: null, layouts: [], filters: [] };
+  var STARTED_AT = Date.now();
   var impactColors = () => (palette().dark ? DATA.meta.dark_impact_colors : null) ?? DATA.meta.impact_colors ?? { selected: "", upstream: "", downstream: "", related: "" };
   function readStore(key) {
     try {
@@ -1624,13 +1617,12 @@ ${text}`;
     const bandLayer = svgEl("g", { class: "bands" });
     const nodeLayer = svgEl("g", { class: "nodes" });
     graphLayer.replaceChildren(bandLayer, edgeLayer, nodeLayer);
-    const dashedEdges = new Set(DATA.meta.dashed_edges || []);
     for (const item of graph.filter(isEdgeElement)) {
       const path = svgEl("path", { class: "edge-line", "marker-end": "url(#req-arrow)" });
       const label = svgEl("text", { class: "edge-label", "text-anchor": "middle" });
       label.textContent = item.data.name;
       const group = svgEl("g", {
-        class: `edge ${dashedEdges.has(item.data.name) ? "dashed" : ""}`.trim(),
+        class: "edge",
         "data-id": item.data.id,
         "data-source": item.data.source,
         "data-target": item.data.target
@@ -1780,7 +1772,7 @@ ${text}`;
   function edgeEndpoint(from, to) {
     const shape = from.shapeName;
     if (shape === "ellipse") return ellipseEndpoint(from, to);
-    if (shape && ["hexagon", "rhomboid", "diamond", "tag", "cut-rectangle"].includes(shape)) {
+    if (shape && POLYGON_SHAPES.includes(shape)) {
       return polygonEndpoint(from, shape, to);
     }
     return rectangleEndpoint(from, to);
@@ -1818,7 +1810,7 @@ ${text}`;
       h: item.h
     }));
     if (!placed.length) return;
-    const { positions, frames } = state.mode === "analysis" ? analysisBandLayout(view, placed, state.direction) : bandedLayout(bands, placed, view.edges, state.direction, { groupMaxWidth: 600 });
+    const { positions, frames } = state.mode === "analysis" ? analysisBandLayout(view, placed, state.direction) : bandedLayout(bands, placed, view.edges, state.direction);
     for (const item of bandItems.values()) classed(item.group, "hidden", !frames.has(item.bandKey));
     for (const [id, position] of positions) {
       const item = nodeItems.get(id);
@@ -1882,14 +1874,7 @@ ${text}`;
     }
     applyBanding();
     fitInitial();
-    const ms = Date.now() - startedAt;
-    METRICS.layouts.push({
-      ms,
-      nodes: shownNodeItems().length,
-      edges: shownEdgeItems().length,
-      direction: state.direction
-    });
-    svg.dataset.layoutMs = String(ms);
+    svg.dataset.layoutMs = String(Date.now() - startedAt);
   }
   function applyVisibility() {
     if (!svg) return;
@@ -1912,9 +1897,7 @@ ${text}`;
       classed(item.group, "hidden", !visibleBands.has(item.bandKey));
     for (const item of edgeItemsByKey.values())
       classed(item.group, "hidden", !edges.has(DATA.edges[item.index]));
-    const ms = Date.now() - startedAt;
-    METRICS.filters.push({ ms, nodes: nodes.size, edges: edges.size });
-    svg.dataset.filterMs = String(ms);
+    svg.dataset.filterMs = String(Date.now() - startedAt);
   }
   function applyHighlight() {
     if (!svg) return;
@@ -1981,9 +1964,6 @@ ${text}`;
     revealNode(cursor);
     const active = document.querySelector("#node-list .node-btn.cursor");
     if (active) active.scrollIntoView({ block: "nearest" });
-  }
-  function relayout() {
-    runLayout();
   }
   function graphBox() {
     const boxes = [...shownNodeItems(), ...shownBandItems()];
@@ -2566,7 +2546,7 @@ ${text}`;
     state = next;
     syncControls();
     setMode(state.mode);
-    if (turned) relayout();
+    if (turned) runLayout();
     writeHash(false);
   }
   function selectRoot(id, toggle = true) {
@@ -2602,8 +2582,6 @@ ${text}`;
     if (state.mode === "analysis" && state.detail && !analysisIds()?.has(state.detail))
       state.detail = null;
     syncGraphControlLabels();
-    renderLegend();
-    renderFindings();
     if (cursor !== null && !hits().includes(cursor)) cursor = null;
     renderNodeList();
     renderDetail();
@@ -2662,7 +2640,7 @@ ${text}`;
   getElement("direction").addEventListener("click", () => {
     state.direction = state.direction === "LR" ? "TD" : "LR";
     syncGraphControlLabels();
-    relayout();
+    runLayout();
     writeHash();
   });
   getElement("focus").addEventListener("change", (event) => {
@@ -2676,7 +2654,7 @@ ${text}`;
     setMode("graph");
     writeHash();
   }
-  getElement("relayout").addEventListener("click", relayout);
+  getElement("relayout").addEventListener("click", runLayout);
   getElement("zoom-in").addEventListener("click", () => zoomBy(1.2));
   getElement("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
   getElement("zoom-reset").addEventListener("click", () => {
@@ -2692,9 +2670,9 @@ ${text}`;
     restyleGraph();
   }
   function restyleGraph() {
+    renderLegend();
     if (!svg || !defs) return;
     applyGraphTheme(graphEl, DATA, nodeItems.values(), bandItems.values(), graphPrimitives);
-    renderLegend();
   }
   themeButton.addEventListener("click", () => {
     theme = nextTheme(theme);
@@ -2771,7 +2749,6 @@ ${text}`;
     .band-label, .edge-label { fill: ${pal.muted}; }
     .edge-label { stroke: ${pal.bg}; stroke-width: 3; paint-order: stroke; font-size: 9px; }
     .edge-line { fill: none; stroke: ${pal.border}; stroke-width: 1.2; }
-    .dashed .edge-line { stroke-dasharray: 6 4; }
     .node-status-ring { display: none; fill: none; transform: scale(.92); transform-box: fill-box; transform-origin: center; }
     .status-verified .node-status-ring { display: block; }
     .dim { opacity: .28; }
@@ -2846,6 +2823,5 @@ ${new XMLSerializer().serializeToString(copy)}`;
   renderStats();
   setMode(state.mode);
   writeHash(false);
-  METRICS.initialRenderMs = Date.now() - METRICS.startedAt;
-  if (drawn) drawn.dataset.initialRenderMs = String(METRICS.initialRenderMs);
+  if (drawn) drawn.dataset.initialRenderMs = String(Date.now() - STARTED_AT);
 })();

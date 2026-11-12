@@ -15,7 +15,14 @@ from typing import Any
 from ..core.graph import RequirementGraph, node_to_json_obj
 from .loader import LoadResult, load_sources
 
-__all__ = ["GraphDiff", "diff_graphs", "load_revision", "format_plan", "impacted_nodes"]
+__all__ = [
+    "FieldChange",
+    "GraphDiff",
+    "diff_graphs",
+    "load_revision",
+    "format_plan",
+    "impacted_nodes",
+]
 
 
 @dataclass
@@ -115,8 +122,6 @@ def impacted_nodes(
 def _fmt_value(value: Any) -> str:
     if isinstance(value, list):
         return "[" + ", ".join(_fmt_value(v) for v in value) + "]"
-    if isinstance(value, (tuple,)):
-        return "(" + ", ".join(_fmt_value(v) for v in value) + ")"
     if value is None:
         return "なし"
     return str(value)

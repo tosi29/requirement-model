@@ -68,20 +68,15 @@ _SVG_SHAPE: dict[type[Node], str] = {
 #: 正規化されているので、比だけで決まる):
 #:
 #:   hexagon  … a <= 1 - b/2      左右の頂点に向かう斜辺が食い込む
-#:   tag      … a <= 1 - 3b/4     右端が尖る
-#:   diamond  … a <= 1 - b
 #:   ellipse  … a^2 + b^2 <= 1
-#:   矩形系   … a <= 1            (cut-rectangle の隅の落ち・barrel の丸みは余白で吸収)
+#:   矩形系   … a <= 1            (cut-rectangle の隅の落ちは余白で吸収)
 #:
 #: b を決めれば倍率が決まる (高さの倍率 = 1/b、幅の倍率 = 1/f(b))。f はどれも b の
 #: 非増加関数なので、余白を足して実際の a・b を狙いより小さくする限り制約は破れない。
 _SHAPE_FIT: dict[str, tuple[float, float, float, float]] = {
     "round-rectangle": (1.0, 20, 1.0, 14),
     "cut-rectangle": (1.0, 26, 1.0, 20),
-    "barrel": (1.0, 20, 1.0, 22),
     "hexagon": (1.70, 18, 1.25, 12),  # b = 0.80
-    "tag": (2.20, 16, 1.40, 12),  # b = 0.71
-    "diamond": (2.05, 16, 2.05, 12),  # b = 0.49
     "ellipse": (1.42, 14, 1.42, 10),  # b = 1/√2
 }
 
@@ -136,8 +131,6 @@ _DOT_SHAPE: dict[type[Node], str] = {
     Constraint: "note",
 }
 
-_EDGE_STYLE_MERMAID: dict[str, str] = {}
-
 
 def _fit_of(shape: str) -> dict[str, float]:
     wmul, wpad, hmul, hpad = _SHAPE_FIT[shape]
@@ -190,9 +183,6 @@ def render_meta() -> dict[str, Any]:
         },
         "bands": [
             {"type": node_type.__name__, "label": label} for node_type, label in _BANDS
-        ],
-        "dashed_edges": [
-            name for name, arrow in _EDGE_STYLE_MERMAID.items() if arrow == "-.->"
         ],
         "impact_colors": dict(_IMPACT_COLORS),
         "dark_impact_colors": dict(_DARK_IMPACT_COLORS),

@@ -1,11 +1,4 @@
-import {
-  compare,
-  edgeSelection,
-  hiddenByDefault,
-  impactScope,
-  impactSets,
-  rankOf,
-} from "./site_graph.ts";
+import { activeEdgeNames, compare, impactScope, impactSets, rankOf } from "./site_graph.ts";
 import type { ExternalReference, GraphViewModel, NodeId, SiteData } from "./site_types.ts";
 
 // --- LLM 用コンテキスト -----------------------------------------------------
@@ -56,9 +49,9 @@ export function explainCommand(
   scope: { depth: number | null; undirected: boolean } | null = null,
 ): string {
   const { depth, undirected } = scope || impactScope(view.state);
-  const selection = edgeSelection(view);
+  const edgeFilter = activeEdgeNames(view);
   const parts = [`req explain ${id}`];
-  if (Array.isArray(selection)) parts.push(`--edges ${selection.join(",")}`);
+  if (edgeFilter) parts.push(`--edges ${edgeFilter.join(",")}`);
   if (depth !== null) parts.push(`--depth ${depth}`);
   if (undirected) parts.push("--undirected");
   return parts.join(" ");
@@ -76,8 +69,7 @@ export function nodeContext(
   scope: { depth: number | null; undirected: boolean } | null = null,
 ): string {
   const settings = scope || impactScope(view.state);
-  const selection = edgeSelection(view);
-  const edgeFilter = Array.isArray(selection) ? selection : null;
+  const edgeFilter = activeEdgeNames(view);
   const { upstream, downstream, whole, undirected } = impactSets(view, id, settings);
 
   const lines = [`# 影響部分グラフ: ${id}`, ""];
@@ -126,9 +118,8 @@ export function nodeContext(
     }
   }
 
-  const hidden = new Set(edgeFilter ? [] : hiddenByDefault(view.data, "edges"));
   const unused = allEdgeNames(view.data).filter(
-    (name) => !hidden.has(name) && !edges.some((edge) => edge.name === name),
+    (name) => !edges.some((edge) => edge.name === name),
   );
   if (unused.length) {
     lines.push("", `(部分グラフに現れなかったエッジ種別: ${unused.join(", ")})`);

@@ -360,11 +360,10 @@ def cmd_plan(args: argparse.Namespace) -> int:
     edges = _edge_filter(args.edges)
     formatter = render_plan_markdown if args.format == "markdown" else format_plan
     sys.stdout.write(formatter(previous.graph, current.graph, diff, args.rev, edges))
-    impacted = impacted_nodes(previous.graph, current.graph, diff, edges)
     if args.fail_on_impact and any(
         (current.graph.nodes.get(node_id) or previous.graph.nodes[node_id]).status
         == args.fail_on_impact
-        for node_id in impacted
+        for node_id in impacted_nodes(previous.graph, current.graph, diff, edges)
     ):
         print(
             f"影響範囲に status={args.fail_on_impact} のノードが含まれるため失敗した。",

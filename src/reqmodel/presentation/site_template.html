@@ -153,7 +153,6 @@ main {
   font-size: 9px;
   pointer-events: none;
 }
-#graph .dashed .edge-line { stroke-dasharray: 6 4; }
 #graph .hidden { display: none; }
 #graph .dim { opacity: .28; }
 #graph .node.sel .node-shape { stroke: var(--impact-selected); stroke-width: 4; }
@@ -463,20 +462,13 @@ button.finding:hover { box-shadow: inset 0 0 0 1px var(--accent); }
 .detail .loc a { overflow-wrap: anywhere; }
 /* 受け入れ基準。クラスの無い素の ul なので、他の項目と同じ大きさをここで決める。 */
 .detail ul:not([class]) { font-size: 13px; }
-/* 源泉は図に描かないので、ここが唯一の出口になる。飛び先ではないので
-   ボタンにせず、id・種別・位置を 1 行目、引用文と引用元を続く行に出す。 */
+/* 外部参照は図に描かないので、ここが唯一の出口になる。飛び先ではないので
+   ボタンにせず、title と URL を 1 行目、note を続く行に出す。 */
 .detail .sources { list-style: none; margin: 0 0 12px; padding: 0; }
 .detail .sources li { margin: 0 0 8px; font-size: 13px; }
 .detail .sources .id { font-family: ui-monospace, monospace; font-size: 11.5px; }
-.detail .sources .type { margin-left: 6px; color: var(--muted); font-size: 11.5px; }
-.detail .sources .locator { margin-left: 6px; color: var(--muted); font-size: 11.5px; }
 .detail .sources .text { display: block; color: var(--muted); font-size: 12px; }
-.detail .sources .parents { display: block; color: var(--muted); font-size: 11.5px; }
 .empty { color: var(--muted); font-size: 13px; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--muted); }
-.legend span { display: inline-flex; align-items: center; gap: 4px; }
-.legend .legend-group { gap: 4px 8px; flex-wrap: wrap; }
-.legend .legend-group b { font-weight: 600; color: var(--fg); }
 .graph-legend .legend-group {
   display: flex;
   align-items: center;
@@ -575,7 +567,7 @@ code { font-family: ui-monospace, monospace; background: var(--panel); padding: 
           </button>
           <span id="focus-control" class="icon-select" title="フォーカス">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
-            <!-- 分析の向きと近傍の深さは site_app.ts が生成する。 -->
+            <!-- 近傍の深さの選択肢は site_app.ts が FOCUS_DEPTHS から生成する。 -->
             <select id="focus" aria-label="フォーカス"></select>
           </span>
           <button id="relayout" class="icon-button" type="button" title="表示中のノードだけで並べ直す" aria-label="表示中のノードだけで並べ直す">

@@ -42,7 +42,8 @@ $ uv sync --locked
 $ uv run --locked req validate examples/sample.py
 ```
 
-Python 3.14 以上と uv が必要である。uv は `pyproject.toml` の
+Python 3.14 以上と uv が必要である。開発と CI で使う Python のバージョンはルートの
+`.python-version` で管理し、uv や pyenv はこれを読んで同じバージョンを選ぶ。uv は `pyproject.toml` の
 `[tool.uv] exclude-newer = "3 days"` により、公開から3日未満の版を解決対象から外す。
 コミット済みの `uv.lock` と `--locked` を使うことで、CI とローカルで同じ解決結果を使い、
 コマンド実行時の再解決も行わない。

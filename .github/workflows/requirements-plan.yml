@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v7.1.0
         with:
-          python-version: "3.14"
+          python-version-file: .python-version
       - uses: astral-sh/setup-uv@v10.3.3
       - name: reqmodel をインストールする
         run: uv sync --locked

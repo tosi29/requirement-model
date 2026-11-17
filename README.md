@@ -48,7 +48,7 @@ Python 3.14 以上と uv が必要である。開発と CI で使う Python の�
 コミット済みの `uv.lock` と `--locked` を使うことで、CI とローカルで同じ解決結果を使い、
 コマンド実行時の再解決も行わない。
 
-Node の依存にはルートの `.npmrc` で `min-release-age=4320` (3日) を設定している。
+Node の依存にはルートの `.npmrc` で `min-release-age=3` (3日) を設定している。
 `npm install` は公開から3日経っていない版を解決せず、`npm ci` はコミット済みの
 `package-lock.json` を変更せず、そのロック済みの結果をインストールする。
 

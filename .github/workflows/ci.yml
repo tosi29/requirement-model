@@ -62,7 +62,7 @@ jobs:
       # tests/test_site_js.py が node を呼ぶ (無ければ skip されてしまうので必ず入れる)。
       - uses: actions/setup-node@v7.1.0
         with:
-          node-version: "22"
+          node-version-file: .node-version
 
       - uses: astral-sh/setup-uv@v10.3.3
 
@@ -99,7 +99,7 @@ jobs:
 
       - uses: actions/setup-node@v7.1.0
         with:
-          node-version: "22"
+          node-version-file: .node-version
 
       - name: Node 依存をインストール
         run: npm ci

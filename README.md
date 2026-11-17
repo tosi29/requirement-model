@@ -938,7 +938,9 @@ TypeScript / JavaScript 側は lint と整形を Biome (`biome.jsonc`)、型検�
 一括整形のコミットは `.git-blame-ignore-revs` に登録してあり、手元の `git blame` では
 `git config blame.ignoreRevsFile .git-blame-ignore-revs` で除外できる。
 
-静的サイトの TypeScript だけを回すなら Node (20 以上) で、`npm ci` 後に次を叩く。
+開発と CI で使う Node のバージョンはルートの `.node-version` で管理し、nodenv や fnm などの
+バージョン管理ツールはこれを読んで同じバージョンを選ぶ。静的サイトの TypeScript だけを回すなら
+`npm ci` 後に次を叩く。
 
 ```console
 $ npm run check:js      # Biome の lint と整形の検査 (fix:js で自動修正)

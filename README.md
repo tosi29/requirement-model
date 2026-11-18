@@ -10,7 +10,7 @@
 IREB の連鎖は Goal → Requirement で `Need` を持たず、INCOSE は `Goal` を別階層に置く。
 本ツールは両者を 1 つのグラフに載せ、`Need` を Goal と Requirement の間の必須の中継点にした
 (FR から Goal への到達は Need 経由の経路でしか判定しない)。
-どちらの体系にも無い接ぎ木なので、3 つの層の境界は[どの型に書くか](#どの型に書くか-主語で決める)で
+どちらの体系にも無い接ぎ木なので、3 つの層の境界は[どの型に書くか](#どの型に書くか)で
 明示的に定義する。
 
 ## アーキテクチャ
@@ -185,7 +185,7 @@ GROUP_CAPTURE = RequirementGroup(
 | `Need` | 何が満たされたいか | 語尾規則あり・主語 (役割) を書く |
 | `FunctionalRequirement` (FR) | システムが提供すべき機能 | 語尾規則・根拠 / 受け入れ基準 |
 | `QualityRequirement` (QR) | 品質要求 (性能・可用性等) | 「非機能要求」の語は使わない |
-| `Constraint` | 解決策の自由度を制限する条件 | 要求ではない |
+| `Constraint` | モデルの外から課され、解決策の自由度を制限する条件 | 要求ではない・`source` で出どころを示す |
 
 外部情報へのトレースはノード型ではなく、値オブジェクト `Reference(title, url=None, note=None)` として持つ。
 `source` は Goal / Need / FR / QR / Constraint の共通属性で、FR / QR にはさらに
@@ -200,7 +200,7 @@ GROUP_CAPTURE = RequirementGroup(
 SRC_POLICY_RECEIPT = Reference(
     title="1万円を超える支出には領収書の添付を要する",
     url="https://example.com/policy#article-12-3",
-    note="経費精算規程 第4版 第12条第3項。領収書添付制約の根拠。",
+    note="経費精算規程 第4版 第12条第3項。領収書添付ルールの根拠。",
 )
 ```
 
@@ -210,10 +210,21 @@ FR と QR は型を分ける (qualifies を出せるのは QR のみ、孤立検
 
 Need は「〜たい」、FR は「〜こと」で終わる必要がある (層1 の語尾規則。末尾の句点は許容)。
 
-### どの型に書くか (主語で決める)
+### どの型に書くか
 
-型の見分けは**文の主語**で決まる。語尾 (層1 の規則) は主語から従属的に決まる結果であって、
-判断の起点ではない。
+型は**文の主語**と**理由の所在**で決まる。語尾 (層1 の規則) はそこから従属的に決まる結果であって、
+判断の起点ではない。次の問いを上から順に当てる。
+
+```text
+主語として一つの役割を名指せる?             ── Yes → Need
+解決策が無くても成り立つ世界の変化?         ── Yes → Goal
+(以下はシステムに課す義務)
+その理由はモデル内の Need から辿れる?       ── No  → Constraint (source に出どころを書く)
+                                            └ Yes → 消すと振る舞いが減る? ── Yes → FR
+                                                                          └ No  → QR (FR の程度)
+```
+
+#### 主語: Goal / Need / 要求系を分ける
 
 | 主語 | 述語 | 型 | 意味 |
 |---|---|---|---|
@@ -228,18 +239,63 @@ Need は「〜たい」、FR は「〜こと」で終わる必要がある (層1
 システムを主語にした `Goal` は書けない。「機械が文脈を揃える」は解決策の存在を前提にしており、
 世界の側の記述ではないため、`Goal` ではなく要求である。
 
-要求系の 3 つは主語では分かれない。ここは構造が決める ([エッジ型と型規則](#エッジ型と型規則))。
+#### 理由の所在: Constraint と FR / QR を分ける
 
-- 他の FR の性質を述べている (`qualifies` を出せる) → `QR`
-- 消すと機能が減る → `FR` / 消すと選択肢が増えるだけ → `Constraint`
+要求系の 3 つは主語では分かれない。分けるのは**その義務の理由がどこにあるか**である。
+
+FR と QR は Need を満たすためにある (QR は `qualifies` 先の FR を通じて Need に繋がる)。
+Constraint は `satisfies` を持たず、Goal → Need の連鎖から理由づけられない。法令・社内規程・
+既存の契約・発注者の方針のように、**理由がモデルの外にあり、モデルの中では交渉しない条件**が
+Constraint である。その出どころを示せる場所は `source` しか無いので、`source` の無い Constraint は
+`structure.unsourced_constraint` として報告される。
+
+この定義は ISO/IEC/IEEE 29148 の constraint ("externally imposed limitation") に沿う。
+IREB は constraint を「機能要求・品質要求を満たすのに必要な範囲を超えて解決策の空間を
+制限するもの」とし、本ツールの「消すと選択肢が増えるだけ」という見方はこちらに対応する。
+
+**禁止形でも理由が Need から辿れるなら QR** である (例: 閲覧用サイトがモデル由来の値を
+HTML として解釈しないこと)。逆に、外から課された条件を「〜できるようにすること」と能力の形で
+書くと FR / QR と区別がつかなくなるため、Constraint の語尾は
+`semantics.capability_constraint` として報告される。
+
+FR と QR の分かれ目は構造が決める ([エッジ型と型規則](#エッジ型と型規則))。
+
+- 新しい振る舞いを足す (消すと振る舞いが減る) → `FR`
+- 既存の FR の程度を述べる (`qualifies` を出せる) → `QR`
+
+#### 記述形式
+
+| 型 | 形式 | 書くこと | 書かないこと |
+|---|---|---|---|
+| `Goal` | 「<世界の量や状態>を<変化>させる」 | 測れるなら数値 (「半減する」) | システムや解決策の語 |
+| `Need` | 「<役割>は、<状況・目的>で<〜したい>」 | 一つの役割の困りごと | 解決策 (画面・通知など) |
+| `FR` | 「<きっかけ>に対して<振る舞い>こと」 | システムの振る舞いを 1 つ | 程度 (数値)・実装手段 |
+| `QR` | 「<対象の振る舞い>の<性質>を<測定値>とすること」 | 数値と測定条件 | 新しい振る舞い |
+| `Constraint` | 禁止形「〜しないこと」/ 限定形「〜にのみ〜こと」/ 指定形「〜を用いること」 | 外から課された条件 1 つ | 能力「〜できるようにすること」 |
+| `acceptance_criteria` | 観測できる条件を 1 文に 1 つ | **本文を満たしたかを判定する**条件 | 本文に無い話題 (画面配置の詳細・設計の経緯) |
+
+`examples/sample.py` は各型をこの形式で書いた見本である。
+
+#### よくある誤り
+
+| 書き方 | 何が起きているか | 直し方 |
+|---|---|---|
+| Constraint「オフラインで表示できるようにすること」 | 能力の記述。FR / QR と区別がつかない | 理由が Need にあれば QR。外から課されたなら「外部ホストへ通信しないこと」 |
+| FR「〜を実行せず、〜を復元すること」と Constraint「〜を実行しないこと」の併存 | 同じ条件の二重管理 | 条件は Constraint だけに置き、FR は振る舞いに絞る |
+| FR「必須入力項目を 3 項目以下とすること」 | 消しても振る舞いは減らない | 対象 FR の程度を述べる QR にする |
+| 受け入れ基準に配色・レイアウトの細目を積み増す | 本文を判定していない。設計判断の記録になっている | 設計判断は `docs/design/`、確認はテストへ |
+| セキュリティの条件を「読みたい」Need に `satisfies` させる | 振る舞いではなく品質。トレースが不自然になる | 対象 FR を `qualifies` する QR にする |
+
+#### 背景
 
 この主語の規則は、**要求は世界について、仕様は機械について書く** (Jackson & Zave) の境界を
 日本語の文法として書き下したものである。`Goal` / `Need` の境界の方は、**目標の分解は単一の
 エージェントに割り当てられた時点で終わる** (KAOS / van Lamsweerde) に対応し、
 `Need` / 要求系の境界は**割り当て先が環境の側かシステムの側か**の分岐に対応する。
 
-**機械が検査しているのは語尾だけで、主語は検査していない。** 上の規約は
-`requirements.py` と `examples/sample.py` の要求系ノードで守られているが、破っても `req validate` は何も言わない。
+**機械が検査しているのは語尾と Constraint の出どころだけで、主語と理由の中身は検査していない。**
+上の規約は `requirements.py` と `examples/sample.py` で守られているが、主語や理由を取り違えても
+`req validate` は何も言わない。
 
 ### 共通属性
 
@@ -312,8 +368,10 @@ FR / QR には検証に関わる 2 つの欄が加わる。
 | `structure.goal_decomposition` | warning | 要求群に到達しない子 Goal がある |
 | `structure.goal_leaf` | warning | 子 Goal も Need も持たない Goal |
 | `structure.unverified_claim` | warning | `verified` なのに `evidence` の無い FR / QR |
+| `structure.unsourced_constraint` | warning | `source` の無い Constraint (制約の出どころが不明) |
 | `structure.status_inconsistent` | warning | 合意済みのノードが proposed のノードを参照 (`constrains` を除く) |
 | `semantics.ambiguous_term` | warning | 曖昧語 (「高速に」「適切に」等) |
+| `semantics.capability_constraint` | warning | 能力を述べる語尾 (「〜できるようにすること」) の Constraint |
 | `waiver.stale` | warning | 陳腐化した抑制 (対象の指摘が出ていない) |
 
 「FR から Goal への到達」は `FR --refines--> FR --satisfies--> Need <--motivates-- Goal`
@@ -406,28 +464,33 @@ Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`statu
 根拠・受け入れ基準・トレースリンク・定義位置を出す。`examples/sample.py` からの抜粋:
 
 ```markdown
-##### FR-1 領収書画像から金額と日付を抽出し、申請フォームの初期値として表示すること
+##### FR-1 領収書画像から金額と日付を読み取り、入力済みの状態で申請フォームに表示すること
 
-- 種別: FunctionalRequirement / 状態: approved
+- 種別: FunctionalRequirement / 状態: proposed
 - 充足するニーズ: Need-1
-- Source: 申請者となる一般社員 <https://example.com/interviews/employee>
-- 付与されている品質要求: QR-1
-- 受けている制約: Constraint-1
+- 付与されている品質要求: QR-1, QR-2
+- 受けている制約: Constraint-1, Constraint-2
+- Source:
+    - **申請者となる一般社員**: 組織内の利用背景であり、公開 URL はない。
 - 受け入れ基準:
-    - 社内で収集した領収書画像 200 枚に対し、金額の抽出正解率が 95% 以上である
-    - 抽出に失敗した項目は空欄で表示され、申請者が手入力で上書きできる
-- 定義: examples/sample.py:128
+    - 読み取れなかった項目は空欄で表示される
+    - 表示された金額と日付を、申請者が申請の確定前に修正できる
+- 定義: examples/sample.py:131
 ```
 
-`verified` の要求では、根拠が受け入れ基準より先に出る (事後の事実が主で、事前の
-基準が従):
+根拠 (`evidence`) は受け入れ基準より先に出る (事後の事実が主で、事前の基準が従):
 
 ```markdown
-###### QR-1 領収書画像の送信から抽出結果の表示までを、95 パーセンタイルで 5 秒以内とすること
+###### QR-1 領収書画像の送信から読み取り結果の表示までを、95 パーセンタイルで 5 秒以内とすること
 
-- 種別: QualityRequirement / 状態: verified
-- 根拠:
-    - 本番同等環境で 100 回計測し (2026-02-20)、95 パーセンタイル値は 4.2 秒だった
+- 種別: QualityRequirement / 状態: proposed
+- 品質を付与する対象: FR-1
+- 受けている制約: Constraint-1, Constraint-2
+- Source:
+    - **申請者となる一般社員**: 組織内の利用背景であり、公開 URL はない。
+- Evidence:
+    - **OCR 応答時間の計測結果**: 2026-02-20 に本番同等環境で 100 回計測し、95 パーセンタイル値は 4.2 秒だった
+      URL: https://example.com/tests/performance/ocr-latency
 - 受け入れ基準:
     - 本番同等環境で 100 回計測し、95 パーセンタイル値が 5.0 秒以下である
 ```
@@ -458,9 +521,10 @@ Goal → Need → FR → QR の階層で並べ、各ノードの `text`・`statu
 ```markdown
 | Need × FR | FR-1 | FR-2 | FR-3 | FR-4 | FR-5 |
 |---|---|---|---|---|---|
-| Need-1 申請者は、領収書を撮影するだけで経費を申請したい | ✓ | ✓ |  |  |  |
-| Need-2 経理担当者は、規程に反する申請を差し戻す前に検知したい |  |  | ✓ |  |  |
-| Need-3 承認者は、自分が承認すべき申請にその日のうちに気づきたい |  |  |  | ✓ | ✓ |
+| Need-1 申請者は、領収書を撮影するだけで経費を申請したい | ✓ |  |  |  |  |
+| Need-2 申請者は、規程に反していることを、申請を出す時点で知りたい |  | ✓ |  |  |  |
+| Need-3 経理担当者は、規程違反の疑いがある申請だけを重点的に点検したい |  |  | ✓ |  |  |
+| Need-4 承認者は、自分が承認すべき申請にその日のうちに気づきたい |  |  |  | ✓ | ✓ |
 
 - トレースの無い行: なし
 - トレースの無い列: なし
@@ -476,7 +540,7 @@ CSV は「1 行 = 1 トレースリンク」の縦持ちにする。4 枚の格�
 ```csv
 matrix,edge,row_type,row_id,row_text,col_type,col_id,col_text
 Goal × Need,motivates,Goal,Goal-1,経費精算にかかる全社の工数を半減する,,,
-Goal × Need,motivates,Goal,Goal-2,申請 1 件あたりの入力の手間を減らす,Need,Need-1,申請者は、領収書を撮影するだけで経費を申請したい
+Goal × Need,motivates,Goal,Goal-2,申請者が申請 1 件の作成にかける時間を減らす,Need,Need-1,申請者は、領収書を撮影するだけで経費を申請したい
 ```
 
 `req doc` は検証をしない。「未カバー」は表に出すが、指摘として数えるのは
@@ -497,10 +561,10 @@ $ uv run --locked req stats examples/sample.py
 ```markdown
 ## 3. 充足率・保有率
 
-- Need の充足率 (satisfies されている): 100.0% (3/3)
-- FR の根拠保有率 (evidence を持つ): 16.7% (1/6) 未達: FR-1, FR-3, FR-4, FR-5, FR-6
+- Need の充足率 (satisfies されている): 100.0% (4/4)
+- FR の根拠保有率 (evidence を持つ): 0.0% (0/5) 未達: FR-1, FR-2, FR-3, FR-4, FR-5
 - QR の根拠保有率 (evidence を持つ): 50.0% (1/2) 未達: QR-2
-- 外部参照率 (source を持つノード): 100.0% (14/14)
+- 外部参照率 (source を持つノード): 100.0% (17/17)
 ```
 
 率が 100% に満たないときは、その行に未達のノード id が並ぶ
@@ -525,7 +589,7 @@ $ uv run --locked req stats examples/sample.py --json
 
 ```json
 {"key": "need_satisfied", "label": "Need の充足率 (satisfies されている)",
- "covered": 3, "total": 3, "rate": 1.0, "missing": []}
+ "covered": 4, "total": 4, "rate": 1.0, "missing": []}
 ```
 
 `rate` は母数が 0 なら `null`、`ambiguity` は `--no-lexicon` を付けたとき
@@ -812,7 +876,7 @@ Mermaid と SVG の書き出しも
 
 要求管理ツールでありながら自分の要求だけが要求管理されていない、という状態を避けるため、
 **このツール自身の要求をルートの `requirements.py` に置いてある**。実装済みの機能と、
-開いている issue の両方が対象である (54 ノード / 116 エッジ)。
+開いている issue の両方が対象である (48 ノード / 55 エッジ)。
 
 `loader.DEFAULT_PATHS` がルートの `requirements.py` を見るので、リポジトリ内では
 引数なしでそのままこのモデルを読む。CI (`.github/workflows/ci.yml`) も
@@ -841,12 +905,19 @@ $ uv run --locked req site -o site && uv run --locked python -m http.server -d s
   直付けしても `--strict` は通り、この層は構造的な荷重を負っていなかった。
   一方で主語の規約 (`Need` だけが役割を書く) は両モデルの該当ノードすべてで守られており、
   **規約は存在するのに文書にも検査にも無かった**。型の選び方は
-  [どの型に書くか](#どの型に書くか-主語で決める)に書き下し、`Goal` の本文もそれに従って
+  [どの型に書くか](#どの型に書くか)に書き下し、`Goal` の本文もそれに従って
   直したが、**機械の検査は無いままである**
 - **未着手の要求に張った制約が `structure.status_inconsistent` になっていた。**
   検査のほうを直し、`constrains` を対象外にした
   ([理由](docs/design/model.md#constrains-を-structurestatus_inconsistent-の対象から外した))。
   誤検出そのものが直った例
+- **Constraint に、外から課された条件ではないものが混ざっていた。**
+  「公開サイトを外部への通信なしで表示できるようにすること」は能力の記述で、
+  理由は Need の側にあった。「定義ファイルを実行しないこと」は FR-1 の本文にも書かれ、
+  二重管理になっていた。受け入れ基準も、本文を判定しない画面配置の細目の追記先になっていた。
+  型の判定に「理由の所在」の問いを加え、Constraint の出どころと語尾を
+  `structure.unsourced_constraint` / `semantics.capability_constraint` で検査するようにした
+  ([理由](docs/design/model.md#constraint-は理由の所在で決める))
 
 残る指摘は抑制 (waiver) で理由付きで残してあり、`req validate --show-suppressed` で読める。
 **`--strict` を通すために表現を歪めてはいない**。2 件の抑制はすべて理由が書かれ、
@@ -972,16 +1043,15 @@ Python API として再利用できる。`presentation` も `core` を利用す�
 
 | 文書 | 中身 |
 |---|---|
-| [`docs/design/model.md`](docs/design/model.md) | 語尾規則を指示書より緩く取った理由、`constrains` を成熟度検査から外した理由、`Decision` と `conflicts` を置かない理由、型を分ける基準 |
+| [`docs/design/model.md`](docs/design/model.md) | 語尾規則を指示書より緩く取った理由、`constrains` を成熟度検査から外した理由、`Decision` と `conflicts` を置かない理由、型を分ける基準、Constraint を理由の所在で判定する理由 |
 | [`docs/design/site.md`](docs/design/site.md) | 描画エンジンの選定、フォーカスと見送った候補、帯表示、日本語ラベルの折り返し、表示状態の実装、JS の構成 |
 
 ## 非スコープ
 
 **意図して持たないものは Constraint として `requirements.py` にモデル化してある。**
-RDB / 外部ストレージを持たないこと、LLM API を直接呼ばず文脈生成に留めること、
-定義ファイルを実行しないこと、実行時の依存を pydantic だけに保つこと、公開サイトを
-外部への通信なしで表示できるようにすること — いずれも `req doc -o spec.md` の
-「3. 制約」に一覧で出る。ここに散文で書き写すと二重管理になるので置かない。
+モデルの保存と履歴の管理に RDB / 外部ストレージを用いないこと、LLM API を呼び出さないこと、
+定義ファイルを実行しないこと、実行時の依存を pydantic だけに保つこと — いずれも
+`req doc -o spec.md` の「2. 制約」に一覧で出る。ここに散文で書き写すと二重管理になるので置かない。
 
 モデルに載せていない非スコープは次の 3 つ。
 

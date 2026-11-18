@@ -170,6 +170,50 @@ def test_approved_constraint_on_proposed_requirement_is_not_reported():
     assert "structure.status_inconsistent" not in codes(findings)
 
 
+def test_constraint_without_source_is_reported():
+    # Constraint の理由はモデルの外にあり、その所在を示せるのは source だけ
+    graph = build(fr("FR-1"), constraint("Constraint-1", constrains=["FR-1"]))
+    findings = validate_structure(graph)
+    assert "structure.unsourced_constraint" in codes_for(findings, "Constraint-1")
+
+
+def test_source_silences_the_unsourced_constraint():
+    s = source("S-1")
+    graph = build(
+        fr("FR-1"), constraint("Constraint-1", constrains=["FR-1"], source=[s])
+    )
+    findings = validate_structure(graph)
+    assert "structure.unsourced_constraint" not in codes(findings)
+
+
+def test_capability_ending_on_constraint_is_reported():
+    for text in (
+        "公開サイトを外部への通信なしで表示できるようにすること",
+        "閲覧用サイトを外部への通信なしで表示できること",
+        "オフラインでも使えるようにすること。",
+    ):
+        graph = build(constraint("Constraint-1", text=text))
+        findings = validate_semantics_lexical(graph)
+        assert codes(findings) == {"semantics.capability_constraint"}, text
+
+
+def test_prohibitive_and_directive_constraints_are_not_reported():
+    for text in (
+        "LLM API を呼び出さないこと",
+        "外部ホストへ送信しないようにすること",
+        "領収書画像を国内リージョンのストレージにのみ保存すること",
+        "領収書の読み取りに、会社が契約済みの OCR サービスを用いること",
+    ):
+        graph = build(constraint("Constraint-1", text=text))
+        assert list(validate_semantics_lexical(graph)) == [], text
+
+
+def test_capability_ending_is_allowed_on_requirements():
+    # 能力を求めるのは FR / QR の役目なので、語尾を咎めるのは Constraint だけ
+    graph = build(fr("FR-1", text="申請を絞り込めるようにすること"))
+    assert list(validate_semantics_lexical(graph)) == []
+
+
 def test_ambiguous_terms_are_detected():
     graph = build(fr("FR-1", text="検索結果を高速に表示すること"))
     findings = validate_semantics_lexical(graph)

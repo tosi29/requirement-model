@@ -25,7 +25,7 @@ def test_validate_sample_is_clean(capsys):
 def test_validate_json_output(capsys):
     assert main(["validate", "-f", SAMPLE, "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["node_count"] == 14
+    assert payload["node_count"] == 17
     assert payload["structure_checked"] is True
     assert payload["findings"] == []
 
@@ -210,14 +210,14 @@ def test_explain_command(capsys):
     assert main(["explain", "FR-3", "-f", SAMPLE]) == 0
     out = capsys.readouterr().out
     assert "# 影響部分グラフ: FR-3" in out
-    assert "FR-3 --satisfies--> Need-2" in out
+    assert "FR-3 --satisfies--> Need-3" in out
 
 
 def test_explain_json_command(capsys):
     assert main(["explain", "FR-3", "-f", SAMPLE, "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["targets"] == ["FR-3"]
-    assert "Need-2" in payload["descendants"]
+    assert "Need-3" in payload["descendants"]
     assert payload["subgraph"]["nodes"]
 
 
@@ -306,7 +306,7 @@ def test_doc_command_writes_spec(tmp_path: Path):
     text = output.read_text(encoding="utf-8")
     assert text.startswith("# 要求仕様書\n")
     assert "### Goal-1 経費精算にかかる全社の工数を半減する" in text
-    assert "##### FR-1 領収書画像から金額と日付を抽出し" in text
+    assert "##### FR-1 領収書画像から金額と日付を読み取り" in text
 
 
 def test_doc_title_option(capsys):
@@ -338,18 +338,18 @@ def test_stats_command(capsys):
     assert main(["stats", SAMPLE]) == 0
     out = capsys.readouterr().out
     assert out.startswith("# モデル統計\n")
-    assert "- 規模: 14 ノード / 16 エッジ" in out
-    assert "| FunctionalRequirement | 6 | 0 | 0 | 0 | 6 |" in out
-    assert "- Need の充足率 (satisfies されている): 100.0% (3/3)" in out
+    assert "- 規模: 17 ノード / 19 エッジ" in out
+    assert "| FunctionalRequirement | 5 | 0 | 0 | 0 | 5 |" in out
+    assert "- Need の充足率 (satisfies されている): 100.0% (4/4)" in out
 
 
 def test_stats_json_output(capsys):
     assert main(["stats", "-f", SAMPLE, "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["files"] == [SAMPLE]
-    assert payload["totals"]["nodes"] == 14
+    assert payload["totals"]["nodes"] == 17
     assert payload["nodes"]["by_status"] == {
-        "proposed": 14,
+        "proposed": 17,
         "approved": 0,
         "implemented": 0,
         "verified": 0,

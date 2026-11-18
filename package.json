@@ -15,12 +15,12 @@
     "fix:js": "biome check --write"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.6",
-    "@types/node": "^24.19.2",
-    "esbuild": "^0.25.9",
+    "@biomejs/biome": "2.6.7",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
     "happy-dom": "^21.0.4",
     "pyright": "^1.1.414",
-    "tsx": "^4.23.13",
-    "typescript": "^5.9.3"
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
   }
 }

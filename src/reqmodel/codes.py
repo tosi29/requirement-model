@@ -46,6 +46,9 @@ CHECK_CODES: dict[str, CheckCode] = {
         _code("syntax.duplicate_id", 1, "id の重複", False),
         _code("syntax.invalid_field", 1, "属性の値が規約に反する", False),
         _code("semantics.ambiguous_term", 1, "曖昧語", True),
+        _code(
+            "semantics.capability_constraint", 1, "能力を述べる語尾の Constraint", True
+        ),
         # 層2: 構造
         _code("structure.dangling_ref", 2, "参照先ノードが存在しない", False),
         _code("structure.edge_type", 2, "型規則違反エッジ", False),
@@ -59,6 +62,7 @@ CHECK_CODES: dict[str, CheckCode] = {
             "structure.goal_decomposition", 2, "Goal の分解が要求群に到達しない", True
         ),
         _code("structure.unverified_claim", 2, "verified なのに根拠が無い", True),
+        _code("structure.unsourced_constraint", 2, "source の無い Constraint", True),
         _code(
             "structure.status_inconsistent",
             2,

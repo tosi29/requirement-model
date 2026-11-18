@@ -154,7 +154,7 @@ def test_sample_definition_loads_cleanly():
     sample = Path(__file__).resolve().parents[1] / "examples" / "sample.py"
     result = load_paths([sample])
     assert result.ok, [f.format() for f in result.findings]
-    assert len(result.graph) == 14
+    assert len(result.graph) == 17
 
 
 def test_requirement_group_is_loaded_as_presentation_view(tmp_path: Path) -> None:

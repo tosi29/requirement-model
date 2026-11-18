@@ -1,4 +1,4 @@
-"""層2 (構造チェック) と、辞書ベースの曖昧語検出。
+"""層2 (構造チェック) と、語彙で決まる層1 の検出 (曖昧語・Constraint の語尾)。
 
 層0 は astcheck、層1 は Pydantic validator (loader が Finding に変換) が担当する。
 ここは決定的な構造判定だけを行い、意味の判断は一切しない。
@@ -6,11 +6,13 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 
 from ..core.graph import RequirementGraph
 from ..core.metamodel import edge_specs_for
 from ..definition import (
+    Constraint,
     FunctionalRequirement,
     Goal,
     Need,
@@ -30,6 +32,10 @@ __all__ = ["validate_structure", "validate_semantics_lexical", "attach_locations
 #: Constraint が proposed の要求を指すのは成熟度の逆転ではない。
 _STATUS_EDGES = ("satisfies", "refines", "qualifies", "motivates")
 
+#: 能力を述べる語尾 (「〜できること」「〜できるようにすること」「〜使えるようにすること」)。
+#: 「〜しないようにすること」は禁止形なので除く。
+_CAPABILITY_ENDING = re.compile(r"(できる|(?<!ない)ようにする)こと。?$")
+
 
 def validate_structure(graph: RequirementGraph) -> FindingList:
     """層2: 構造チェック一式。"""
@@ -41,6 +47,7 @@ def validate_structure(graph: RequirementGraph) -> FindingList:
     _check_orphan_quality(graph, findings)
     _check_goal_decomposition(graph, findings)
     _check_unverified_claims(graph, findings)
+    _check_unsourced_constraints(graph, findings)
     _check_status_consistency(graph, findings)
     return attach_locations(graph, findings)
 
@@ -285,6 +292,31 @@ def _check_unverified_claims(graph: RequirementGraph, findings: FindingList) -> 
             )
 
 
+def _check_unsourced_constraints(
+    graph: RequirementGraph, findings: FindingList
+) -> None:
+    """Constraint が、どこから課されたかを ``source`` で示しているかを見る。
+
+    Constraint は ``satisfies`` を持たず、Goal → Need の連鎖から理由づけられない。
+    理由がモデルの外にある条件だからこそ Constraint なのであり、その所在を示す
+    場所は ``source`` しか無い。空なら、制約が誰にも課されていないことになる。
+    """
+    for node in graph.by_type(Constraint):
+        if not node.source:
+            findings.add(
+                Finding(
+                    severity="warning",
+                    code="structure.unsourced_constraint",
+                    layer=2,
+                    message=(
+                        "source が無い (制約を課している規程・契約・方針などを書くこと。"
+                        "理由が Need から辿れるなら FR / QR として書くこと)"
+                    ),
+                    node_id=node.id,
+                )
+            )
+
+
 def _check_status_consistency(graph: RequirementGraph, findings: FindingList) -> None:
     """合意済みの構造が、未合意のノードに依存していないかを見る。
 
@@ -355,4 +387,18 @@ def validate_semantics_lexical(graph: RequirementGraph) -> FindingList:
                         node_id=node.id,
                     )
                 )
+        if isinstance(node, Constraint) and _CAPABILITY_ENDING.search(node.text):
+            findings.add(
+                Finding(
+                    severity="warning",
+                    code="semantics.capability_constraint",
+                    layer=1,
+                    message=(
+                        "能力を述べる語尾の Constraint: 制約は禁止形 (〜しないこと)・"
+                        "限定形 (〜にのみ〜こと)・指定形 (〜を用いること) で書き、"
+                        "能力を求めるなら FR / QR として書くこと"
+                    ),
+                    node_id=node.id,
+                )
+            )
     return attach_locations(graph, findings)

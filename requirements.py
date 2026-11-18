@@ -455,7 +455,7 @@ NEED_CI = Need(
 GOAL_LESS_REWORK = Goal(
     id="Goal-1",
     text="要求の不備が後工程で見つかることによる手戻りを減らす",
-    motivates=[NEED_SELF_CHECK, NEED_NO_DANGLING, NEED_CI],
+    motivates=[NEED_SELF_CHECK, NEED_NO_DANGLING, NEED_METRICS, NEED_CI],
     source=[SRC_SPEC, SRC_OWNER, SRC_LEGACY],
     status="approved",
 )
@@ -469,7 +469,7 @@ GOAL_LESS_SURVEY = Goal(
 GOAL_SHARED_UNDERSTANDING = Goal(
     id="Goal-3",
     text="要求の理解が書き手に依存する度合いを下げる",
-    motivates=[NEED_LLM_CONTEXT, NEED_READABLE, NEED_METRICS],
+    motivates=[NEED_LLM_CONTEXT, NEED_READABLE],
     source=[SRC_SPEC, SRC_OWNER, SRC_LEGACY],
     status="approved",
 )
@@ -478,7 +478,7 @@ GOAL_SHARED_UNDERSTANDING = Goal(
 
 FR_AST_ONLY = FunctionalRequirement(
     id="FR-1",
-    text="定義ファイルを実行せず、AST からノード集合を復元すること",
+    text="定義ファイルの宣言だけからノード集合を復元し、宣言以外の構文を報告すること",
     satisfies=[NEED_SELF_CHECK],
     source=[SRC_SPEC],
     status="implemented",
@@ -486,7 +486,7 @@ FR_AST_ONLY = FunctionalRequirement(
     evidence=[EVIDENCE_AST, EVIDENCE_LOADER],
     acceptance_criteria=[
         "for 文・if 文・関数定義を含む定義ファイルは declarative.forbidden として報告される",
-        "ノードの復元に exec と eval のどちらも用いない",
+        "宣言だけから成る定義ファイルでは、宣言したノードがすべて復元される",
     ],
 )
 FR_SYNTAX = FunctionalRequirement(
@@ -653,7 +653,7 @@ FR_DOC = FunctionalRequirement(
 )
 FR_SITE = FunctionalRequirement(
     id="FR-12",
-    text="外部の実行環境を要さない 1 枚の HTML として、閲覧用サイトを生成すること",
+    text="モデルから、ブラウザで閲覧できる静的サイトを生成すること",
     satisfies=[NEED_READABLE],
     source=[
         SRC_OWNER,
@@ -693,22 +693,12 @@ FR_SITE = FunctionalRequirement(
     acceptance_criteria=[
         "生成物を静的ファイルとして配るだけでブラウザから閲覧できる",
         "ノードを選ぶと影響範囲が色分けされ、指摘の一覧から該当ノードへ飛べる",
-        "図は SVG DOM として描画され、表示中の図をそのまま SVG ファイルに保存できる",
-        "書き出し形式のメニューはペインや画面の端で切れず、形式を選択できる",
-        "ダークテーマでは明色の文字に暗色のノード背景、ライトテーマではその逆を使用する",
-        "グラフのパン操作では選択中のノードを維持する",
-        "エッジは帯の再配置後のノード座標から短い曲線として描く",
-        "Requirements 段は機能枠内のノードだけを幅制限で折り返し、機能枠自体は同じ段に並べる",
-        "Goal と Need は、横に並べた全 Requirements 機能枠の外端と同じ幅へ揃える",
-        "Goal と Need は折り返さず、dagre の並び順だけを使って不要な横方向の空白を詰める",
-        "Requirements の各機能枠はグループ数にかかわらず個別の最大幅まで使用できる",
-        "中央上部にはビュー切替と共通操作だけを置き、グラフ専用操作と出力はグラフ領域内に置く",
-        "テーブル表示中はグラフ専用操作と図のダウンロードを表示せず、グラフ領域内の操作はアイコンと title / aria-label で確認できる",
+        "表示中の図を SVG ファイルとして保存できる",
     ],
 )
 FR_FIT_WHOLE = FunctionalRequirement(
     id="FR-13",
-    text=("図の初期表示でグラフ全体を 1 画面に収め、この表示は俯瞰の用途に限ること"),
+    text="図の初期表示で、グラフ全体を 1 画面に収めること",
     refines=[FR_SITE],
     satisfies=[NEED_READABLE],
     source=[SRC_OWNER, ISSUE_SCALE],
@@ -757,21 +747,6 @@ FR_PERMALINK = FunctionalRequirement(
         "解釈できない値は黙って捨て、読み込み後の URL は解釈できた形に直る",
     ],
 )
-FR_SITE_DOM_SAFETY = FunctionalRequirement(
-    id="FR-31",
-    text="閲覧用サイトはモデル由来の値をHTMLとして解釈せず、安全なURLだけをリンクにすること",
-    refines=[FR_SITE],
-    satisfies=[NEED_READABLE],
-    source=[SRC_OWNER, ISSUE_DOM_XSS],
-    status="implemented",
-    realized_by=[PR_DOM_XSS],
-    evidence=[EVIDENCE_SITE],
-    acceptance_criteria=[
-        "動的なUI生成はDOM APIとtextContentを用い、innerHTMLへモデル値を渡さない",
-        "外部参照と出所のリンクはhttps、http、about schemeだけを許可する",
-        "HTMLタグを含むnode id、本文、外部参照、指摘は文字列として表示される",
-    ],
-)
 FR_STATS = FunctionalRequirement(
     id="FR-16",
     text="ノード数・エッジ数・充足率・曖昧語密度を数え、判定を伴わない形で出すこと",
@@ -812,6 +787,20 @@ FR_STATUS_BY_TYPE = FunctionalRequirement(
         "Goal・Need・Constraint では proposed と approved だけを許可する",
         "FR・QR では proposed・approved・implemented・verified を許可する",
         "合意済みノードから proposed ノードへの参照を structure.status_inconsistent として報告する",
+    ],
+)
+
+FR_CONSTRAINT_FORM = FunctionalRequirement(
+    id="FR-32",
+    text="source の無い Constraint と、能力を述べる語尾の Constraint を warning として報告すること",
+    satisfies=[NEED_SELF_CHECK],
+    source=[SRC_OWNER, SRC_IREB],
+    status="implemented",
+    evidence=[EVIDENCE_VALIDATE],
+    acceptance_criteria=[
+        "source が空の Constraint は structure.unsourced_constraint として報告される",
+        "「〜できるようにすること」で終わる Constraint は semantics.capability_constraint として報告される",
+        "「〜しないようにすること」で終わる Constraint と、FR・QR の能力の語尾は報告されない",
     ],
 )
 
@@ -858,7 +847,7 @@ FR_MCP = FunctionalRequirement(
 FR_MORE_CHECKS = FunctionalRequirement(
     id="FR-21",
     text="測定不能な QR・status の後退・id の命名規則違反を検査すること",
-    satisfies=[NEED_NO_DANGLING],
+    satisfies=[NEED_SELF_CHECK],
     source=[SRC_OWNER, SRC_IREB, ISSUE_MORE_CHECKS],
     acceptance_criteria=[
         "数値を含まない QR の text が報告される",
@@ -901,17 +890,15 @@ FR_ID_COLLISION = FunctionalRequirement(
 )
 FR_SOURCE_AS_ATTRIBUTE = FunctionalRequirement(
     id="FR-25",
-    text=("源泉を図に描かず、参照元ノードの属性として引用文・位置・引用元まで出すこと"),
+    text="ノードの説明に、そのノードの外部参照 (源泉・実現箇所・根拠) の題名・補足・URL を併記すること",
     satisfies=[NEED_READABLE, NEED_LLM_CONTEXT],
     source=[SRC_OWNER, ISSUE_SOURCE_ATTRIBUTE, ISSUE_REFERENCE],
     status="implemented",
     realized_by=[PR_SOURCE_ATTRIBUTE, PR_REFERENCE, PR_REFERENCE_CLEANUP],
     evidence=[EVIDENCE_EXPLAIN, EVIDENCE_SITE],
     acceptance_criteria=[
-        "既定の Mermaid / DOT 出力に外部参照用のノードやエッジが現れない",
         "req explain の各ノードに Source / Realized by / Evidence の Reference 行が出る",
         "閲覧用サイトの詳細ペインに外部参照欄が出る",
-        "Source ノードを表示に戻すための --with-sources オプションは存在しない",
     ],
 )
 FR_FOCUS = FunctionalRequirement(
@@ -932,17 +919,10 @@ FR_FOCUS = FunctionalRequirement(
         ),
     ],
     acceptance_criteria=[
-        "深さ (1〜3 ホップ) を選ぶと、図に描かれるのは選択ノードの近傍だけになる",
         "グラフでノードを選択してフォーカス分析タブに入ると、影響するノードとその間のエッジだけが表示される",
-        "分析では常に上流と下流の両方を描き、要求グループではなく上流・下流の枠で区別する",
-        "深さと種別・status・エッジの絞り込みが分析の探索に効く",
-        "図内の別のノードを選んでも起点・配置・パン・倍率は変わらず、detail の対象と経路の強調だけが変わる",
-        "detail の対象と、表示範囲内で起点を結ぶ接続するすべての経路のノード・エッジが強調される",
-        "左のノード一覧・検索・指摘は通常画面と同じ範囲を保ち、そこで選ぶと分析の起点が切り替わる",
-        "詳細の件数とコピー本文は detail の対象と影響範囲設定に従い、描画範囲では切らない",
-        "操作アイコン・パン・ズーム・再配置・書き出し・凡例はグラフ画面と共通である",
-        "フォーカスの起点・範囲・detail の対象を URL で復元できる",
-        "背景クリックでは起点を解除せず、グラフタブ・Esc で起点を選択した通常グラフに戻る",
+        "深さ (1〜3 ホップ) を選ぶと、図に描かれるのは起点からその深さまでのノードだけになる",
+        "図内の別のノードを選んでも起点は変わらず、詳細の対象と経路の強調だけが変わる",
+        "詳細の対象と起点を結ぶ経路のノードとエッジが強調される",
     ],
 )
 
@@ -983,8 +963,37 @@ QR_KEYBOARD = QualityRequirement(
         "フォーカスの位置がマウス操作以外では常に見える",
     ],
 )
+QR_SITE_DOM_SAFETY = QualityRequirement(
+    id="QR-5",
+    text=(
+        "閲覧用サイトで、モデル由来の値を HTML として解釈せず、"
+        "https・http・about の scheme の URL だけをリンクにすること"
+    ),
+    qualifies=[FR_SITE],
+    source=[SRC_OWNER, ISSUE_DOM_XSS],
+    status="implemented",
+    realized_by=[PR_DOM_XSS],
+    evidence=[EVIDENCE_SITE],
+    acceptance_criteria=[
+        "HTML タグを含む node id・本文・外部参照・指摘は文字列として表示される",
+        "javascript: scheme の URL はリンクにならない",
+    ],
+)
+QR_OFFLINE_SITE = QualityRequirement(
+    id="QR-6",
+    text="描画ライブラリを同梱して生成した閲覧用サイトを、外部ホストへ 1 件も通信せずに表示できること",
+    qualifies=[FR_SITE],
+    source=[SRC_OWNER],
+    status="implemented",
+    acceptance_criteria=[
+        "--assets local で生成し、出力先に描画ライブラリを置いたサイトは、"
+        "ネットワークを遮断したブラウザでもグラフとテーブルを表示できる",
+    ],
+)
 
 # --- 制約 -------------------------------------------------------------------
+# 理由が Need から辿れず、要求モデルの外 (ここでは実装指示書 #1) から課された条件。
+# 禁止形・限定形・指定形で書く。
 
 CONSTRAINT_NO_EXEC = Constraint(
     id="Constraint-1",
@@ -1002,21 +1011,14 @@ CONSTRAINT_PYDANTIC_ONLY = Constraint(
 )
 CONSTRAINT_GIT_ONLY = Constraint(
     id="Constraint-3",
-    text="履歴とレビューの基盤を Git に置き、RDB と外部ストレージを持たないこと",
+    text="モデルの保存と履歴の管理に、RDB と外部ストレージを用いないこと",
     constrains=[FR_PLAN],
     source=[SRC_SPEC],
     status="approved",
 )
-CONSTRAINT_OFFLINE_SITE = Constraint(
-    id="Constraint-4",
-    text="公開する閲覧用サイトを、外部への通信なしで表示できるようにすること",
-    constrains=[FR_SITE],
-    source=[SRC_OWNER],
-    status="approved",
-)
 CONSTRAINT_NO_LLM_CALL = Constraint(
     id="Constraint-5",
-    text="LLM API を直接呼ばず、LLM に渡す文脈の生成までに留めること",
+    text="LLM API を呼び出さないこと",
     constrains=[FR_EXPLAIN, FR_MCP],
     source=[SRC_SPEC],
     status="approved",
@@ -1038,6 +1040,7 @@ GROUP_VALIDATION = RequirementGroup(
         FR_WAIVER,
         FR_EXIT_CODE,
         FR_STATUS_BY_TYPE,
+        FR_CONSTRAINT_FORM,
         CONSTRAINT_NO_EXEC,
     ],
 )
@@ -1063,7 +1066,6 @@ GROUP_PRESENTATION = RequirementGroup(
         FR_FIT_WHOLE,
         FR_TABLE,
         FR_PERMALINK,
-        FR_SITE_DOM_SAFETY,
         FR_STATS,
         FR_MCP,
         FR_SVG,
@@ -1073,7 +1075,8 @@ GROUP_PRESENTATION = RequirementGroup(
         QR_READABLE_ZOOM,
         QR_SITE_CLI_PARITY,
         QR_KEYBOARD,
+        QR_SITE_DOM_SAFETY,
+        QR_OFFLINE_SITE,
         CONSTRAINT_PYDANTIC_ONLY,
-        CONSTRAINT_OFFLINE_SITE,
     ],
 )

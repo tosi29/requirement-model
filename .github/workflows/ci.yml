@@ -25,7 +25,7 @@ jobs:
         with:
           python-version-file: .python-version
 
-      - uses: astral-sh/setup-uv@v10.3.3
+      - uses: astral-sh/setup-uv@v10.4.0
 
       - name: uv のロック済み環境を作成する
         run: uv sync --locked
@@ -45,7 +45,7 @@ jobs:
           (github.event_name != 'pull_request' ||
            (github.event.pull_request.head.repo.full_name == github.repository &&
             github.actor != 'dependabot[bot]'))
-        uses: github/codeql-action/upload-sarif@v4.39.3
+        uses: github/codeql-action/upload-sarif@v4.39.4
         with:
           sarif_file: reqmodel.sarif
           category: reqmodel
@@ -64,7 +64,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - uses: astral-sh/setup-uv@v10.3.3
+      - uses: astral-sh/setup-uv@v10.4.0
 
       - name: uv と npm のロック済み環境を作成する
         run: |
